@@ -1,0 +1,760 @@
+#ifdef SWIG
+%include "petsc4py/petsc4py.i"
+#endif
+
+#ifndef MY_DEFS
+#define MY_DEFS
+#define FUNCTIONALNAME {{ functionalname }}
+
+{% if facet_direc == 0 %}
+#define i1 (i - 1) 
+{% else %}
+#define i1 (i) 
+{% endif %}
+{% if facet_direc == 1 %}
+#define j1 (j - 1) 
+{% else %}
+#define j1 (j) 
+{% endif %}
+{% if facet_direc == 2 %}
+#define k1 (k - 1) 
+{% else %}
+#define k1 (k) 
+{% endif %}
+
+#define i2 (i)
+#define j2 (j)
+#define k2 (k)
+
+#define outward_normal(c,d1) outward_normals[c-1][d1]
+
+ {% if formdim == 2 %}
+#define CLEAR_VALS11 ierr = PetscMemzero(vals1,sizeof(PetscScalar\
+    [{{ nbasis1_x }}][{{ nbasis1_y }}][{{ nbasis1_z }}]\
+    [{{ nbasis2_x }}][{{ nbasis2_y }}][{{ nbasis2_z }}])); CHKERRQ(ierr);
+#define CLEAR_VALS12 ierr = PetscMemzero(vals2,sizeof(PetscScalar\
+    [{{ nbasis1_x }}][{{ nbasis1_y }}][{{ nbasis1_z }}]\
+    [{{ nbasis2_x }}][{{ nbasis2_y }}][{{ nbasis2_z }}])); CHKERRQ(ierr);
+#define CLEAR_VALS21 ierr = PetscMemzero(vals3,sizeof(PetscScalar\
+    [{{ nbasis1_x }}][{{ nbasis1_y }}][{{ nbasis1_z }}]\
+    [{{ nbasis2_x }}][{{ nbasis2_y }}][{{ nbasis2_z }}])); CHKERRQ(ierr);
+#define CLEAR_VALS22 ierr = PetscMemzero(vals4,sizeof(PetscScalar\
+    [{{ nbasis1_x }}][{{ nbasis1_y }}][{{ nbasis1_z }}]\
+    [{{ nbasis2_x }}][{{ nbasis2_y }}][{{ nbasis2_z }}])); CHKERRQ(ierr);
+{% endif %}
+
+ {% if formdim == 1 %}
+#define CLEAR_VALS11 ierr = PetscMemzero(vals1,sizeof(PetscScalar\
+    [{{ nbasis1_x }}][{{ nbasis1_y }}][{{ nbasis1_z }}])); CHKERRQ(ierr);
+#define CLEAR_VALS22 ierr = PetscMemzero(vals2,sizeof(PetscScalar\
+    [{{ nbasis1_x }}][{{ nbasis1_y }}][{{ nbasis1_z }}])); CHKERRQ(ierr);
+{% endif %}
+
+# define CLEAR_COEFFS ierr = PetscMemzero(coeffs,sizeof(PetscScalar\
+    [{{ npts_x }}][{{ npts_y }}][{{ npts_z }}])); CHKERRQ(ierr);
+# define CLEAR_COEFFS2 ierr = PetscMemzero(coeffs2,sizeof(PetscScalar\
+    [{{ npts_x }}][{{ npts_y }}][{{ npts_z }}])); CHKERRQ(ierr);
+# define CLEAR_COEFFST ierr = PetscMemzero(coeffsT,sizeof(PetscScalar\
+    [{{ npts_x }}][{{ npts_y }}][{{ npts_z }}][{{ ndim }}])); CHKERRQ(ierr);
+
+#define LOOP_BASIS1 for (nx=0;nx<{{ nbasis1_x }};nx++) { \
+                    for (ny=0;ny<{{ nbasis1_y }};ny++) { \
+                    for (nz=0;nz<{{ nbasis1_z }};nz++) {
+#define LOOP_BASIS2 for (mx=0;mx<{{ nbasis2_x }};mx++) { \
+                    for (my=0;my<{{ nbasis2_y }};my++) { \
+                    for (mz=0;mz<{{ nbasis2_z }};mz++) {
+
+{% if facet_direc == 0 %}
+#define LOOP_QUAD   for (qy=0;qy<{{ npts_y }};qy++) { \
+                    for (qz=0;qz<{{ npts_z }};qz++) { 
+{% endif %}
+{% if facet_direc == 1 %}
+#define LOOP_QUAD   for (qx=0;qx<{{ npts_x }};qx++) { \
+                    for (qz=0;qz<{{ npts_z }};qz++) { 
+{% endif %}
+{% if facet_direc == 2 %}
+#define LOOP_QUAD   for (qx=0;qx<{{ npts_x }};qx++) { \
+                    for (qy=0;qy<{{ npts_y }};qy++) { 
+{% endif %}
+
+#define LOOP_DIMS for (t=0;t<{{ ndim }};t++) { 
+#define LOOP_DIMS2 for (t=0;t<{{ ndim }};t++) { \
+					for (o=0;o<{{ ndim }};o++) {	
+#define END_QUAD }}
+#define END_FIELD }}}
+#define END_BASIS1 }}}
+#define END_BASIS2 }}}
+#define END_DIMS2 }}
+#define END_DIMS }
+{% if formdim == 2 %}
+#define vals11 vals1[nx][ny][nz][mx][my][mz]
+#define vals12 vals2[nx][ny][nz][mx][my][mz]
+#define vals21 vals3[nx][ny][nz][mx][my][mz]
+#define vals22 vals4[nx][ny][nz][mx][my][mz]
+{% endif %}
+
+{% if formdim == 1 %}
+#define vals11 vals1[nx][ny][nz]
+#define vals22 vals2[nx][ny][nz]
+{% endif %}
+
+{% if facet_direc == 0 %}
+#define quads(c) [c-1][qy][qz]
+#define singlequads(c) [qz + {{ npts_z }} * (qy + {{ npts_y }} * (c-1))]
+#define singlequadsv(c,d1) [d1 + {{ ndim }} * (qz + {{ npts_z }} * (qy + {{ npts_y }} * (c-1)))]
+#define singlequadst(c,d1,d2) [d2 + {{ ndim }} * (d1 + {{ ndim }} * (qz + {{ npts_z }} * (qy + {{ npts_y }} * (c-1))))] 
+{% endif %}
+{% if facet_direc == 1 %}
+#define quads(c) [qx][c-1][qz]
+#define singlequads(c) [qz + {{ npts_z }} * ((c-1) + {{ npts_y }} * qx)]
+#define singlequadsv(c,d1) [d1 + {{ ndim }} * (qz + {{ npts_z }} * ((c-1) + {{ npts_y }} * qx))]
+#define singlequadst(c,d1,d2) [d2 + {{ ndim }} * (d1 + {{ ndim }} * (qz + {{ npts_z }} * ((c-1) + {{ npts_y }} * qx)))] 
+{% endif %}
+{% if facet_direc == 2 %}
+#define quads(c) [qx][qy][c-1]
+#define singlequads(c) [(c-1) + {{ npts_z }} * (qy + {{ npts_y }} * qx)]
+#define singlequadsv(c,d1) [d1 + {{ ndim }} * ((c-1) + {{ npts_z }} * (qy + {{ npts_y }} * qx))]
+#define singlequadst(c,d1,d2) [d2 + {{ ndim }} * (d1 + {{ ndim }} * ((c-1) + {{ npts_z }} * (qy + {{ npts_y }} * qx)))] 
+{% endif %}
+
+#define b1(c) basis1[nx][ny][nz] quads(c)
+#define d1(c) derivs1[nx][ny][nz] quads(c)
+#define b2(c) basis2[mx][my][mz] quads(c)
+#define d2(c) derivs2[mx][my][mz] quads(c)
+#define wb1(c) weighted_basis1[nx][ny][nz] quads(c)
+#define wd1(c) weighted_derivs1[nx][ny][nz] quads(c)
+#define wb2(c) weighted_basis2[mx][my][mz] quads(c)
+#define wd2(c) weighted_derivs2[mx][my][mz] quads(c)
+#define wq(c) wts quads(c)
+
+#define NBASIS1 {{ nbasis1_x }} * {{ nbasis1_y }} * {{ nbasis1_z }}
+#define NBASIS2 {{ nbasis2_x }} * {{ nbasis2_y }} * {{ nbasis2_z }}
+#define NPTS {{ npts_x }}  * {{ npts_y }} * {{ npts_z }}
+#define ND2 {{ ndim }} * {{ ndim }} 
+#define ND {{ ndim }}
+
+ {% if ndim == 1 %}
+ #define SCALARINDICES(c) [i] singlequads(c)
+ #define VECTORINDICES(c,d1) [i] singlequadsv(c,d1)
+ #define TENSORINDICES(c,d1,d2) [i] singlequadst(c,d1,d2)
+       {% endif %}
+ {% if ndim == 2 %}
+ #define SCALARINDICES(c) [j][i] singlequads(c)
+ #define VECTORINDICES(c,d1) [j][i] singlequadsv(c,d1)
+ #define TENSORINDICES(c,d1,d2) [j][i] singlequadst(c,d1,d2)
+       {% endif %}
+ {% if ndim == 3 %}
+ #define SCALARINDICES(c) [k][j][i] singlequads(c)
+ #define VECTORINDICES(c,d1) [k][j][i] singlequadsv(c,d1)
+ #define TENSORINDICES(c,d1,d2) [k][j][i] singlequadst(c,d1,d2)
+       {% endif %}
+       
+#endif
+
+{%macro COMPUTE_FIELD(fieldname,func,ci,cell) -%}
+{%set fieldstring = fieldname~'_'~ci %}
+{%set offset_mult = fieldstring~'_offset_mult' %}
+{%set offset = fieldstring~'_offsets' %}
+
+{% if cell == 1 %}
+#define kk (k1 *{{ offset_mult }}[lx][ly][lz][2] + {{ offset }}[lx][ly][lz][2]) 
+#define jj (j1 *{{ offset_mult }}[lx][ly][lz][1] + {{ offset }}[lx][ly][lz][1]) 
+#define ii (i1 *{{ offset_mult }}[lx][ly][lz][0] + {{ offset }}[lx][ly][lz][0]) 
+{% endif %}
+{% if cell == 2 %}
+#define kk (k2 *{{ offset_mult }}[lx][ly][lz][2] + {{ offset }}[lx][ly][lz][2]) 
+#define jj (j2 *{{ offset_mult }}[lx][ly][lz][1] + {{ offset }}[lx][ly][lz][1]) 
+#define ii (i2 *{{ offset_mult }}[lx][ly][lz][0] + {{ offset }}[lx][ly][lz][0]) 
+{% endif %}
+
+{{ func }}=0.;
+for (lx=0;lx<{{ fielddict[fieldname].nbasis_x[ci] }};lx++){
+for (ly=0;ly<{{ fielddict[fieldname].nbasis_y[ci] }};ly++){
+for (lz=0;lz<{{ fielddict[fieldname].nbasis_z[ci] }};lz++){
+{% if fielddict[fieldname].ndim == 3 %}
+{{ func }} += {{ 'data_'~fieldstring }}[kk][jj][ii] * {{ fieldstring~'_basis' }}[lx][ly][lz] quads({{ cell }});
+{% endif %}
+{% if fielddict[fieldname].ndim == 2 %}
+{{ func }} += {{ 'data_'~fieldstring }}[jj][ii] * {{ fieldstring~'_basis' }}[lx][ly][lz] quads({{ cell }});
+{% endif %}
+{% if fielddict[fieldname].ndim == 1 %}
+{{ func }} += {{ 'data_'~fieldstring }}[ii] * {{ fieldstring~'_basis' }}[lx][ly][lz] quads({{ cell }});
+{% endif %}
+}}}
+#undef ii
+#undef jj
+#undef kk
+{% endmacro %}
+
+{%macro COMPUTE_DERIV(fieldname,func,d,ci,cell) -%}
+{%set fieldstring = fieldname~'_'~ci %}
+{%set offset_mult = fieldstring~'_offset_mult' %}
+{%set offset = fieldstring~'_offsets' %}
+
+{% if cell == 1 %}
+#define kk (k1 *{{ offset_mult }}[lx][ly][lz][2] + {{ offset }}[lx][ly][lz][2]) 
+#define jj (j1 *{{ offset_mult }}[lx][ly][lz][1] + {{ offset }}[lx][ly][lz][1]) 
+#define ii (i1 *{{ offset_mult }}[lx][ly][lz][0] + {{ offset }}[lx][ly][lz][0]) 
+{% endif %}
+{% if cell == 2 %}
+#define kk (k2 *{{ offset_mult }}[lx][ly][lz][2] + {{ offset }}[lx][ly][lz][2]) 
+#define jj (j2 *{{ offset_mult }}[lx][ly][lz][1] + {{ offset }}[lx][ly][lz][1]) 
+#define ii (i2 *{{ offset_mult }}[lx][ly][lz][0] + {{ offset }}[lx][ly][lz][0]) 
+{% endif %}
+
+{{ func }}=0.;
+for (lx=0;lx<{{ fielddict[fieldname].nbasis_x[ci] }};lx++){
+for (ly=0;ly<{{ fielddict[fieldname].nbasis_y[ci] }};ly++){
+for (lz=0;lz<{{ fielddict[fieldname].nbasis_z[ci] }};lz++){
+{% if fielddict[fieldname].ndim == 3 %}
+{{ func }} += {{ 'data_'~fieldstring }}[kk][jj][ii] * {{ fieldstring~'_derivs' }}[lx][ly][lz] quads({{ cell }}) [{{ d }}];
+{% endif %}
+{% if fielddict[fieldname].ndim == 2 %}
+{{ func }} += {{ 'data_'~fieldstring }}[jj][ii] * {{ fieldstring~'_derivs' }}[lx][ly][lz] quads({{ cell }}) [{{ d }}];
+{% endif %}
+{% if fielddict[fieldname].ndim == 1 %}
+{{ func }} += {{ 'data_'~fieldstring }}[ii] * {{ fieldstring~'_derivs' }}[lx][ly][lz] quads({{ cell }}) [{{ d }}];
+{% endif %}
+}}}
+#undef ii
+#undef jj
+#undef kk
+{% endmacro %}
+
+{%macro SETVALS(cell) -%}
+{% if cell == 1 %}
+#define kk (k1 *offset_mult1[lx][ly][lz][2] + offsets1[lx][ly][lz][2]) 
+#define jj (j1 *offset_mult1[lx][ly][lz][1] + offsets1[lx][ly][lz][1]) 
+#define ii (i1 *offset_mult1[lx][ly][lz][0] + offsets1[lx][ly][lz][0]) 
+#define vals vals1[lx][ly][lz];
+{% endif %}
+{% if cell == 2 %}
+#define kk (k2 *offset_mult1[lx][ly][lz][2] + offsets1[lx][ly][lz][2]) 
+#define jj (j2 *offset_mult1[lx][ly][lz][1] + offsets1[lx][ly][lz][1]) 
+#define ii (i2 *offset_mult1[lx][ly][lz][0] + offsets1[lx][ly][lz][0]) 
+#define vals vals2[lx][ly][lz];
+{% endif %}
+for (lx=0;lx<{{ nbasis1_x }};lx++) {
+for (ly=0;ly<{{ nbasis1_y }};ly++) {
+for (lz=0;lz<{{ nbasis1_z }};lz++) {
+{% if ndim == 1 %}
+data_v[ii] += vals;
+{% endif %}
+{% if ndim == 2 %}
+data_v[jj][ii] += vals;
+{% endif %}
+{% if ndim == 3 %}
+data_v[kk][jj][ii] += vals;
+{% endif %}
+}}}
+#undef ii
+#undef jj
+#undef kk
+#undef vals
+{% endmacro %}
+
+#include <petsc.h>
+#include "math.h"
+#include <stdio.h>
+#include <numpy/arrayobject.h>
+
+ {% if formdim == 2 %}
+PetscErrorCode assemble(DM da, DM s1da, DM s2da, Mat A {{ fieldargs }}  {{ geometryargs }} {{ coefficientargs }})
+{% endif %}
+ {% if formdim == 1 %}
+PetscErrorCode assemble(DM da, DM s1da, Vec v {{ fieldargs }}  {{ geometryargs }} {{ coefficientargs }}) 
+{% endif %}
+ {% if formdim == 0 %}
+ {% if layered == 1 %}
+PetscScalar assemble(DM da, PetscInt layerindex {{ fieldargs }}  {{ geometryargs }} {{ coefficientargs }})
+{% endif %}
+ {% if layered == 0 %}
+PetscScalar assemble(DM da {{ fieldargs }}  {{ geometryargs }} {{ coefficientargs }})
+{% endif %}
+{% endif %}
+{% if evaluate == 1 %}
+PetscScalar evaluate(DM da {{ fieldargs }}  {{ geometryargs }} {{ coefficientargs }} {{ valsargs }})
+{% endif %}
+{
+
+ {% if formdim == 2 %}
+ PetscScalar	vals1[{{ nbasis1_x }}][{{ nbasis1_y }}][{{ nbasis1_z }}][{{ nbasis2_x }}][{{ nbasis2_y }}][{{ nbasis2_z }}] = { { { { { {0.,},},},},},};
+ PetscScalar	vals2[{{ nbasis1_x }}][{{ nbasis1_y }}][{{ nbasis1_z }}][{{ nbasis2_x }}][{{ nbasis2_y }}][{{ nbasis2_z }}] = { { { { { {0.,},},},},},};
+ PetscScalar	vals3[{{ nbasis1_x }}][{{ nbasis1_y }}][{{ nbasis1_z }}][{{ nbasis2_x }}][{{ nbasis2_y }}][{{ nbasis2_z }}] = { { { { { {0.,},},},},},};
+ PetscScalar	vals4[{{ nbasis1_x }}][{{ nbasis1_y }}][{{ nbasis1_z }}][{{ nbasis2_x }}][{{ nbasis2_y }}][{{ nbasis2_z }}] = { { { { { {0.,},},},},},};
+ {% endif %}
+ {% if formdim == 1 %}
+ PetscScalar	vals1[{{ nbasis1_x }}][{{ nbasis1_y }}][{{ nbasis1_z }}]= { { {0.,},},};
+ PetscScalar	vals2[{{ nbasis1_x }}][{{ nbasis1_y }}][{{ nbasis1_z }}]= { { {0.,},},};
+ {% endif %}
+ {% if formdim == 0 %}
+ PetscScalar	vals = 0.0;
+ PetscScalar s = 0.0;
+ {% endif %}
+
+  PetscScalar functional,functional2;
+
+ {% if formdim == 2 %}
+  PetscInt     cols1[{{ nbasis2_x }}][{{ nbasis2_y }}][{{ nbasis2_z }}],rows1[{{ nbasis1_x }}][{{ nbasis1_y }}][{{ nbasis1_z }}];
+  PetscInt     cols2[{{ nbasis2_x }}][{{ nbasis2_y }}][{{ nbasis2_z }}],rows2[{{ nbasis1_x }}][{{ nbasis1_y }}][{{ nbasis1_z }}];
+ {% endif %}
+ 
+ {% if formdim == 1 %}
+  {% if ndim == 1 %}
+ PetscScalar *data_v;
+      {% endif %}
+ {% if ndim == 2 %}
+ PetscScalar **data_v;
+      {% endif %}
+ {% if ndim == 3 %}
+ PetscScalar ***data_v;
+      {% endif %}
+ {% endif %}
+ 
+  PetscErrorCode ierr;
+  PetscInt i,j,k; //spatial loop indices
+ // PetscInt iadj,jadj,kadj;
+   PetscInt lx,ly,lz; //rows/cols indices
+  PetscInt qx,qy,qz; //quadrature pt indices
+  PetscInt nx,ny,nz,mx,my,mz; //basis function indices
+  PetscInt t,o; //dimension indices
+  PetscInt xs,xm,ys,ym,zs,zm,xmax,ymax,zmax; 
+  PetscInt icoord,jcoord,kcoord;
+  PetscInt upper_boundary = 0;
+  PetscInt lower_boundary = 0;
+   {% if formdim >= 1 %}
+  PetscInt x1s,x1m,y1s,y1m,z1s,z1m,x1max,y1max,z1max,swidth1; 
+   {% endif %}
+ {% if formdim == 2 %}
+  PetscInt x2s,x2m,y2s,y2m,z2s,z2m,x2max,y2max,z2max,swidth2; 
+ {% endif %}
+ 
+	//set outward normals for right (2) and left (1) cells
+    {% if ndim == 1 %}
+const PetscScalar outward_normals[2][1] = { { 1., }, { -1.,}};
+ {% endif %}
+   {% if ndim == 2 %}
+ {% if facet_direc == 0 %}
+const PetscScalar outward_normals[2][2] = { { 1.,0. }, { -1.,0.}};
+ {% endif %}
+ {% if facet_direc == 1 %}
+const PetscScalar outward_normals[2][2] = { { 0.,1. }, { 0.,-1.}};
+ {% endif %}
+  {% endif %}
+   {% if ndim == 3 %}
+ {% if facet_direc == 0 %}
+const PetscScalar outward_normals[2][3] = { { 1.,0.,0. }, { -1.,0.,0.}};
+ {% endif %}
+ {% if facet_direc == 1 %}
+const PetscScalar outward_normals[2][3] = { { 0.,1.,0. }, { 0.,-1.,0.}};
+ {% endif %}
+ {% if facet_direc == 2 %}
+const PetscScalar outward_normals[2][3] = { { 0.,0.,1. }, { 0.,0.,-1.}};
+ {% endif %}
+ {% endif %}
+
+const PetscScalar wts[{{ npts_x }}][{{ npts_y }}][{{ npts_z }}] = {{ wts }};
+
+ {% if formdim == 2 %}
+const PetscScalar basis2[{{ nbasis2_x }}][{{ nbasis2_y }}][{{ nbasis2_z }}][{{ npts_x }}][{{ npts_y }}][{{ npts_z }}] = {{ basis2 }};
+const PetscScalar weighted_basis2[{{ nbasis2_x }}][{{ nbasis2_y }}][{{ nbasis2_z }}][{{ npts_x }}][{{ npts_y }}][{{ npts_z }}] = {{ weighted_basis2 }};
+const PetscInt offsets2[{{ nbasis2_x }}][{{ nbasis2_y }}][{{ nbasis2_z }}][3] = {{ offsets2 }};
+const PetscInt offset_mult2[{{ nbasis2_x }}][{{ nbasis2_y }}][{{ nbasis2_z }}][3] = {{ offset_mult2 }};
+const PetscScalar derivs2[{{ nbasis2_x }}][{{ nbasis2_y }}][{{ nbasis2_z }}][{{ npts_x }}][{{ npts_y }}][{{ npts_z }}][3]  = {{ derivs2 }};
+const PetscScalar weighted_derivs2[{{ nbasis2_x }}][{{ nbasis2_y }}][{{ nbasis2_z }}][{{ npts_x }}][{{ npts_y }}][{{ npts_z }}][3] = {{ weighted_derivs2 }};
+  {% endif %}
+ {% if formdim >= 1 %}
+const PetscScalar basis1[{{ nbasis1_x }}][{{ nbasis1_y }}][{{ nbasis1_z }}][{{ npts_x }}][{{ npts_y }}][{{ npts_z }}] = {{ basis1 }};
+const PetscScalar weighted_basis1[{{ nbasis1_x }}][{{ nbasis1_y }}][{{ nbasis1_z }}][{{ npts_x }}][{{ npts_y }}][{{ npts_z }}] = {{ weighted_basis1 }};
+const PetscInt offsets1[{{ nbasis1_x }}][{{ nbasis1_y }}][{{ nbasis1_z }}][3] = {{ offsets1 }};
+const PetscInt offset_mult1[{{ nbasis1_x }}][{{ nbasis1_y }}][{{ nbasis1_z }}][3] = {{ offset_mult1 }};
+const PetscScalar derivs1[{{ nbasis1_x }}][{{ nbasis1_y }}][{{ nbasis1_z }}][{{ npts_x }}][{{ npts_y }}][{{ npts_z }}][3] = {{ derivs1 }};
+const PetscScalar weighted_derivs1[{{ nbasis1_x }}][{{ nbasis1_y }}][{{ nbasis1_z }}][{{ npts_x }}][{{ npts_y }}][{{ npts_z }}][3] = {{ weighted_derivs1 }};
+  {% endif %}
+
+ {% for field in fielddict.values() %}
+ {% for k in range(field.ncomp) %}
+ const   PetscScalar {{field.name}}_{{k}}_basis[{{ field.nbasis_x[k] }}][{{ field.nbasis_y[k] }}][{{ field.nbasis_z[k] }}][{{ npts_x }}][{{ npts_y }}][{{ npts_z }}] = {{ field.basis_str[k] }};
+const   PetscInt {{field.name}}_{{k}}_offsets[{{ field.nbasis_x[k] }}][{{ field.nbasis_y[k] }}][{{ field.nbasis_z[k] }}][3] = {{ field.offsets_str[k] }};
+const   PetscInt {{field.name}}_{{k}}_offset_mult[{{ field.nbasis_x[k] }}][{{ field.nbasis_y[k] }}][{{ field.nbasis_z[k] }}][3] = {{ field.offset_mult_str[k] }};
+const   PetscScalar {{field.name}}_{{k}}_derivs[{{ field.nbasis_x[k] }}][{{ field.nbasis_y[k] }}][{{ field.nbasis_z[k] }}][{{ npts_x }}][{{ npts_y }}][{{ npts_z }}][3] = {{ field.derivs_str[k] }};
+ PetscInt xfs_{{field.name}}_{{k}},xfm_{{field.name}}_{{k}},yfs_{{field.name}}_{{k}},yfm_{{field.name}}_{{k}},zfs_{{field.name}}_{{k}},zfm_{{field.name}}_{{k}};
+ {% if field.ndim == 1 %}
+  PetscScalar *data_{{field.name}}_{{k}};
+      {% endif %}
+ {% if field.ndim == 2 %}
+  PetscScalar **data_{{field.name}}_{{k}};
+      {% endif %}
+ {% if field.ndim == 3 %}
+  PetscScalar ***data_{{field.name}}_{{k}};
+      {% endif %}
+    {% endfor %}
+  {% endfor %}
+
+ {% for paramname,length,values in vecparams %}
+ const PetscScalar {{ paramname }}[{{ length }}] = {{ values }};
+ {% endfor %}
+ {% for paramname,length1,length2,values in tensorparams %}
+ const PetscScalar {{ paramname }}[{{ length1 }}][{{ length2 }}] = {{ values }};
+ {% endfor %}
+  PetscFunctionBegin;
+
+	//get DMDA ranges
+   {% if formdim >= 1 %}
+  ierr = DMDAGetGhostCorners(s1da,&x1s,&y1s,&z1s,&x1m,&y1m,&z1m);CHKERRQ(ierr);
+  ierr = DMDAGetInfo(s1da,0,&x1max,&y1max,&z1max,0,0,0,0,&swidth1,0,0,0,0);CHKERRQ(ierr);
+    {% endif %}
+    {% if formdim >= 2 %}   
+  ierr = DMDAGetGhostCorners(s2da,&x2s,&y2s,&z2s,&x2m,&y2m,&z2m);CHKERRQ(ierr);
+  ierr = DMDAGetInfo(s2da,0,&x2max,&y2max,&z2max,0,0,0,0,&swidth2,0,0,0,0);CHKERRQ(ierr);
+      {% endif %}
+  ierr = DMDAGetCorners(da,&xs,&ys,&zs,&xm,&ym,&zm);CHKERRQ(ierr);
+  ierr = DMDAGetInfo(da,0,&xmax,&ymax,&zmax,0,0,0,0,0,0,0,0,0);CHKERRQ(ierr);
+
+//printf("xs ys zs : xm ym zm : xmax ymax zmax\n");
+//printf("%i %i %i : %i %i %i : %i %i %i\n",xs,ys,zs,xm,ym,zm,xmax,ymax,zmax);
+
+//determine if we own the upper/lower boundary
+//DO THESE POSSIBLY CHANGE FOR PERIODIC BC'S??
+{% if facet_direc == 0 %}
+if (xs == 0) { //if owned 
+lower_boundary = 1;
+}
+if (xs+xm == xmax) { //if owned
+upper_boundary = 1;
+}
+{% endif %}
+{% if facet_direc == 1 %}
+if (ys == 0) { //if owned 
+lower_boundary = 1;
+}
+if (ys+ym == ymax) { //if owned 
+upper_boundary = 1;
+}
+{% endif %}
+{% if facet_direc == 2 %}
+if (zs == 0) { //if owned 
+lower_boundary = 1;
+}
+if (zs+zm == zmax) { //if owned
+upper_boundary = 1;
+}
+{% endif %}
+
+//printf("%i %i\n",lower_boundary,upper_boundary);
+
+//printf("STARTING {{ facet_type }} {{ facet_exterior_boundary }} {{ facet_direc }} : %i %i : %i %i : %i %i\n",xs,ys,xm,ym,upper_boundary,lower_boundary);
+
+//if exterior facet, check that this process actually owns any part of the relevant boundary!
+{% if facet_type == 'exterior' %}
+{% if facet_exterior_boundary == 'upper' %}
+if (upper_boundary == 0) PetscFunctionReturn(0);
+{% endif %}
+{% if facet_exterior_boundary == 'lower' %}
+if (lower_boundary == 0) PetscFunctionReturn(0);
+{% endif %}
+{% endif %}
+
+	//get field data
+ {% for field in fielddict.values() %}
+      {% for k in range(field.ncomp) %}
+   ierr = DMDAGetGhostCorners(da_{{field.name}}_{{k}},&xfs_{{field.name}}_{{k}},&yfs_{{field.name}}_{{k}},&zfs_{{field.name}}_{{k}},&xfm_{{field.name}}_{{k}},&yfm_{{field.name}}_{{k}},&zfm_{{field.name}}_{{k}});CHKERRQ(ierr);
+   ierr = DMDAVecGetArrayRead(da_{{field.name}}_{{k}},{{field.name}}_{{k}},&data_{{field.name}}_{{k}});CHKERRQ(ierr);
+      {% endfor %}
+  {% endfor %}
+  
+  //Get the data out of Vec v
+    {% if formdim == 1 %}
+    ierr = DMDAVecGetArray(s1da,v,&data_v);CHKERRQ(ierr);
+    {% endif %}
+
+//THIS SHOULD CHANGE TO ALLOW STUFF TO COME IN ON SUBMESHES...ie dimension is different than ndim- just like fields!
+{% for item in geometrylist %}
+ {% if ndim == 1 %}
+  PetscScalar **data_{{ item }};
+      {% endif %}
+ {% if ndim == 2 %}
+  PetscScalar ***data_{{ item }};
+      {% endif %}
+ {% if ndim == 3 %}
+  PetscScalar ****data_{{ item }};
+      {% endif %}
+  {% endfor %}
+  
+{% for item in coefficientlist %}
+ {% if ndim == 1 %}
+  PetscScalar **data_{{ item.name }};
+      {% endif %}
+ {% if ndim == 2 %}
+  PetscScalar ***data_{{ item.name }};
+      {% endif %}
+ {% if ndim == 3 %}
+  PetscScalar ****data_{{ item.name }};
+      {% endif %}
+    {% endfor %}
+  
+{% if evaluate == 1 %}
+ {% if ndim == 1 %}
+  PetscScalar **data_vals;
+      {% endif %}
+ {% if ndim == 2 %}
+  PetscScalar ***data_vals;
+      {% endif %}
+ {% if ndim == 3 %}
+  PetscScalar ****data_vals;
+      {% endif %}
+{% endif %}
+
+//create geometry pointers
+{% for item in geometrylist %}
+ierr = DMDAVecGetArrayDOFRead(da_{{ item }} , {{ item }} , &data_{{ item }} );CHKERRQ(ierr);
+{% if item == 'detJ' or item == 'detJinv' or item == 'detJfacet' %}
+ #define P{{ item|upper }}(c) data_{{ item }} SCALARINDICES(c)
+{% elif item == 'coords' %}
+ #define P{{ item|upper }}(c,d1) data_{{ item }} VECTORINDICES(c,d1)
+{% else %}
+ #define P{{ item|upper }}(c,d1,d2) data_{{ item }} TENSORINDICES(c,d1,d2)
+{% endif %}
+{% endfor %}
+	
+//create coefficient pointers
+{% for item in coefficientlist %}
+ierr = DMDAVecGetArrayDOFRead(da_{{ item.name }} , {{ item.name }} , &data_{{ item.name }} );CHKERRQ(ierr);
+{% if item.ctype == 'scalar' %}
+ #define P{{ item.name|upper }}(c) data_{{ item.name }} SCALARINDICES(c)
+{% elif item.ctype == 'vector' %}
+ #define P{{ item.name|upper }}(c,d1) data_{{ item.name }} VECTORINDICES(c,d1)
+{% elif item.ctype == 'tensor' %}
+ #define P{{ item.name|upper }}(c,d1,d2) data_{{ item.name }} TENSORINDICES(c,d1,d2)
+{% endif %}
+{% endfor %}
+
+//create vals pointer for evaluate
+{% if evaluate == 1 %}
+ierr = DMDAVecGetArrayDOF(da_vals , evals , &data_vals );CHKERRQ(ierr);
+{% if valstype == 'scalar' %}
+ #define PVALS(c) data_vals SCALARINDICES(c)
+{% elif valstype == 'vector' %}
+ #define PVALS(c,d1) data_vals VECTORINDICES(c,d1)
+{% elif valstype == 'tensor' %}
+ #define PVALS(c,d1,d2) data_vals TENSORINDICES(c,d1,d2)
+{% endif %}
+{% endif %}
+
+//here i/j/k represent the EDGE indices, and i1/i2. are the left/right CELLS associated with that edge
+//in parallel just need to be careful with loop bounds in "active" dimension
+//for periodic interior, everything is fine
+
+//for non-periodic interior need to skip the first and last edges
+//therefore we must adjust the loop bounds by adding 1 IFF we own the lower boundary
+//We and also subtract 1 from xm if we own the upper boundary AND if we own the lower boundary!
+
+
+{% if facet_type == 'interior' %}
+{% if facet_direc == 0 %}
+{% if (bcs[0] != 'periodic') %}
+if (lower_boundary == 1) xs = xs+1;
+xm = xm - upper_boundary - lower_boundary;
+{% endif %}
+{% endif %}
+{% if facet_direc == 1 %}
+{% if (bcs[1] != 'periodic') %}
+if (lower_boundary == 1) ys = ys+1;
+ym = ym - upper_boundary - lower_boundary;
+{% endif %}
+{% endif %}
+{% if facet_direc == 2 %}
+{% if (bcs[2] != 'periodic') %}
+if (lower_boundary == 1) zs = zs+1;
+zm = zm - upper_boundary - lower_boundary;
+{% endif %}
+{% endif %}
+{% endif %}
+
+//for non-periodic exterior do the upper/lower boundary IFF they are owned
+//lower boundary (set xm=1)
+//upper boundary (set xs=xs+xm-1)
+ 
+{% if facet_type == 'exterior' %}
+{% if facet_exterior_boundary == 'lower' %}
+{% if facet_direc == 0 %}
+if (lower_boundary == 1) xm = 1;
+{% endif %}
+{% if facet_direc == 1 %}
+if (lower_boundary == 1) ym = 1;
+{% endif %}
+{% if facet_direc == 2 %}
+if (lower_boundary == 1) zm = 1;
+{% endif %}
+{% endif %}
+
+{% if facet_exterior_boundary == 'upper' %}
+{% if facet_direc == 0 %}
+if (upper_boundary == 1) xs = xs+xm-1; xm = 1;
+{% endif %}
+{% if facet_direc == 1 %}
+if (upper_boundary == 1) ys = ys+ym-1; ym = 1;
+{% endif %}
+{% if facet_direc == 2 %}
+if (upper_boundary == 1) zs = zs+zm-1; zm = 1;
+{% endif %}
+{% endif %}
+
+{% endif %}
+
+//set the exterior dir ie the correct cell to use (right cell = 2 for lower, left cell = 1 for upper)
+{% if facet_type == 'exterior' and facet_exterior_boundary == 'lower' %}
+{% set exterior_dir = 2 %}
+{% endif %}
+{% if facet_type == 'exterior' and facet_exterior_boundary == 'upper' %}
+{% set exterior_dir = 1 %}
+{% endif %}
+
+//printf("ADJUSTED {{ facet_type }} {{ facet_exterior_boundary }} {{ facet_direc }} : %i %i : %i %i : %i %i\n",xs,ys,xm,ym,upper_boundary,lower_boundary);
+
+for (k=zs; k<zs+zm; k++) {
+for (j=ys; j<ys+ym; j++) {
+for (i=xs; i<xs+xm; i++) {
+				//printf("%i %i : %i %i : %i %i\n",i,j,xs,ys,xm,ym);
+				
+		//kadj = k - zs;
+		//jadj = j - ys;
+		//iadj = i - xs;		
+		//printf("%i %i %i\n",i,j,k);
+		
+//fix i/j/k adj since "xs" changed
+{% if facet_type == 'exterior' %}
+{% if facet_exterior_boundary == 'upper' %}
+{% if facet_direc == 0 %}
+//if (upper_boundary == 1) iadj = i - xs + xm - 1;
+{% endif %}
+{% if facet_direc == 1 %}
+//if (upper_boundary == 1) jadj = j - ys + ym - 1;
+{% endif %}
+{% if facet_direc == 2 %}
+//if (upper_boundary == 1) kadj = k - zs + zm - 1;
+{% endif %}
+{% endif %}
+{% endif %}
+
+		 {% if formdim == 2 %}
+		{% if facet_type == 'interior' or exterior_dir == 1 %}
+		 //1
+		for (lx=0;lx<{{ nbasis1_x }};lx++) {
+		for (ly=0;ly<{{ nbasis1_y }};ly++) {
+		for (lz=0;lz<{{ nbasis1_z }};lz++) {
+			icoord = i1 * offset_mult1[lx][ly][lz][0] + offsets1[lx][ly][lz][0] - x1s;
+			jcoord = j1 * offset_mult1[lx][ly][lz][1] + offsets1[lx][ly][lz][1] - y1s;
+			kcoord = k1 * offset_mult1[lx][ly][lz][2] + offsets1[lx][ly][lz][2] - z1s;
+			rows1[lx][ly][lz] = icoord + x1m*(jcoord + y1m*kcoord);
+		}}}
+
+		for (lx=0;lx<{{ nbasis2_x }};lx++) {
+		for (ly=0;ly<{{ nbasis2_y }};ly++) {
+		for (lz=0;lz<{{ nbasis2_z }};lz++) {
+			icoord = i1 * offset_mult2[lx][ly][lz][0] + offsets2[lx][ly][lz][0] - x2s;
+			jcoord = j1 * offset_mult2[lx][ly][lz][1] + offsets2[lx][ly][lz][1] - y2s;
+			kcoord = k1 * offset_mult2[lx][ly][lz][2] + offsets2[lx][ly][lz][2] - z2s;
+			cols1[lx][ly][lz] =  icoord + x2m*(jcoord + y2m*kcoord);
+		}}}
+		{% endif %}
+		{% if facet_type == 'interior' or exterior_dir == 2 %}
+		//2
+		for (lx=0;lx<{{ nbasis1_x }};lx++) {
+		for (ly=0;ly<{{ nbasis1_y }};ly++) {
+		for (lz=0;lz<{{ nbasis1_z }};lz++) {
+			icoord = i2 * offset_mult1[lx][ly][lz][0] + offsets1[lx][ly][lz][0] - x1s;
+			jcoord = j2 * offset_mult1[lx][ly][lz][1] + offsets1[lx][ly][lz][1] - y1s;
+			kcoord = k2 * offset_mult1[lx][ly][lz][2] + offsets1[lx][ly][lz][2] - z1s;
+			rows2[lx][ly][lz] = icoord + x1m*(jcoord + y1m*kcoord);
+		}}}
+
+		for (lx=0;lx<{{ nbasis2_x }};lx++) {
+		for (ly=0;ly<{{ nbasis2_y }};ly++) {
+		for (lz=0;lz<{{ nbasis2_z }};lz++) {
+			icoord = i2 * offset_mult2[lx][ly][lz][0] + offsets2[lx][ly][lz][0] - x2s;
+			jcoord = j2 * offset_mult2[lx][ly][lz][1] + offsets2[lx][ly][lz][1] - y2s;
+			kcoord = k2 * offset_mult2[lx][ly][lz][2] + offsets2[lx][ly][lz][2] - z2s;
+			cols2[lx][ly][lz] =  icoord + x2m*(jcoord + y2m*kcoord);
+		}}}
+		{% endif %}
+
+		//printf("%i : %i %i : %i %i\n",i,rows1[0][0][0],rows1[1][0][0],cols1[0][0][0],cols1[1][0][0]);
+		//printf("%i : %i %i : %i %i\n",i,rows1[0][0][0],rows1[1][0][0],cols2[0][0][0],cols2[1][0][0]);
+		//printf("%i : %i %i : %i %i\n",i,rows2[0][0][0],rows2[1][0][0],cols1[0][0][0],cols1[1][0][0]);
+		//printf("%i : %i %i : %i %i\n",i,rows2[0][0][0],rows2[1][0][0],cols2[0][0][0],cols2[1][0][0]);
+		
+		{% endif %}
+
+		//compute the element tensor
+		{% import functionalfile as functionals with context %}
+		{{ functionals[functionalname]() }}
+
+		//printf("%i : %12.12f %12.12f %12.12f %12.12f\n",i,vals1[0][0][0][0][0][0],vals1[0][0][0][1][0][0],vals1[1][0][0][0][0][0],vals1[1][0][0][1][0][0]);
+		//printf("%i : %12.12f %12.12f %12.12f %12.12f\n",i,vals2[0][0][0][0][0][0],vals2[0][0][0][1][0][0],vals2[1][0][0][0][0][0],vals2[1][0][0][1][0][0]);
+		//printf("%i : %12.12f %12.12f %12.12f %12.12f\n",i,vals3[0][0][0][0][0][0],vals3[0][0][0][1][0][0],vals3[1][0][0][0][0][0],vals3[1][0][0][1][0][0]);
+		//printf("%i : %12.12f %12.12f %12.12f %12.12f\n",i,vals4[0][0][0][0][0][0],vals4[0][0][0][1][0][0],vals4[1][0][0][0][0][0],vals4[1][0][0][1][0][0]);
+		
+		//Put the element tensor into the local tensor
+		{% if formdim == 2 %}
+		{% if facet_type == 'interior' or exterior_dir == 1 %}        
+        ierr = MatSetValuesLocal(A,{{ nbasis1_x }} * {{ nbasis1_y }} * {{ nbasis1_z }},rows1,{{ nbasis2_x }} * {{ nbasis2_y }} * {{ nbasis2_z }},cols1,*vals1,ADD_VALUES);CHKERRQ(ierr);
+		{% endif %}
+
+		{% if facet_type == 'interior' or exterior_dir == 2 %}        
+        ierr = MatSetValuesLocal(A,{{ nbasis1_x }} * {{ nbasis1_y }} * {{ nbasis1_z }},rows2,{{ nbasis2_x }} * {{ nbasis2_y }} * {{ nbasis2_z }},cols2,*vals4,ADD_VALUES);CHKERRQ(ierr);
+		{% endif %}
+
+		{% if facet_type == 'interior' %}        
+        ierr = MatSetValuesLocal(A,{{ nbasis1_x }} * {{ nbasis1_y }} * {{ nbasis1_z }},rows1,{{ nbasis2_x }} * {{ nbasis2_y }} * {{ nbasis2_z }},cols2,*vals2,ADD_VALUES);CHKERRQ(ierr);
+        ierr = MatSetValuesLocal(A,{{ nbasis1_x }} * {{ nbasis1_y }} * {{ nbasis1_z }},rows2,{{ nbasis2_x }} * {{ nbasis2_y }} * {{ nbasis2_z }},cols1,*vals3,ADD_VALUES);CHKERRQ(ierr);
+		{% endif %}
+
+		{% endif %}
+
+		{% if formdim == 1 %}
+		{% if facet_type == 'interior' or exterior_dir == 1 %}        
+		{{ SETVALS(1) }}
+		{% endif %}
+		{% if facet_type == 'interior' or exterior_dir == 2 %}        
+		{{ SETVALS(2) }}
+		{% endif %}
+		{% endif %}
+		
+		{% if formdim == 0 %}
+		s = s + vals;
+		{% endif %}
+
+       }}}
+
+//restore fields arrays and data
+ {% for field in fielddict.values() %}
+      {% for k in range(field.ncomp) %}
+    ierr = DMDAVecRestoreArrayRead(da_{{field.name}}_{{k}},{{field.name}}_{{k}},&data_{{field.name}}_{{k}});CHKERRQ(ierr);
+      {% endfor %}
+   {% endfor %}
+
+//restore geometry/coefficient pointers
+{% for item in geometrylist %}
+ierr = DMDAVecRestoreArrayDOFRead(da_{{ item }} , {{ item }} , &data_{{ item }} );CHKERRQ(ierr);
+{% endfor %}
+{% for item in coefficientlist %}
+ierr = DMDAVecRestoreArrayDOFRead(da_{{ item.name }} , {{ item.name }} , &data_{{ item.name }} );CHKERRQ(ierr);
+{% endfor %}
+
+//restore evaluate pointer
+{% if evaluate == 1 %}
+ierr = DMDAVecRestoreArrayDOF(da_vals , evals , &data_vals );CHKERRQ(ierr);
+{% endif %}
+
+ {% if formdim == 1 %}
+//restore data in Vec v
+    ierr = DMDAVecRestoreArray(s1da,v,&data_v);CHKERRQ(ierr);
+{% endif %}
+ 
+  {% if formdim == 0 %}
+return s;
+{% endif %}
+
+  PetscFunctionReturn(0);
+}

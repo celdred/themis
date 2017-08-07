@@ -1,0 +1,443 @@
+#ifdef SWIG
+%include "petsc4py/petsc4py.i"
+#endif
+
+
+ {% if formdim >= 1 %}
+ {% for ci in range(nci1) %}
+#define s1_{{ci}}_indices [lz + {{  nbasis1_z[ci]  }} * (ly + {{ nbasis1_y[ci]  }} * lx)]
+#define s1_{{ci}}_indices_n [nz + {{  nbasis1_z[ci]  }} * (ny + {{ nbasis1_y[ci]  }} * nx)]
+#define s1_{{ci}}_indices_noff [ci1off + nz + {{  nbasis1_z[ci]  }} * (ny + {{ nbasis1_y[ci]  }} * nx)]
+ {% endfor %}
+ {% endif %}
+  {% if formdim == 2 %}
+ {% for ci in range(nci2) %}
+#define s2_{{ci}}_indices [lz + {{  nbasis2_z[ci]  }} * (ly + {{ nbasis2_y[ci]  }} * lx)]
+#define s2_{{ci}}_indices_m [mz + {{  nbasis2_z[ci]  }} * (my + {{ nbasis2_y[ci]  }} * mx)]
+#define s2_{{ci}}_indices_moff [ci2off + mz + {{  nbasis2_z[ci]  }} * (my + {{ nbasis2_y[ci]  }} * mx)]
+ {% endfor %}
+{% endif %}
+
+{%macro SETVALS(ci) -%}
+//THIS ORDERING OF ROWS IS THEMIS SPECIFIC...
+//ALSO MAKE THIS ACCESS MACRO SPECIFIC- ie we should be able to swap between C and Fortran ordering!
+ #define kk	(k * offset_mult1_z_{{ ci }}[lz] + offsets1_z_{{ ci }}[lz])
+ #define jj (j * offset_mult1_y_{{ ci }}[ly] + offsets1_y_{{ ci }}[ly])
+ #define ii (i * offset_mult1_x_{{ ci }}[lx] + offsets1_x_{{ ci }}[lx])
+for (lx=0;lx<{{ nbasis1_x[ci] }};lx++) {
+for (ly=0;ly<{{ nbasis1_y[ci] }};ly++) {
+for (lz=0;lz<{{ nbasis1_z[ci] }};lz++) {
+{% if ndim == 1 %}
+data_formvec_{{ ci }}[ii] += vals_{{ ci }} s1_{{ci}}_indices;
+{% endif %}
+{% if ndim == 2 %}
+data_formvec_{{ ci }}[jj][ii] += vals_{{ ci }} s1_{{ci}}_indices;
+{% endif %}
+{% if ndim == 3 %}
+data_formvec_{{ ci }}[kk][jj][ii] += vals_{{ ci }} s1_{{ci}}_indices;
+{% endif %}
+}}}
+#undef ii
+#undef jj
+#undef kk
+{% endmacro %}
+
+#include <petsc.h>
+#include "math.h"
+#include <stdio.h>
+#include <numpy/arrayobject.h>
+
+//Actual kernel snippet
+		{{ kernelstr }}
+		
+ {% if formdim == 2 %}
+PetscErrorCode assemble(DM da {{ submatlist }}  {{ s1dalist }}  {{ s2dalist }} {{ fieldargs }} {{ constantargs }})
+{% endif %}
+ {% if formdim == 1 %}
+PetscErrorCode assemble(DM da {{ subveclist }} {{ s1dalist }} {{ fieldargs }} {{ constantargs }}) 
+{% endif %}
+ {% if formdim == 0 %}
+PetscScalar assemble(DM da {{ fieldargs }} {{ constantargs }})
+{% endif %}
+
+{% if evaluate == 1 %}
+PetscScalar evaluate(DM da {{ valsargs }} {{ fieldargs }} {{ constantargs }})
+{% endif %}
+
+{
+
+ {% if formdim == 2 %}
+ PetscScalar vals[{{ nbasis1_total }}][{{ nbasis2_total }}] = { {0.,},};
+ {% for ci1 in range(nci1) %}
+ {% for ci2 in range(nci2) %}
+  PetscScalar	vals_{{ ci1 }}_{{ ci2 }}[{{ nbasis1_x[ci1] }} * {{ nbasis1_y[ci1] }} * {{ nbasis1_z[ci1] }}][{{ nbasis2_x[ci2] }} * {{ nbasis2_y[ci2] }} * {{ nbasis2_z[ci2] }}] = { {0.,},};
+ {% endfor %}
+ {% endfor %}
+  {% for ci2 in range(nci2) %}
+   PetscInt     cols_{{ ci2 }}[{{ nbasis2_x[ci2] }} * {{ nbasis2_y[ci2]  }} * {{ nbasis2_z[ci2]  }}];
+    {% endfor %}
+    {% for ci1 in range(nci1) %}
+   PetscInt     rows_{{ ci1 }}[{{ nbasis1_x[ci1] }} * {{ nbasis1_y[ci1]  }} * {{ nbasis1_z[ci1]  }}];
+ {% endfor %}
+ {% endif %}
+ 
+ {% if formdim == 1 %}
+ PetscScalar vals[{{ nbasis1_total }}] = {0.,};
+ {% for ci1 in range(nci1) %}
+ PetscScalar	vals_{{ ci1 }}[{{ nbasis1_x[ci1] }} * {{ nbasis1_y[ci1] }} * {{ nbasis1_z[ci1] }}]= {0.,};
+ {% if ndim == 1 %}
+ PetscScalar *data_formvec_{{ ci1 }};
+      {% endif %}
+ {% if ndim == 2 %}
+ PetscScalar **data_formvec_{{ ci1 }};
+      {% endif %}
+ {% if ndim == 3 %}
+ PetscScalar ***data_formvec_{{ ci1 }};
+      {% endif %}
+  {% endfor %}
+ {% endif %}
+ 
+ {% if formdim == 0 %}
+ PetscScalar	vals[1] = {0.0,};
+ PetscScalar formsum[1] = {0.0,};
+ {% endif %}
+
+  PetscErrorCode ierr;
+  PetscInt ci1off,ci2off,fieldoffset;
+  PetscInt i,j,k; //spatial loop indices
+   PetscInt lx,ly,lz; //rows/cols indices
+   PetscInt nx,ny,nz;
+   PetscInt mx,my,mz;
+   PetscInt d; //dof index
+  PetscInt xs,xm,ys,ym,zs,zm;
+  PetscInt icoord,jcoord,kcoord;
+   {% if formdim >= 1 %}
+  {% for ci1 in range(nci1) %}
+  PetscInt x1s_{{ ci1 }},x1m_{{ ci1 }},y1s_{{ ci1 }},y1m_{{ ci1 }},z1s_{{ ci1 }},z1m_{{ ci1 }};
+    {% endfor %}
+   {% endif %}
+ {% if formdim == 2 %}
+  {% for ci2 in range(nci2) %}
+  PetscInt x2s_{{ ci2 }},x2m_{{ ci2 }},y2s_{{ ci2 }},y2m_{{ ci2 }},z2s_{{ ci2 }},z2m_{{ ci2 }};
+   {% endfor %}
+ {% endif %}
+
+const   PetscScalar wts_x[{{ npts_x }}] = {{ wts_x }};
+const   PetscScalar wts_y[{{ npts_y }}] = {{ wts_y }};
+const   PetscScalar wts_z[{{ npts_z }}] = {{ wts_z }};
+
+ {% if formdim == 2 %}
+  {% for ci2 in range(nci2) %}
+const   PetscInt offsets2_x_{{ ci2 }}[{{ nbasis2_x[ci2] }}] = {{ offsets2_x[ci2] }};
+const   PetscInt offsets2_y_{{ ci2 }}[{{ nbasis2_y[ci2] }}] = {{ offsets2_y[ci2] }};
+const   PetscInt offsets2_z_{{ ci2 }}[{{ nbasis2_z[ci2] }}] = {{ offsets2_z[ci2] }};
+const   PetscInt offset_mult2_x_{{ ci2 }}[{{ nbasis2_x[ci2] }}] = {{ offset_mult2_x[ci2] }};
+const   PetscInt offset_mult2_y_{{ ci2 }}[{{ nbasis2_y[ci2] }}] = {{ offset_mult2_y[ci2] }};
+const   PetscInt offset_mult2_z_{{ ci2 }}[{{ nbasis2_z[ci2] }}] = {{ offset_mult2_z[ci2] }};
+const   PetscScalar basis2_x_{{ ci2 }}[{{ nbasis2_x[ci2] }}][{{ npts_x }}] = {{ basis2_x[ci2] }};
+const   PetscScalar basis2_y_{{ ci2 }}[{{ nbasis2_y[ci2] }}][{{ npts_y }}] = {{ basis2_y[ci2] }};
+const   PetscScalar basis2_z_{{ ci2 }}[{{ nbasis2_z[ci2] }}][{{ npts_z }}] = {{ basis2_z[ci2] }};
+const   PetscScalar derivs2_x_{{ ci2 }}[{{ nbasis2_x[ci2] }}][{{ npts_x }}] = {{ derivs2_x[ci2] }};
+const   PetscScalar derivs2_y_{{ ci2 }}[{{ nbasis2_y[ci2] }}][{{ npts_y }}] = {{ derivs2_y[ci2] }};
+const   PetscScalar derivs2_z_{{ ci2 }}[{{ nbasis2_z[ci2] }}][{{ npts_z }}] = {{ derivs2_z[ci2] }};
+  {% endfor %}
+  {% endif %}
+ {% if formdim >= 1 %}
+ {% for ci1 in range(nci1) %}
+const   PetscInt offsets1_x_{{ ci1 }}[{{ nbasis1_x[ci1] }}] = {{ offsets1_x[ci1] }};
+const   PetscInt offsets1_y_{{ ci1 }}[{{ nbasis1_y[ci1] }}] = {{ offsets1_y[ci1] }};
+const   PetscInt offsets1_z_{{ ci1 }}[{{ nbasis1_z[ci1] }}] = {{ offsets1_z[ci1] }};
+const   PetscInt offset_mult1_x_{{ ci1 }}[{{ nbasis1_x[ci1] }}] = {{ offset_mult1_x[ci1] }};
+const   PetscInt offset_mult1_y_{{ ci1 }}[{{ nbasis1_y[ci1] }}] = {{ offset_mult1_y[ci1] }};
+const   PetscInt offset_mult1_z_{{ ci1 }}[{{ nbasis1_z[ci1] }}] = {{ offset_mult1_z[ci1] }};
+const   PetscScalar basis1_x_{{ ci1 }}[{{ nbasis1_x[ci1] }}][{{ npts_x }}] = {{ basis1_x[ci1] }};
+const   PetscScalar basis1_y_{{ ci1 }}[{{ nbasis1_y[ci1] }}][{{ npts_y }}] = {{ basis1_y[ci1] }};
+const   PetscScalar basis1_z_{{ ci1 }}[{{ nbasis1_z[ci1] }}][{{ npts_z }}] = {{ basis1_z[ci1] }};
+const   PetscScalar derivs1_x_{{ ci1 }}[{{ nbasis1_x[ci1] }}][{{ npts_x }}] = {{ derivs1_x[ci1] }};
+const   PetscScalar derivs1_y_{{ ci1 }}[{{ nbasis1_y[ci1] }}][{{ npts_y }}] = {{ derivs1_y[ci1] }};
+const   PetscScalar derivs1_z_{{ ci1 }}[{{ nbasis1_z[ci1] }}][{{ npts_z }}] = {{ derivs1_z[ci1] }};
+  {% endfor %}
+  {% endif %}
+
+ {% for field in fieldlist %}
+ PetscScalar	{{field.name}}_vals[{{ field.nbasis_total }}][{{ field.ndofs }}] = { { 0.,},};
+ {% for k in range(field.ncomp) %}
+const   PetscInt {{field.name}}_{{k}}_offsets_x[{{ field.nbasis_x[k] }}] = {{ field.offsets_x[k] }};
+const   PetscInt {{field.name}}_{{k}}_offsets_y[{{ field.nbasis_y[k] }}] = {{ field.offsets_y[k] }};
+const   PetscInt {{field.name}}_{{k}}_offsets_z[{{ field.nbasis_z[k] }}] = {{ field.offsets_z[k] }};
+const   PetscInt {{field.name}}_{{k}}_offset_mult_x[{{ field.nbasis_x[k] }}] = {{ field.offset_mult_x[k] }};
+const   PetscInt {{field.name}}_{{k}}_offset_mult_y[{{ field.nbasis_y[k] }}] = {{ field.offset_mult_y[k] }};
+const   PetscInt {{field.name}}_{{k}}_offset_mult_z[{{ field.nbasis_z[k] }}] = {{ field.offset_mult_z[k] }};
+const   PetscScalar {{field.name}}_{{k}}_basis_x[{{ field.nbasis_x[k] }}][{{ npts_x }}] = {{ field.basis_x[k] }};
+const   PetscScalar {{field.name}}_{{k}}_basis_y[{{ field.nbasis_y[k] }}][{{ npts_y }}] = {{ field.basis_y[k] }};
+const   PetscScalar {{field.name}}_{{k}}_basis_z[{{ field.nbasis_z[k] }}][{{ npts_z }}] = {{ field.basis_z[k] }};
+const   PetscScalar {{field.name}}_{{k}}_derivs_x[{{ field.nbasis_x[k] }}][{{ npts_x }}] = {{ field.derivs_x[k] }};
+const   PetscScalar {{field.name}}_{{k}}_derivs_y[{{ field.nbasis_y[k] }}][{{ npts_y }}] = {{ field.derivs_y[k] }};
+const   PetscScalar {{field.name}}_{{k}}_derivs_z[{{ field.nbasis_z[k] }}][{{ npts_z }}] = {{ field.derivs_z[k] }};
+
+#define {{field.name}}_{{k}}_indices [fieldoffset + lz + {{  field.nbasis_z[k]  }} * (ly + {{ field.nbasis_y[k]  }} * lx)][d]
+
+ {% if ndim == 1 %}
+  PetscScalar **data_{{field.name}}_{{k}};
+      {% endif %}
+ {% if ndim == 2 %}
+  PetscScalar ***data_{{field.name}}_{{k}};
+      {% endif %}
+ {% if ndim == 3 %}
+  PetscScalar ****data_{{field.name}}_{{k}};
+      {% endif %}
+    {% endfor %}
+  {% endfor %}
+ 
+
+ {% for field in fieldlist %}
+      {% for k in range(field.ncomp) %}
+  ierr = DMDAVecGetArrayDOFRead(da_{{field.name}}_{{k}},{{field.name}}_{{k}},&data_{{field.name}}_{{k}});CHKERRQ(ierr);
+      {% endfor %}
+  {% endfor %}
+  
+  //Get the data out of Vec formvec
+    {% if formdim == 1 %}
+     {% for ci1 in range(nci1) %}
+    ierr = DMDAVecGetArray(s1da_{{ ci1 }},formvec_{{ ci1 }},&data_formvec_{{ ci1 }});CHKERRQ(ierr);
+      {% endfor %}
+    {% endif %}
+
+	//get DMDA ranges
+   {% if formdim >= 1 %}
+       {% for ci1 in range(nci1) %}
+  ierr = DMDAGetGhostCorners(s1da_{{ ci1 }},&x1s_{{ ci1 }},&y1s_{{ ci1 }},&z1s_{{ ci1 }},&x1m_{{ ci1 }},&y1m_{{ ci1 }},&z1m_{{ ci1 }});CHKERRQ(ierr);
+      {% endfor %}
+    {% endif %}
+    {% if formdim >= 2 %}   
+         {% for ci2 in range(nci2) %}
+  ierr = DMDAGetGhostCorners(s2da_{{ ci2 }},&x2s_{{ ci2 }},&y2s_{{ ci2 }},&z2s_{{ ci2 }},&x2m_{{ ci2 }},&y2m_{{ ci2 }},&z2m_{{ ci2 }});CHKERRQ(ierr);
+       {% endfor %}
+      {% endif %}
+  ierr = DMDAGetCorners(da,&xs,&ys,&zs,&xm,&ym,&zm);CHKERRQ(ierr);
+
+//create vals pointer for evaluate
+{% if evaluate == 1 %}
+#define quadss [qz + {{ npts_z }} * (qy + {{ npts_y }} * qx)]
+#define quadsv(d1) [d1 + {{ ndim }} * (qz + {{ npts_z }} * (qy + {{ npts_y }} * qx))]
+#define quadst(d1,d2) [d2 + {{ ndim }} * (d1 + {{ ndim }} * (qz + {{ npts_z }} * (qy + {{ npts_y }} * qx)))]
+
+ {% if ndim == 1 %}
+ #define SCALARINDICES [i] quadss
+ #define VECTORINDICES(d1) [i] quadsv(d1)
+ #define TENSORINDICES(d1,d2) [i] quadst(d2,d1)
+  PetscScalar **data_vals;
+       {% endif %}
+ {% if ndim == 2 %}
+ #define SCALARINDICES [j][i] quadss
+ #define VECTORINDICES(d1) [j][i] quadsv(d1)
+ #define TENSORINDICES(d1,d2) [j][i] quadst(d2,d1)
+   PetscScalar ***data_vals;
+       {% endif %}
+ {% if ndim == 3 %}
+ #define SCALARINDICES [k][j][i] quadss
+ #define VECTORINDICES(d1) [k][j][i] quadsv(d1)
+ #define TENSORINDICES(d1,d2) [k][j][i] quadst(d2,d1)
+   PetscScalar ****data_vals;
+       {% endif %}
+       
+ierr = DMDAVecGetArrayDOF(da_vals , evals , &data_vals );CHKERRQ(ierr);
+{% if valstype == 'scalar' %}
+ #define PVALS data_vals SCALARINDICES
+{% elif valstype == 'vector' %}
+ #define PVALS(d1) data_vals VECTORINDICES(d1)
+{% elif valstype == 'tensor' %}
+ #define PVALS(d1,d2) data_vals TENSORINDICES(d1,d2)
+{% endif %}
+{% endif %}
+ 
+for (k=zs; k<zs+zm; k++) {
+   for (j=ys; j<ys+ym; j++) {
+      for (i=xs; i<xs+xm; i++) {
+		
+		//THESE ROWS/COLS ARE THEMIS SPECIFIC RIGHT NOW
+		//THIS CAN BE SWITCHED TO FiNaT TENSOR PRODUCT SPECIFIC ORDER
+		
+		//THIS SHOULD BE SWAPPABLE BETWEEN C AND FORTRAN STYLE ORDERINGS...
+		
+		//THIS IS REALLY THE DIFFERENCE BETWEEN STRUCTURED AND UNSTRUCTURED
+		
+		 {% if formdim == 2 %}
+       {% for ci1 in range(nci1) %}
+		for (lx=0;lx<{{ nbasis1_x[ci1] }};lx++) {
+		for (ly=0;ly<{{ nbasis1_y[ci1] }};ly++) {
+		for (lz=0;lz<{{ nbasis1_z[ci1] }};lz++) {
+			icoord = i * offset_mult1_x_{{ ci1 }}[lx] + offsets1_x_{{ ci1 }}[lx] - x1s_{{ ci1 }};
+			jcoord = j * offset_mult1_y_{{ ci1 }}[ly] + offsets1_y_{{ ci1 }}[ly] - y1s_{{ ci1 }};
+			kcoord = k * offset_mult1_z_{{ ci1 }}[lz] + offsets1_z_{{ ci1 }}[lz] - z1s_{{ ci1 }};
+
+			rows_{{ ci1 }} s1_{{ci1}}_indices =  icoord + x1m_{{ ci1 }}*(jcoord + y1m_{{ ci1 }}*kcoord);
+		}}}
+      {% endfor %}
+
+       {% for ci2 in range(nci2) %}
+		for (lx=0;lx<{{ nbasis2_x[ci2] }};lx++) {
+		for (ly=0;ly<{{ nbasis2_y[ci2] }};ly++) {
+		for (lz=0;lz<{{ nbasis2_z[ci2] }};lz++) {
+			icoord = i * offset_mult2_x_{{ ci2 }}[lx] + offsets2_x_{{ ci2 }}[lx] - x2s_{{ ci2 }};
+			jcoord = j * offset_mult2_y_{{ ci2 }}[ly] + offsets2_y_{{ ci2 }}[ly] - y2s_{{ ci2 }};
+			kcoord = k * offset_mult2_z_{{ ci2 }}[lz] + offsets2_z_{{ ci2 }}[lz] - z2s_{{ ci2 }};
+			cols_{{ ci2 }} s2_{{ci2}}_indices =  icoord + x2m_{{ ci2 }}*(jcoord + y2m_{{ ci2 }}*kcoord);
+		}}}
+	 {% endfor %}
+		{% endif %}
+		
+		//extract element dofs from local dofs
+		//THIS IS REALLY THE DIFFERENCE BETWEEN STRUCTURED AND UNSTRUCTURED
+		
+		//THIS IS A COPY- PROBABLY BAD
+		//BUT INDIRECT MEMORY ACCESS IS LIKELY JUST AS BAD, SO...
+		//SEE HPGMG CODE- I THINK THERE ARE SOME NICE EXTRACT ROUTINES IN THERE?
+		
+		//I THINK WE CAN REPLACE THE WHOLE IDEA OF OFFSETS AND OFFSET MULTS WITH START/END AND A SINGLE MULTIPLIER
+		//ALL HARD CODED
+		//THIS WILL BE MUCH CLEANER, and likely faster
+		//ESPECIALLY SINCE WE ARE TENSOR PRODUCT!
+		//I THINK ALL THE ELEMENTS WE ARE INTERESTED IN WORK LIKE THIS...
+		
+		//can really optimize this...
+		
+		//THIS IS DONE IN THEMIS SPECIFIC ORDER RIGHT NOW...
+		//THIS CAN BE SWITCHED TO FiNaT TENSOR PRODUCT SPECIFIC ORDER
+		
+		 {% for field in fieldlist %}
+		 		fieldoffset = 0;
+		{% for k in range(field.ncomp) %}
+		{%set offset_mult = field.name~'_'~k ~'_offset_mult' %}
+		{%set offset = field.name~'_'~k ~'_offsets' %}
+		#define ii (i*{{ offset_mult }}_x[lx] + {{ offset }}_x[lx]) 
+		#define jj (j*{{ offset_mult }}_y[ly] + {{ offset }}_y[ly]) 
+		#define kk (k*{{ offset_mult }}_z[lz] + {{ offset }}_z[lz]) 
+		for (lx=0;lx<{{ field.nbasis_x[k] }};lx++){
+		for (ly=0;ly<{{ field.nbasis_y[k] }};ly++){
+		for (lz=0;lz<{{ field.nbasis_z[k] }};lz++){
+		for (d=0;d<{{ field.ndofs }};d++){
+		{% if ndim == 1 %}
+		{{field.name}}_vals {{field.name}}_{{k}}_indices = data_{{field.name}}_{{k}} [ii][d];
+		{% endif %}
+		{% if ndim == 2 %}
+		{{field.name}}_vals {{field.name}}_{{k}}_indices = data_{{field.name}}_{{k}} [jj][ii][d];
+		{% endif %}
+		{% if ndim == 3 %}
+		{{field.name}}_vals {{field.name}}_{{k}}_indices = data_{{field.name}}_{{k}} [kk][jj][ii][d];
+		{% endif %}
+		}}}}
+		#undef ii
+		#undef jj
+		#undef kk
+		fieldoffset = fieldoffset + {{ field.nbasis_x[k] }} * {{ field.nbasis_y[k] }} * {{ field.nbasis_z[k] }};
+		{% endfor %}
+		{% endfor %}
+		
+		//compute the element tensor
+		{% if not kernelstr == '' %}
+		
+		    {% if formdim == 2 %}
+	ierr = PetscMemzero(vals,sizeof(PetscScalar[{{ nbasis1_total }}][{{ nbasis2_total }}])); CHKERRQ(ierr);
+				{% endif %}
+		    {% if formdim == 1 %}
+	ierr = PetscMemzero(vals,sizeof(PetscScalar[{{ nbasis1_total }}])); CHKERRQ(ierr);
+				{% endif %}
+		    {% if formdim == 0 %}
+		    vals[0] = 0.0;
+				{% endif %}
+		{{kernelname}}(vals
+				 {% for field in fieldplusconstantslist %}
+				 ,{{field}}
+				{% endfor %}
+			);
+			
+			//unsplat vals
+			//THIS CAN/SHOULD BE OPTIMIZED AWAY FOR SINGLE COMPONENT STUFF
+		//THIS IS REALLY THE DIFFERENCE BETWEEN STRUCTURED AND UNSTRUCTURED
+		
+	 {% if formdim == 2 %}
+	   ci1off = 0;
+       {% for ci1 in range(nci1) %}
+       ci2off = 0;
+       {% for ci2 in range(nci2) %}
+        for (nx=0;nx<{{ nbasis1_x[ci1] }};nx++) {
+		for (ny=0;ny<{{ nbasis1_y[ci1] }};ny++) {
+		for (nz=0;nz<{{ nbasis1_z[ci1] }};nz++) {		
+		for (mx=0;mx<{{ nbasis2_x[ci2] }};mx++) {
+		for (my=0;my<{{ nbasis2_y[ci2] }};my++) {
+		for (mz=0;mz<{{ nbasis2_z[ci2] }};mz++) {
+			
+       vals_{{ ci1 }}_{{ ci2 }} s1_{{ci1}}_indices_n s2_{{ci2}}_indices_m = vals s1_{{ci1}}_indices_noff s2_{{ci2}}_indices_moff;
+       
+   }}}}}}
+   ci2off = ci2off + {{ nbasis2_x[ci2] }} * {{ nbasis2_y[ci2] }} * {{ nbasis2_z[ci2] }};
+				{% endfor %}
+			ci1off = ci1off + {{ nbasis1_x[ci1] }} * {{ nbasis1_y[ci1] }} * {{ nbasis1_z[ci1] }};
+				{% endfor %}
+				{% endif %}
+					    {% if formdim == 1 %}
+					    ci1off = 0;
+		       {% for ci1 in range(nci1) %}
+        for (nx=0;nx<{{ nbasis1_x[ci1] }};nx++) {
+		for (ny=0;ny<{{ nbasis1_y[ci1] }};ny++) {
+		for (nz=0;nz<{{ nbasis1_z[ci1] }};nz++) {
+			vals_{{ ci1 }} s1_{{ci1}}_indices_n = vals s1_{{ci1}}_indices_noff;
+		}}}
+						ci1off = ci1off + {{ nbasis1_x[ci1] }} * {{ nbasis1_y[ci1] }} * {{ nbasis1_z[ci1] }};
+				{% endfor %}
+				{% endif %}
+		{% endif %}
+		
+		
+		//functional for evaluate
+		{% if evaluate == 1 %}
+		{{ kernelstr }}
+		{% endif %}
+		
+		//Put the element tensor into the local tensor
+		{% if formdim == 2 %}
+		       {% for ci1 in range(nci1) %}
+       {% for ci2 in range(nci2) %}
+        ierr = MatSetValuesLocal(formmat_{{ ci1 }}_{{ ci2 }},{{ nbasis1_x[ci1] }} * {{ nbasis1_y[ci1] }} * {{ nbasis1_z[ci1] }},rows_{{ ci1 }},{{ nbasis2_x[ci2] }} * {{ nbasis2_y[ci2] }} * {{ nbasis2_z[ci2] }},cols_{{ ci2 }},*vals_{{ ci1 }}_{{ ci2 }},ADD_VALUES);CHKERRQ(ierr);
+			 {% endfor %}
+	 {% endfor %}
+		{% endif %}
+		
+		{% if formdim == 1 %}
+		 {% for ci1 in range(nci1) %}
+		{{ SETVALS(ci1) }}
+		{% endfor %}
+		{% endif %}
+		
+		{% if formdim == 0 %}
+		formsum[0] = formsum[0] + vals[0];
+		{% endif %}
+		
+       }}}
+
+//restore fields arrays and data
+ {% for field in fieldlist %}
+      {% for k in range(field.ncomp) %}
+    ierr = DMDAVecRestoreArrayDOFRead(da_{{field.name}}_{{k}},{{field.name}}_{{k}},&data_{{field.name}}_{{k}});CHKERRQ(ierr);
+      {% endfor %}
+   {% endfor %}
+  
+//restore evaluate pointer
+{% if evaluate == 1 %}
+ierr = DMDAVecRestoreArrayDOF(da_vals , evals , &data_vals );CHKERRQ(ierr);
+{% endif %}
+
+ {% if formdim == 1 %}
+//restore data in Vec v
+		 {% for ci1 in range(nci1) %}
+    ierr = DMDAVecRestoreArray(s1da_{{ ci1 }},formvec_{{ ci1 }},&data_formvec_{{ ci1 }});CHKERRQ(ierr);
+    		{% endfor %}
+{% endif %}
+ 
+  {% if formdim == 0 %}
+return formsum[0];
+{% endif %}
+
+  PetscFunctionReturn(0);
+}
