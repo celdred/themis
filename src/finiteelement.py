@@ -1,19 +1,20 @@
 import numpy as np
-from ufl import VectorElement,TensorProductElement,EnrichedElement,HDivElement,HCurlElement
+from ufl import VectorElement,TensorProductElement,EnrichedElement,HDivElement,HCurlElement,interval,quadrilateral
 import sympy
 from lagrange import gauss_lobatto,lagrange_poly_support
 
 def check_continuous(family):
-	return family == 'Lagrange' or family == 'CGD' or family == 'CQB' or family == 'CMSE'
+	return family == 'CG' or family == 'CGD' or family == 'CQB' or family == 'CMSE'
 	
 def check_discontinuous(family):
-	return family == 'Discontinuous Lagrange' or family == 'DGD' or family == 'DQB' or family == 'DMSE'
+	return family == 'DG' or family == 'DGD' or family == 'DQB' or family == 'DMSE'
 	
 class ThemisElement():
-	def __init__(self,elem,sptsH1=None,sptsL2=None):
+	def __init__(self,elem,sptsH1=None,sptsL2=None): #THESE SPTS SHOULD REALLY BE DIFFERENT VARIANTS I THINK...
 		
 		#extract the "base" element for VectorElements
 		#also get ndofs
+
 		if isinstance(elem,VectorElement):
 			self._ndofs = elem.value_size() #do this BEFORE extracting baseelem
 			elem = elem.sub_elements()[0]
@@ -21,66 +22,129 @@ class ThemisElement():
 			self._ndofs = 1
 			
 		#check that we are either a 1D "CG"/"DG" element, OR a Tensor Product of these elements, OR an enriched element made up of Hdiv/Hcurl that are made of TP of 1D elements
+
+		#oneD = False
+		#if elem.cell().num_vertices() == 2: #we are on an interval
+		#	oneD = True
 		
-		oneD = False
-		if (elem.cell().num_vertices() == 2) and (check_continuous(elem.family()) or check_discontinuous(elem.family())): #1D
-			oneD = True
-		elif isinstance(elem,TensorProductElement):
-			for subelem in elem.sub_elements():
-				if (subelem.cell().num_vertices() == 2) and (check_continuous(subelem.family()) or check_discontinuous(subelem.family())):
-					pass
-				else:
-					raise TypeError("Themis does not support Tensor Product Elements made with anything other than 1D CG/DG")
-		elif isinstance(elem,EnrichedElement):
-			for subelem in elem._elements:
-				if isinstance(subelem,HDivElement) or isinstance(subelem,HCurlElement):
-					subelem = subelem._element
-					if not isinstance(subelem,TensorProductElement):
-						raise TypeError("Themis does not support Enriched elements made with anything other than HDiv/HCurl elements (which are themselves Tensor Products of 1D CG/DG elements)  or TensorProductElements made of 1D CG/DG elements")
-					for subsubelem in subelem.sub_elements():
-						if (subsubelem.cell().num_vertices() == 2) and (check_continuous(subsubelem.family()) or check_discontinuous(subsubelem.family())):
-							pass
-						else:
-							raise TypeError("Themis does not support Enriched elements made with anything other than HDiv/HCurl elements (which are themselves Tensor Products of 1D CG/DG elements) or TensorProductElements made of 1D CG/DG elements")
-				if isinstance(subelem,TensorProductElement):
-					for subsubelem in subelem.sub_elements():
-						if (subsubelem.cell().num_vertices() == 2) and (check_continuous(subsubelem.family()) or check_discontinuous(subsubelem.family())):
-							pass
-						else:
-							raise TypeError("Themis does not support Enriched elements made with anything other than HDiv/HCurl elements (which are themselves Tensor Products of 1D CG/DG elements) or TensorProductElements made of 1D CG/DG elements")					
-				else:
-					raise TypeError("Themis does not support Enriched elements made with anything other than HDiv/HCurl elements (which are themselves Tensor Products of 1D CG/DG elements)")
-		else:
-			raise TypeError("Themis supports only Tensor Product elements made with 1D CG/DG, or Enriched (possibly HDiv/HCurl) versions of these (except for 1D CG/DG)")
+		#REVISE THIS
+		#if (elem.cell().num_vertices() == 2) and (check_continuous(elem.family()) or check_discontinuous(elem.family())): #1D
+		#	oneD = True
+		#elif isinstance(elem,TensorProductElement):
+			#for subelem in elem.sub_elements():
+				#if (subelem.cell().num_vertices() == 2) and (check_continuous(subelem.family()) or check_discontinuous(subelem.family())):
+					#pass
+				#else:
+					#raise TypeError("Themis does not support Tensor Product Elements made with anything other than 1D CG/DG")
+		#elif isinstance(elem,EnrichedElement):
+			#for subelem in elem._elements:
+				#if isinstance(subelem,HDivElement) or isinstance(subelem,HCurlElement):
+					#subelem = subelem._element
+					#if not isinstance(subelem,TensorProductElement):
+						#raise TypeError("Themis does not support Enriched elements made with anything other than HDiv/HCurl elements (which are themselves Tensor Products of 1D CG/DG elements)  or TensorProductElements made of 1D CG/DG elements")
+					#for subsubelem in subelem.sub_elements():
+						#if (subsubelem.cell().num_vertices() == 2) and (check_continuous(subsubelem.family()) or check_discontinuous(subsubelem.family())):
+							#pass
+						#else:
+							#raise TypeError("Themis does not support Enriched elements made with anything other than HDiv/HCurl elements (which are themselves Tensor Products of 1D CG/DG elements) or TensorProductElements made of 1D CG/DG elements")
+				#if isinstance(subelem,TensorProductElement):
+					#for subsubelem in subelem.sub_elements():
+						#if (subsubelem.cell().num_vertices() == 2) and (check_continuous(subsubelem.family()) or check_discontinuous(subsubelem.family())):
+							#pass
+						#else:
+							#raise TypeError("Themis does not support Enriched elements made with anything other than HDiv/HCurl elements (which are themselves Tensor Products of 1D CG/DG elements) or TensorProductElements made of 1D CG/DG elements")					
+				#else:
+					#raise TypeError("Themis does not support Enriched elements made with anything other than HDiv/HCurl elements (which are themselves Tensor Products of 1D CG/DG elements)")
+		#else:
+			#raise TypeError("Themis supports only Tensor Product elements made with 1D CG/DG, or Enriched (possibly HDiv/HCurl) versions of these (except for 1D CG/DG)")
 
 		#create list of subelements
-			
-		self._subelemlist = []
-		if oneD:
-			self._subelemlist.append([elem,])
-			self._ncomp = 1
-		elif isinstance(elem,EnrichedElement):
-			for ci in range(len(elem._elements)):
-				self._subelemlist.append([])
-				if isinstance(elem._elements[ci],HDivElement) or isinstance(elem._elements[ci],HCurlElement):
-					subelements = elem._elements[ci]._element.sub_elements()
-				if isinstance(elem._elements[ci],TensorProductElement):
-					subelements = elem._elements[ci].sub_elements()
-				for subelem in subelements:
-					self._subelemlist[ci].append(subelem)
-			self._ncomp = len(elem._elements)
-				
-		elif isinstance(elem,TensorProductElement):
-			self._subelemlist.append([])
-			subelements = elem.sub_elements()
-			for subelem in subelements:
-				self._subelemlist[0].append(subelem)
-			self._ncomp = 1	
 		
-		self._cont = []
+		#THIS IS NOW BROKEN
+		#self._subelemlist = []
+		#if oneD:
+			#self._subelemlist.append([elem,])
+			#self._ncomp = 1
+		#elif isinstance(elem,EnrichedElement):
+			#for ci in range(len(elem._elements)):
+				#self._subelemlist.append([])
+				#if isinstance(elem._elements[ci],HDivElement) or isinstance(elem._elements[ci],HCurlElement):
+					#subelements = elem._elements[ci]._element.sub_elements()
+				#if isinstance(elem._elements[ci],TensorProductElement):
+					#subelements = elem._elements[ci].sub_elements()
+				#for subelem in subelements:
+					#self._subelemlist[ci].append(subelem)
+			#self._ncomp = len(elem._elements)
+				
+		#elif isinstance(elem,TensorProductElement):
+			#self._subelemlist.append([])
+			#subelements = elem.sub_elements()
+			#for subelem in subelements:
+				#self._subelemlist[0].append(subelem)
+			#self._ncomp = 1	
+
+		#print(elem)
+		#print(elem.family())
+		#print(elem.variant())
+		#print(elem.degree())
+		#print(self._ndofs)
+		#print(type(elem.variant()))
+		
+		#FIX THIS STUFF UP FOR MORE GENERAL ELEMENTS
+		family_to_continuity = {}
+		family_to_continuity['DQ'] = 'L2'
+		family_to_continuity['Q'] = 'H1'
+		variant_to_elemname = {}
+		variant_to_elemname['chrisH1'] = 'CG'
+		variant_to_elemname['chrisL2'] = 'DG'
+		variant_to_elemname['H1'] = 'CG'
+		variant_to_elemname['L2'] = 'DG'
+		#####################
+		
+		self._elemnamelist = []
+		self._degreelist = []
+		self._contlist = []
+		
+		degree = elem.degree()
+		variant = elem.variant()
+		if elem.variant() == None: variant = '' #EVENTUALLY REMOVE THIS
+		if elem.cell().cellname() == 'interval':
+			self._ncomp = 1
+			cont = family_to_continuity[elem.family()]
+			self._degreelist.append([degree,])
+			self._contlist.append([cont,])
+			self._elemnamelist.append([variant_to_elemname[variant + cont],])
+			
+		if elem.cell().cellname() == 'quadrilateral':
+			if elem.family() == 'DQ' or elem.family() == 'Q':
+				self._ncomp = 1
+				cont = family_to_continuity[elem.family()]
+				self._degreelist.append([degree,degree])
+				self._contlist.append([cont,cont])
+				self._elemnamelist.append([variant_to_elemname[variant + cont],variant_to_elemname[variant + cont]])
+			if elem.family() == 'RTCF':
+				self._ncomp = 2
+				self._degreelist.append([degree,degree-1])
+				self._degreelist.append([degree-1,degree])
+				self._contlist.append(['H1','L2'])
+				self._contlist.append(['L2','H1'])
+				self._elemnamelist.append([variant_to_elemname[variant + 'H1'],variant_to_elemname[variant + 'L2']])
+				self._elemnamelist.append([variant_to_elemname[variant + 'L2'],variant_to_elemname[variant + 'H1']])				
+			if elem.family() == 'RTCE':
+				self._ncomp = 2
+				self._degreelist.append([degree-1,degree])
+				self._degreelist.append([degree,degree-1])
+				self._contlist.append(['L2','H1'])
+				self._contlist.append(['H1','L2'])
+				self._elemnamelist.append([variant_to_elemname[variant + 'L2'],variant_to_elemname[variant + 'H1']])				
+				self._elemnamelist.append([variant_to_elemname[variant + 'H1'],variant_to_elemname[variant + 'L2']])
+
+		#FIX THIS
+		if elem.cell().cellname() == 'tensorproduct':
+			raise ValueError("tensor product cells not implemented yet!")
+		
 		self._nbasis = []
 		self._ndofs_per_element = []
-		self._degree = []
 		self._offsets = []
 		self._offset_mult = []
 		self._basis = []
@@ -89,54 +153,46 @@ class ThemisElement():
 		for ci in range(self._ncomp):
 			self._nbasis.append([])
 			self._ndofs_per_element.append([])
-			self._degree.append([])
 			self._offsets.append([])
 			self._offset_mult.append([])
 			self._basis.append([])
 			self._derivs.append([])
 			self._spts.append([])
-			self._cont.append([])
-			for subelem in self._subelemlist[ci]:
-				#compute degrees
-				self._degree[ci].append(subelem.degree())
-
-				#compute continuities
-				if check_continuous(subelem.family()): self._cont[ci].append('H1')
-				if check_discontinuous(subelem.family()): self._cont[ci].append('L2')
+			for elemname,degree in zip(self._elemnamelist[ci],self._degreelist[ci]):
 				
 				#compute number of shape functions in each direction (=nbasis); and number of degrees of freedom per element
-				self._nbasis[ci].append(subelem.degree() + 1)
-				if subelem.family() == 'Lagrange': self._ndofs_per_element[ci].append(subelem.degree())
-				if subelem.family() == 'Discontinuous Lagrange': self._ndofs_per_element[ci].append(subelem.degree() + 1)
-				if subelem.family() == 'CGD': self._ndofs_per_element[ci].append(1)
-				if subelem.family() == 'DGD': self._ndofs_per_element[ci].append(1)
-				if subelem.family() == 'CQB': self._ndofs_per_element[ci].append(subelem.degree())
-				if subelem.family() == 'DQB': self._ndofs_per_element[ci].append(subelem.degree() + 1)
-				if subelem.family() == 'CMSE': self._ndofs_per_element[ci].append(subelem.degree())
-				if subelem.family() == 'DMSE': self._ndofs_per_element[ci].append(subelem.degree() + 1)
+				self._nbasis[ci].append(degree + 1)
+				if elemname == 'CG': self._ndofs_per_element[ci].append(degree)
+				if elemname == 'DG': self._ndofs_per_element[ci].append(degree + 1)
+				if elemname == 'CGD': self._ndofs_per_element[ci].append(1)
+				if elemname == 'DGD': self._ndofs_per_element[ci].append(1)
+				if elemname == 'CQB': self._ndofs_per_element[ci].append(degree)
+				if elemname == 'DQB': self._ndofs_per_element[ci].append(degree + 1)
+				if elemname == 'CMSE': self._ndofs_per_element[ci].append(degree)
+				if elemname == 'DMSE': self._ndofs_per_element[ci].append(degree + 1)
 				
 				#compute offsets and offset mults
-				if subelem.family() == 'Lagrange': of,om = _CG_offset_info(subelem.degree())
-				if subelem.family() == 'Discontinuous Lagrange': of,om = _DG_offset_info(subelem.degree())
-				if subelem.family() == 'CGD': of,om = _CGD_offset_info(subelem.degree()) 
-				if subelem.family() == 'DGD': of,om = _DGD_offset_info(subelem.degree()) 
-				if subelem.family() == 'CQB': of,om = _CG_offset_info(subelem.degree()) #MIGHT BE WRONG?
-				if subelem.family() == 'DQB': of,om = _DG_offset_info(subelem.degree()) #MIGHT BE WRONG?
-				if subelem.family() == 'CMSE': of,om = _CG_offset_info(subelem.degree())
-				if subelem.family() == 'DMSE': of,om = _DG_offset_info(subelem.degree())
+				if elemname == 'CG': of,om = _CG_offset_info(degree)
+				if elemname == 'DG': of,om = _DG_offset_info(degree)
+				if elemname == 'CGD': of,om = _CGD_offset_info(degree) 
+				if elemname == 'DGD': of,om = _DGD_offset_info(degree) 
+				if elemname == 'CQB': of,om = _CG_offset_info(degree) #MIGHT BE WRONG?
+				if elemname == 'DQB': of,om = _DG_offset_info(degree) #MIGHT BE WRONG?
+				if elemname == 'CMSE': of,om = _CG_offset_info(degree)
+				if elemname == 'DMSE': of,om = _DG_offset_info(degree)
 				
 				self._offsets[ci].append(of)
 				self._offset_mult[ci].append(om)
 					
 				#compute basis and deriv functions
-				if subelem.family() == 'Lagrange': b,d,s = _CG_basis(subelem.degree(),spts=sptsH1)
-				if subelem.family() == 'Discontinuous Lagrange': b,d,s = _DG_basis(subelem.degree(),spts=sptsL2)
-				if subelem.family() == 'CGD': b,d,s = _CGD_basis(subelem.degree())
-				if subelem.family() == 'DGD': b,d,s = _DGD_basis(subelem.degree())
-				if subelem.family() == 'CQB': b,d,s = _CQB_basis(subelem.degree())
-				if subelem.family() == 'DQB': b,d,s = _DQB_basis(subelem.degree())
-				if subelem.family() == 'CMSE': b,d,s = _CMSE_basis(subelem.degree(),spts=sptsH1)
-				if subelem.family() == 'DMSE': b,d,s = _DMSE_basis(subelem.degree(),spts=sptsL2)
+				if elemname == 'CG': b,d,s = _CG_basis(degree,spts=sptsH1)
+				if elemname == 'DG': b,d,s = _DG_basis(degree,spts=sptsL2)
+				if elemname == 'CGD': b,d,s = _CGD_basis(degree)
+				if elemname == 'DGD': b,d,s = _DGD_basis(degree)
+				if elemname == 'CQB': b,d,s = _CQB_basis(degree)
+				if elemname == 'DQB': b,d,s = _DQB_basis(degree)
+				if elemname == 'CMSE': b,d,s = _CMSE_basis(degree,spts=sptsH1)
+				if elemname == 'DMSE': b,d,s = _DMSE_basis(degree,spts=sptsL2)
 				self._basis[ci].append(b)
 				self._derivs[ci].append(d)
 				self._spts[ci].append(s)
@@ -152,16 +208,16 @@ class ThemisElement():
 				self._spts[ci].append(s)
 	
 	def get_continuity(self,ci,direc):
-		return self._cont[ci][direc]
+		return self._contlist[ci][direc]
 	
 	def get_nx(self,ci,direc,ncell,bc):
-		fam = self._subelemlist[ci][direc].family()
-		if fam == 'Lagrange' or fam == 'CQB' or fam == 'CMSE':
-			nx = self._subelemlist[ci][direc].degree() * ncell
+		fam = self._elemnamelist[ci][direc]
+		if fam == 'CG' or fam == 'CQB' or fam == 'CMSE':
+			nx = self._degreelist[ci][direc] * ncell
 			if (not bc == 'periodic'):
 				nx = nx + 1
-		if fam == 'Discontinuous Lagrange' or fam == 'DQB' or fam == 'DMSE':
-			nx = (self._subelemlist[ci][direc].degree()+1) * ncell
+		if fam == 'DG' or fam == 'DQB' or fam == 'DMSE':
+			nx = (self._degreelist[ci][direc]+1) * ncell
 		if fam == 'CGD':
 			nx = ncell
 			if (not bc == 'periodic'):
@@ -253,18 +309,19 @@ class ThemisElement():
 
 		
 	def get_icells(self,ci,direc,ncell,bc,interior_facet):
-		subelem = self._subelemlist[ci][direc]
-		if subelem.family() == 'Lagrange': return _CG_interaction_cells(ncell,bc,interior_facet,subelem.degree())
-		if subelem.family() == 'Discontinuous Lagrange': return _DG_interaction_cells(ncell,bc,interior_facet,subelem.degree())
-		if subelem.family() == 'CGD': return _CGD_interaction_cells(ncell,bc,interior_facet,subelem.degree())
-		if subelem.family() == 'DGD': return _DGD_interaction_cells(ncell,bc,interior_facet,subelem.degree())
-		if subelem.family() == 'CQB': return _CG_interaction_cells(ncell,bc,interior_facet,subelem.degree()) #MIGHT BE WRONG?
-		if subelem.family() == 'DQB': return _DG_interaction_cells(ncell,bc,interior_facet,subelem.degree()) #MIGHT BE WRONG?
-		if subelem.family() == 'CMSE': return _CG_interaction_cells(ncell,bc,interior_facet,subelem.degree())
-		if subelem.family() == 'DMSE': return _DG_interaction_cells(ncell,bc,interior_facet,subelem.degree())
+		elemname = self._elemnamelist[ci][direc]
+		degree = self._degreelist[ci][direc]
+		if elemname == 'CG': return _CG_interaction_cells(ncell,bc,interior_facet,degree)
+		if elemname == 'DG': return _DG_interaction_cells(ncell,bc,interior_facet,degree)
+		if elemname == 'CGD': return _CGD_interaction_cells(ncell,bc,interior_facet,degree)
+		if elemname == 'DGD': return _DGD_interaction_cells(ncell,bc,interior_facet,degree)
+		if elemname == 'CQB': return _CG_interaction_cells(ncell,bc,interior_facet,degree) #MIGHT BE WRONG?
+		if elemname == 'DQB': return _DG_interaction_cells(ncell,bc,interior_facet,degree) #MIGHT BE WRONG?
+		if elemname == 'CMSE': return _CG_interaction_cells(ncell,bc,interior_facet,degree)
+		if elemname == 'DMSE': return _DG_interaction_cells(ncell,bc,interior_facet,degree)
 				
 	def maxdegree(self):
-		return max(max(self._degree))
+		return max(max(self._degreelist))
 
 	def get_info(self,ci,direc,x):
 		b = self.get_basis(ci,direc,x)
@@ -466,4 +523,3 @@ _CMSE_basis = _CG_basis
 
 def _DMSE_basis(order,spts=None):
 	pass
-	

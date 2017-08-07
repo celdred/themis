@@ -8,6 +8,7 @@ from ufl import VectorElement
 from mpi4py import MPI
 from function import Function
 from constant import Constant
+import functools
 
 def compile_functional(kernel,tspace,sspace,mesh):
 	
@@ -49,7 +50,7 @@ def compile_functional(kernel,tspace,sspace,mesh):
 	
 	#THIS NEEDS SOME SORT OF CACHING CHECK!
 	assembly_routine = generate_assembly_routine(mesh,tspace,sspace,kernel)
-	assembly_routine = assembly_routine.encode('ascii','ignore')
+	#assembly_routine = assembly_routine.encode('ascii','ignore')
 	kernel.assemble_function= instant.build_module( code=assembly_routine,
 		  include_dirs=include_dirs,
 		  library_dirs=library_dirs,
@@ -122,18 +123,18 @@ def AssembleTwoForm(mat,tspace,sspace,kernel,zeroassembly=False):
 			#SHOULD REALLY DO 1 ASSEMBLY PER PATCH
 			#get the list of das
 			tdalist = []
-			for ci1 in xrange(tspace.ncomp):
+			for ci1 in range(tspace.ncomp):
 				for bi in range(mesh.npatches):
 					tdalist.append(tspace.get_da(ci1,bi))
 			sdalist = []
-			for ci2 in xrange(sspace.ncomp):
+			for ci2 in range(sspace.ncomp):
 				for bi in range(mesh.npatches):
 					sdalist.append(sspace.get_da(ci2,bi))
 
 			#get the block sub matrices
 			submatlist = []
-			for ci1 in xrange(tspace.ncomp):
-				for ci2 in xrange(sspace.ncomp):
+			for ci1 in range(tspace.ncomp):
+				for ci2 in range(sspace.ncomp):
 					for bi in range(mesh.npatches):
 						isrow_block = tspace.get_component_block_lis(ci1,bi)
 						iscol_block = sspace.get_component_block_lis(ci2,bi)
@@ -153,8 +154,8 @@ def AssembleTwoForm(mat,tspace,sspace,kernel,zeroassembly=False):
 			
 			#restore sub matrices
 			k=0
-			for ci1 in xrange(tspace.ncomp):
-					for ci2 in xrange(sspace.ncomp):
+			for ci1 in range(tspace.ncomp):
+					for ci2 in range(sspace.ncomp):
 						for bi in range(mesh.npatches):
 							isrow_block = tspace.get_component_block_lis(ci1,bi)
 							iscol_block = sspace.get_component_block_lis(ci2,bi)
@@ -213,7 +214,7 @@ def AssembleZeroForm(mesh,kernellist):
 
 def AssembleOneForm(veclist,space,kernel):
 	
-	print 'oneform',kernel.integral_type
+	#print('oneform',kernel.integral_type)
 	
 	name = 'test'
 	
@@ -247,7 +248,7 @@ def AssembleOneForm(veclist,space,kernel):
 				
 			#get the list of das
 			tdalist = []
-			for ci1 in xrange(space.ncomp):
+			for ci1 in range(space.ncomp):
 				for bi in range(mesh.npatches):
 					tdalist.append(space.get_da(ci1,bi))
 
@@ -268,7 +269,7 @@ def compute_1d_bounds(ci1,ci2,i,elem1,elem2,ncell,ndofs,interior_facet,bc,ranges
 	leftmostcells = icells[:,0]
 	rightmostcells = icells[:,1]
 
-	for i in xrange(ranges1[0],ranges1[1]):
+	for i in range(ranges1[0],ranges1[1]):
 		leftmostcell = leftmostcells[i]
 		rightmostcell = rightmostcells[i]
 		leftbound = leftmost_offsets[0] + leftmostcell * leftmost_offsetmult[0]
@@ -326,11 +327,15 @@ def two_form_preallocate_opt(mesh,space1,space2,ci1,ci2,bi,interior_x,interior_y
 		dnnzarr = dnnz_x
 		nnzarr = nnz_x
 	if mesh.ndim == 2:
-		dnnzarr = reduce(np.multiply, np.ix_(dnnz_y,dnnz_x)) #np.ravel(np.outer(nnz_x,nnz_y))
-		nnzarr = reduce(np.multiply, np.ix_(nnz_y,nnz_x)) #np.ravel(np.outer(nnz_x,nnz_y))
+		#dnnzarr = reduce(np.multiply, np.ix_(dnnz_y,dnnz_x)) #np.ravel(np.outer(nnz_x,nnz_y))
+		#nnzarr = reduce(np.multiply, np.ix_(nnz_y,nnz_x)) #np.ravel(np.outer(nnz_x,nnz_y))
+		dnnzarr = functools.reduce(np.multiply, np.ix_(dnnz_y,dnnz_x)) #np.ravel(np.outer(nnz_x,nnz_y))
+		nnzarr = functools.reduce(np.multiply, np.ix_(nnz_y,nnz_x)) #np.ravel(np.outer(nnz_x,nnz_y))
 	if mesh.ndim == 3:
-		dnnzarr = reduce(np.multiply, np.ix_(dnnz_z,dnnz_y,dnnz_x))
-		nnzarr = reduce(np.multiply, np.ix_(nnz_z,nnz_y,nnz_x))
+		#dnnzarr = reduce(np.multiply, np.ix_(dnnz_z,dnnz_y,dnnz_x))
+		#nnzarr = reduce(np.multiply, np.ix_(nnz_z,nnz_y,nnz_x))
+		dnnzarr = functools.reduce(np.multiply, np.ix_(dnnz_z,dnnz_y,dnnz_x))
+		nnzarr = functools.reduce(np.multiply, np.ix_(nnz_z,nnz_y,nnz_x))
 	onnzarr = nnzarr - dnnzarr
 	
 		#see http://stackoverflow.com/questions/17138393/numpy-outer-product-of-n-vectors

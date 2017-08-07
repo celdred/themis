@@ -6,23 +6,23 @@ from solver import NonlinearVariationalProblem,NonlinearVariationalSolver
 
 #NEEDS FIREDRAKE ATTRIBUTION
 class Projector():
-    """
-    A projector projects a UFL expression into a function space
-    and places the result in a function from that function space,
-    allowing the solver to be reused. Projection reverts to an assign
-    operation if ``v`` is a :class:`.Function` and belongs to the same
-    function space as ``v_out``.
+	"""
+	A projector projects a UFL expression into a function space
+	and places the result in a function from that function space,
+	allowing the solver to be reused. Projection reverts to an assign
+	operation if ``v`` is a :class:`.Function` and belongs to the same
+	function space as ``v_out``.
 
-    :arg v: the :class:`ufl.Expr` or
-         :class:`.Function` to project or a
-         list of :class:`ufl.Expr`
-    :arg v_out: :class:`.Function` to put the result in
-    :arg solver_parameters: parameters to pass to the solver used when
-         projecting.
-    """
-	
-	
-    def __init__(self, v, v_out, bcs=None, options_prefix=None, solver_parameters=None):
+	:arg v: the :class:`ufl.Expr` or
+		 :class:`.Function` to project or a
+		 list of :class:`ufl.Expr`
+	:arg v_out: :class:`.Function` to put the result in
+	:arg solver_parameters: parameters to pass to the solver used when
+		 projecting.
+	"""
+
+
+	def __init__(self, v, v_out, bcs=None, options_prefix=None, solver_parameters=None):
 		if type(v) == type([]) or type(v) == type(()):
 			vlist = v
 		else:
@@ -67,11 +67,11 @@ class Projector():
 			problem = NonlinearVariationalProblem(lhs- rhs,v_out,bcs=bcs,constant_jacobian=True)
 			self.solver = NonlinearVariationalSolver(problem,options_prefix=options_prefix,solver_parameters=solver_parameters)
 
-    def project(self):
-        """
-        Apply the projection.
-        """
-        if self._same_fspace:
-            self.v_out.assign(self.v)
-        else:
-            self.solver.solve()
+	def project(self):
+		"""
+		Apply the projection.
+		"""
+		if self._same_fspace:
+			self.v_out.assign(self.v)
+		else:
+			self.solver.solve()

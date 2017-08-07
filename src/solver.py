@@ -195,7 +195,7 @@ class NonlinearVariationalSolver(): #solving_utils.ParametersMixin
 		ismixed = self.problem.u.space.nspaces > 1
 		pc = self.snes.getKSP().getPC()
 		if ismixed: 
-			for si1 in xrange(self.Jform.target.nspaces):
+			for si1 in range(self.Jform.target.nspaces):
 				indices = self.Jform.target.get_field_gis(si1)
 				name = str(si1)
 				pc.setFieldSplitIS((name,indices))

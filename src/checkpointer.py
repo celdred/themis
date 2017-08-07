@@ -42,7 +42,7 @@ class Checkpoint():
 		group = self._get_data_group()
 		self._write_timestep_attr(group)
 		self.viewer.pushGroup(group)
-		for bi in xrange(quadcoeff.npatches):
+		for bi in range(quadcoeff.npatches):
 			quadcoeff.vecs[bi].setName(name + str(bi))
 			self.viewer.view(obj=quadcoeff.vecs[bi])
 		self.viewer.popGroup()
@@ -54,7 +54,7 @@ class Checkpoint():
 		group = self._get_data_group()
 		self.viewer.pushGroup(group)
 		name = name or quadcoeff.name()
-		for bi in xrange(quadcoeff.npatches):
+		for bi in range(quadcoeff.npatches):
 			quadcoeff.vecs[bi].setName(name + str(bi))
 			quadcoeff.vecs[bi].load(self.viewer)
 		self.viewer.popGroup()
@@ -77,9 +77,9 @@ class Checkpoint():
 				silist = [field._si,]
 			for si in silist:
 				soff = field.space.get_space_offset(si)
-				for ci in xrange(field.space.get_space(si).ncomp):
+				for ci in range(field.space.get_space(si).ncomp):
 					coff = field.space.get_space(si).get_component_offset(ci)
-					for bi in xrange(field.space.get_space(si).npatches):
+					for bi in range(field.space.get_space(si).npatches):
 						splitglobalvec[bi+soff+coff].setName(name + '_' + str(si) + '_' + str(ci) + '_' + str(bi))
 						self.viewer.view(obj=splitglobalvec[bi+soff+coff])
 		self.viewer.popGroup()
@@ -97,9 +97,9 @@ class Checkpoint():
 				silist = [field._si,]
 			for si in silist:
 				soff = field.space.get_space_offset(si)
-				for ci in xrange(field.space.get_space(si).ncomp):
+				for ci in range(field.space.get_space(si).ncomp):
 					coff = field.space.get_space(si).get_component_offset(ci)
-					for bi in xrange(field.space.get_space(si).npatches):
+					for bi in range(field.space.get_space(si).npatches):
 						splitglobalvec[bi+soff+coff].setName(name + '_' + str(si) + '_' + str(ci) + '_' + str(bi))
 						splitglobalvec[bi+soff+coff].load(self.viewer)
 		self.viewer.popGroup()

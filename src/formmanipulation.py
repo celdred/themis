@@ -16,51 +16,51 @@ from ufl import MixedElement
 #NEEDS ATTRIBUTION- BASICALLY UFL VERSION WITH SOME FIREDRAKE CODE...
 class FormSplitter(MultiFunction):
 
-    def split(self, form, ix=0, iy=0):
-        # Remember which block to extract
-        self.idx = [ix, iy]
-        args = form.arguments()
-        if len(args) == 0:
-            # Functional can't be split
-            return form
-        if all(len(a.function_space()) == 1 for a in args): #not mixed, just return self
+	def split(self, form, ix=0, iy=0):
+		# Remember which block to extract
+		self.idx = [ix, iy]
+		args = form.arguments()
+		if len(args) == 0:
+			# Functional can't be split
+			return form
+		if all(len(a.function_space()) == 1 for a in args): #not mixed, just return self
 			#SHOULD/CAN THESE BE RESTORED?
 			#WHAT EXACTLY WERE THEY CHECKING?
-            #assert (len(idx) == 1 for idx in self.blocks.values())
-            #assert (idx[0] == 0 for idx in self.blocks.values())
-            return form
-        return map_integrand_dags(self, form)
+			#assert (len(idx) == 1 for idx in self.blocks.values())
+			#assert (idx[0] == 0 for idx in self.blocks.values())
+			return form
+		return map_integrand_dags(self, form)
 
-    def argument(self, obj):
-        Q = obj.ufl_function_space()
-        dom = Q.ufl_domain()
-        sub_elements = obj.ufl_element().sub_elements()
+	def argument(self, obj):
+		Q = obj.ufl_function_space()
+		dom = Q.ufl_domain()
+		sub_elements = obj.ufl_element().sub_elements()
 
-        # If not a mixed element, do nothing
-        if not isinstance(obj.ufl_element(),MixedElement):
+		# If not a mixed element, do nothing
+		if not isinstance(obj.ufl_element(),MixedElement):
 			return obj
 
         # Split into sub-elements, creating appropriate space for each
-        args = []
-        for i, sub_elem in enumerate(sub_elements):
-            Q_i = FunctionSpace(dom, sub_elem)
-            a = Argument(Q_i, obj.number(), part=obj.part())
+		args = []
+		for i, sub_elem in enumerate(sub_elements):
+			Q_i = FunctionSpace(dom, sub_elem)
+			a = Argument(Q_i, obj.number(), part=obj.part())
 
-            indices = [()]
-            for m in a.ufl_shape:
-                indices = [(k + (j,)) for k in indices for j in range(m)]
+			indices = [()]
+			for m in a.ufl_shape:
+				indices = [(k + (j,)) for k in indices for j in range(m)]
 
-            if (i == self.idx[obj.number()]):
-                args += [a[j] for j in indices]
-            else:
-                args += [Zero() for j in indices]
+			if (i == self.idx[obj.number()]):
+				args += [a[j] for j in indices]
+			else:
+				args += [Zero() for j in indices]
 
-        return as_vector(args)
+		return as_vector(args)
 
-    def multi_index(self, obj):
-        return obj
+	def multi_index(self, obj):
+		return obj
 
-    expr = MultiFunction.reuse_if_untouched
+	expr = MultiFunction.reuse_if_untouched
    
 #NEEDS FIREDRAKE ATTRIBUTION!
 def split_form(form):

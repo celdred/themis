@@ -5,7 +5,7 @@ import numpy as np
 from functionspace import FunctionSpace
 from function import Function
 
-from ufl import Mesh,FiniteElement,TensorProductElement,interval,VectorElement
+from ufl import Mesh,FiniteElement,TensorProductElement,interval,VectorElement,quadrilateral
 
 #THIS IS AN UGLY HACK NEEDED BECAUSE OWNERSHIP RANGES ARGUMENT TO petc4py DMDA_CREATE is BROKEN
 decompfunction_code = r"""
@@ -73,7 +73,7 @@ class MeshBase(Mesh):
 		
 		sizes = []
 		ndofs_per_cell = [] #this is the number of "unique" dofs per element ie 1 for DG0, 2 for DG1, 1 for CG1, 2 for CG2, etc.
-		for i in xrange(self.ndim):
+		for i in range(self.ndim):
 			nx = elem.get_nx(ci,i,self.nxs[b][i],self.bcs[i])
 			ndofs = elem.get_ndofs_per_element(ci,i)
 			
@@ -225,13 +225,7 @@ class SingleBlockMesh(MeshBase):
 			self._edgez_das = [edgez_da,]		
 			self._edgez_nxs = [edgez_nxs,]
 
-		#ADD ACTUAL COORDINATE FUNCTION INITIALIZATION HERE
-
 		#construct coordelem
-		#FIX THIS- SHOULD USE H1 FOR NON-PERIODIC!
-		#Use DG for periodic boundaries to avoid wrapping issues
-		h1elem = FiniteElement("CG", interval, 1) #1 dof per element = linear
-		l2elem = FiniteElement("DG", interval, 1) #2 dofs per element = linear
 		elemlist = []
 		dxs = []
 		pxs = []
@@ -240,20 +234,26 @@ class SingleBlockMesh(MeshBase):
 			dxs.append(2.)
 			pxs.append(0.)
 			lxs.append(2. * nxs[i])
-			#if bcs[i] == 'periodic':
-			elemlist.append(l2elem)
-			#else:
-			#	elemlist.append(h1elem)
-		celem = TensorProductElement(*elemlist)
-		if len(nxs) == 1:
-			celem = elemlist[0]
+			#elemlist.append(l2elem)
+		#celem = TensorProductElement(*elemlist)
+
 		if not (coordelem == None):
 			celem = coordelem
+		else:
+			if len(nxs) == 1:
+				celem = FiniteElement("DG",interval,1) #FIX THIS- HOW SHOULD WE DEFAULT HERE?
+				#celem = FiniteElement("DG",interval,1,variant='chris') #FIX THIS- HOW SHOULD WE DEFAULT HERE?
+			if len(nxs) == 2:
+				celem = FiniteElement("DG",quadrilateral,1) #FIX THIS- HOW SHOULD WE DEFAULT HERE?
+				#celem = FiniteElement("DG",quadrilateral,1,variant='chris') #FIX THIS- HOW SHOULD WE DEFAULT HERE?
+			if len(nxs) == 3:
+				raise ValueError("3D NEEDS TO BE A TENSOR PRODUCT ELEMENT- FIX THIS!")
 		celem = VectorElement(celem,dim=self.ndim)
 
 		Mesh.__init__(self,celem)
 		
 		#THIS BREAKS FOR COORDELEM NOT DG1...
+		#SO NEED
 		#construct and set coordsvec
 		coordsspace = FunctionSpace(self,celem)
 		self.coordinates = Function(coordsspace,name='coords')
@@ -271,6 +271,10 @@ class SingleBlockMesh(MeshBase):
 			
 		self.coordinates.scatter()
 
+#ONLY REALLY WORKING FOR DG1...
+#NEED TO BE MUCH MORE CLEVER HERE...
+#REALLY WHAT WE WANT TO DO HERE IS CREATE THE UNDERLYING [0,nx1 * dx1] x ... coordinate field
+#THEN THE USER SETS THE GEOMETRY SOME OTHER WAY!
 def create_uniform_nodal_coords(dm,nxs,pxs,lxs,dxs,bcs,localnxs):
 	xmin = 0.0
 	xmax = 0.0

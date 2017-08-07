@@ -21,7 +21,7 @@ class FieldObject():
 facet_integrals = ['interior_facet_x','interior_facet_y','interior_facet_z','exterior_facet_x_top','exterior_facet_x_bottom','exterior_facet_y_top','exterior_facet_y_bottom','exterior_facet_z_top','exterior_facet_z_bottom',]
 def generate_assembly_routine(mesh,space1,space2,kernel):		
 	#load templates
-	templateLoader = jinja2.FileSystemLoader( searchpath=["../../src","../src","","../../../src"] )
+	templateLoader = jinja2.FileSystemLoader( searchpath=["../../gitrepo/src",] )
 	
 	#create environment
 	templateEnv = jinja2.Environment( loader=templateLoader, trim_blocks=True)
@@ -223,7 +223,7 @@ def generate_assembly_routine(mesh,space1,space2,kernel):
 		fieldobj.offset_mult_z = []
 
 		fieldobj.ndofs = fspace.get_space(si).themis_element().ndofs()
-		for ci in xrange(fspace.get_space(si).ncomp):
+		for ci in range(fspace.get_space(si).ncomp):
 			elem = fspace.get_space(si).themis_element()
 	
 			#THESE SHOULD EVENTUALLY TAKE A BLOCK INDEX
@@ -365,6 +365,8 @@ def generate_assembly_routine(mesh,space1,space2,kernel):
 		templateVars['evaluate'] = 0
 	
 	#FIX THIS- HOW DO WE DETERMINE MATRIX FREE?
+	#HOW ARE MATRIX-FREE KERNELS SUPPORTED?
+	
 	#if functional.assemblytype == 'tensor-product-matrixfree':
 	#	templateVars['matrixfree'] = 1
 	#else:
@@ -372,7 +374,7 @@ def generate_assembly_routine(mesh,space1,space2,kernel):
 
 	# Process template to produce source code
 	outputText = template.render( templateVars )
-
+	
 	return outputText
 		
 

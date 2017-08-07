@@ -49,15 +49,15 @@ class FunctionSpace(UFLFunctionSpace):
 	
 
 	def destroy(self):
-		for ci in xrange(self.ncomp):
-			for bi in xrange(self.npatches):
+		for ci in range(self.ncomp):
+			for bi in range(self.npatches):
 				self._da[ci][bi].destroy()
 				self._lgmaps[ci][bi].destroy()
 		self._composite_da.destroy()
 
 	def output(self):
-		for ci in xrange(self.ncomp):
-			for bi in xrange(self.npatches):
+		for ci in range(self.ncomp):
+			for bi in range(self.npatches):
 				da_output(self.get_da(ci,bi),self._name + '.da_cb' + str(ci) + '.' + str(bi))
 				lgmap_output(self.get_lgmap(ci,bi),self._name + '.lgmap_cb.' + str(ci) + '.' + str(bi))
 				is_output(self.get_component_block_lis(ci,bi),self._name + '.cb_lis.' + str(ci) + '.' + str(bi))
@@ -225,7 +225,7 @@ class FunctionSpace(UFLFunctionSpace):
 		self._da = []
 		self._lgmaps = []
 		self._component_offsets = []
-		for ci in xrange(self.ncomp):
+		for ci in range(self.ncomp):
 			self._component_offsets.append(self.npatches*ci)
 			das = []
 			lgmaps = []
@@ -264,24 +264,24 @@ class MixedFunctionSpace(UFLMixedFunctionSpace):
 
 		#create composite DM for component-block wise view
 		self._composite_da = PETSc.DMComposite().create()
-		for si in xrange(self.nspaces): 
-			for ci in xrange(self.get_space(si).ncomp):
-				for bi in xrange(self.get_space(si).npatches):
+		for si in range(self.nspaces): 
+			for ci in range(self.get_space(si).ncomp):
+				for bi in range(self.get_space(si).npatches):
 					self._composite_da.addDM(self.get_space(si).get_da(ci,bi))
 		self._composite_da.setUp()
 
 		#compute space offsets ie how far in a list of component until space k starts
 		s = 0
 		self._space_offsets = []
-		for si in xrange(self.nspaces):
+		for si in range(self.nspaces):
 			self._space_offsets.append(s)
 			s = s + self._spaces[si].ncomp * self._spaces[si].npatches
 
 		#Create correct FIELD local and global IS's since DMComposite can't handle nested DMComposites in this case
 		lndofs_total = 0
-		for si in xrange(self.nspaces): 	#determine offset into global vector
-			for ci in xrange(self.get_space(si).ncomp):
-				for bi in xrange(self.get_space(si).npatches):
+		for si in range(self.nspaces): 	#determine offset into global vector
+			for ci in range(self.get_space(si).ncomp):
+				for bi in range(self.get_space(si).npatches):
 					lndofs_total = lndofs_total + self.get_space(si).get_localndofs(ci,bi)
 
 		mpicomm = PETSc.COMM_WORLD.tompi4py()
@@ -292,12 +292,12 @@ class MixedFunctionSpace(UFLMixedFunctionSpace):
 		self._field_gis = []
 		ghostedlocaloffset = 0 #this is the offset for a given FIELD!
 		localoffset = 0 #this is the offset for a given FIELD!
-		for si in xrange(self.nspaces):
+		for si in range(self.nspaces):
 			#sum up the number of ghosted ndofs for the whole space
 			totalghostedspacendofs = 0
 			totalspacendofs = 0
-			for ci in xrange(self.get_space(si).ncomp):
-				for bi in xrange(self.get_space(si).npatches):
+			for ci in range(self.get_space(si).ncomp):
+				for bi in range(self.get_space(si).npatches):
 					totalghostedspacendofs = totalghostedspacendofs + self.get_space(si).get_localghostedndofs(ci,bi)
 					totalspacendofs = totalspacendofs + self.get_space(si).get_localndofs(ci,bi)
 			#create a strided index set of this size starting at the correct point

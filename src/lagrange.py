@@ -85,9 +85,9 @@ def gauss_radau(n):
 #My own stuff
 
 def LagrangePoly(x,order,i,xi=None):
-	if xi==None:
+	if not (xi is not None):
 		xi=symbols('x:%d'%(order+1))
-	index = range(order+1)
+	index = list(range(order+1))
 	index.pop(i)
 	return sympy.prod([(x-xi[j])/(xi[i]-xi[j]) for j in index])
     

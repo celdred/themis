@@ -74,7 +74,8 @@ def PeriodicRectangleMesh(nx, ny, Lx, Ly, direction="both",quadrilateral=True):
 	Creates a domain with extent [0,Lx] x [0,Ly]
 
 	"""
-
+	if not quadrilateral:
+		raise ValueError("Themis does not support non-quadrilateral cells in 2D")
 	for n in (nx, ny):
 		if n <= 0 or n % 1:
 			raise ValueError("Number of cells must be a postive integer")
@@ -132,6 +133,8 @@ def RectangleMesh(nx, ny, Lx, Ly,quadrilateral=True):
 	Creates a domain with extent [0,Lx] x [0,Ly]
 	"""
 
+	if not quadrilateral:
+		raise ValueError("Themis does not support non-quadrilateral cells in 2D")
 	for n in (nx, ny):
 		if n <= 0 or n % 1:
 			raise ValueError("Number of cells must be a postive integer")

@@ -52,7 +52,8 @@ class Constant(ufl.Coefficient):
 		return float(self.dat)
 	
 	def name(self):
-		return self.__str__().translate(None,'{}')
+		#return self.__str__().translate(None,'{}')
+		return self.__str__().translate(str.maketrans('', '', '{}'))
 		
 	def evaluate(self, x, mapping, component, index_values):
 		"""Return the evaluation of this :class:`Constant`.

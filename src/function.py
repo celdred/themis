@@ -124,9 +124,9 @@ class Function(Coefficient):
 			with PETSc.Log.Event('create_local'):
 				#create local vectors- one for EACH component on each PATCH
 				self._lvectors = []
-				for si in xrange(self.space.nspaces):
-					for ci in xrange(self.space.get_space(si).ncomp):
-						for bi in xrange(self.space.get_space(si).npatches):
+				for si in range(self.space.nspaces):
+					for ci in range(self.space.get_space(si).ncomp):
+						for bi in range(self.space.get_space(si).npatches):
 							self._lvectors.append(self.space.get_space(si).get_da(ci,bi).createLocalVector())
 
 			if self.space.nspaces > 1:

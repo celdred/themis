@@ -7,14 +7,13 @@ from tsfc_interface import compile_form
 #############3
 
 def create_matrix(mat_type,target,source,blocklist,kernellist):
-	
 	#block matrix
 	if mat_type == 'nest' and (target.nspaces > 1 or source.nspaces > 1):
 		#create matrix array
 		matrices = []			
-		for si1 in xrange(target.nspaces):
+		for si1 in range(target.nspaces):
 			matrices.append([])
-			for si2 in xrange(source.nspaces):
+			for si2 in range(source.nspaces):
 				if ((si1,si2) in blocklist):
 					bindex = blocklist.index((si1,si2))
 					mat = create_mono(target.get_space(si1),source.get_space(si2),[(0,0),],[kernellist[bindex],])
@@ -23,8 +22,8 @@ def create_matrix(mat_type,target,source,blocklist,kernellist):
 				matrices[si1].append(mat)
 		
 		#do an empty assembly
-		for si1 in xrange(target.nspaces):
-			for si2 in xrange(source.nspaces):
+		for si1 in range(target.nspaces):
+			for si2 in range(source.nspaces):
 				if ((si1,si2) in blocklist):
 					bindex = blocklist.index((si1,si2))
 					fill_mono(matrices[si1][si2],target.get_space(si1),source.get_space(si2),[(0,0),],[kernellist[bindex],],zeroassembly=True)
@@ -60,16 +59,16 @@ def create_empty(target,source):
 	#create matrix			
 	mlist = []
 	nlist = []
-	for si1 in xrange(target.nspaces):
+	for si1 in range(target.nspaces):
 		tspace = target.get_space(si1)
-		for ci1 in xrange(tspace.ncomp):
-			for bi1 in xrange(tspace.npatches):
+		for ci1 in range(tspace.ncomp):
+			for bi1 in range(tspace.npatches):
 				m = tspace.get_localndofs(ci1,bi1)
 				mlist.append(m)
-	for si2 in xrange(source.nspaces):
+	for si2 in range(source.nspaces):
 		sspace = source.get_space(si2)
-		for ci2 in xrange(sspace.ncomp):						
-			for bi2 in xrange(sspace.npatches):						
+		for ci2 in range(sspace.ncomp):						
+			for bi2 in range(sspace.npatches):						
 				n = sspace.get_localndofs(ci2,bi2)
 				nlist.append(n)
 	
@@ -90,16 +89,16 @@ def create_mono(target,source,blocklist,kernellist):
 	#create matrix			
 	mlist = []
 	nlist = []			
-	for si1 in xrange(target.nspaces):
+	for si1 in range(target.nspaces):
 		tspace = target.get_space(si1)
-		for ci1 in xrange(tspace.ncomp):
-			for bi1 in xrange(tspace.npatches):
+		for ci1 in range(tspace.ncomp):
+			for bi1 in range(tspace.npatches):
 				m = tspace.get_localndofs(ci1,bi1)
 				mlist.append(m)
-	for si2 in xrange(source.nspaces):
+	for si2 in range(source.nspaces):
 		sspace = source.get_space(si2)
-		for ci2 in xrange(sspace.ncomp):						
-			for bi2 in xrange(sspace.npatches):						
+		for ci2 in range(sspace.ncomp):						
+			for bi2 in range(sspace.npatches):						
 				n = sspace.get_localndofs(ci2,bi2)
 				nlist.append(n)
 				
@@ -121,14 +120,14 @@ def create_mono(target,source,blocklist,kernellist):
 	i = 0 #this tracks which row "block" are at
 	#This loop order ensures that we fill an entire row in the matrix first
 	#Assuming that fields are stored si,ci,bi, which they are!
-	for si1 in xrange(target.nspaces):
+	for si1 in range(target.nspaces):
 		tspace = target.get_space(si1)
-		for ci1 in xrange(tspace.ncomp):
+		for ci1 in range(tspace.ncomp):
 			#only pre-allocate diagonal blocks, so one loop on bi
-			for bi in xrange(tspace.npatches): #here we can assume tspace.mesh = sspace.mesh, and therefore tspace.blocks = sspace.nblocks)
-				for si2 in xrange(source.nspaces):
+			for bi in range(tspace.npatches): #here we can assume tspace.mesh = sspace.mesh, and therefore tspace.blocks = sspace.nblocks)
+				for si2 in range(source.nspaces):
 					sspace = source.get_space(si2)
-					for ci2 in xrange(sspace.ncomp):
+					for ci2 in range(sspace.ncomp):
 						if ((si1,si2) in blocklist):
 							bindex = blocklist.index((si1,si2))
 							interior_x,interior_y,interior_z = get_interior_flags(kernellist[bindex])
@@ -160,9 +159,9 @@ def get_interior_flags(kernellist):
 
 def fill_mono(mat,target,source,blocklist,kernellist,zeroassembly=False):
 	#print blocklist
-	for si1 in xrange(target.nspaces):
+	for si1 in range(target.nspaces):
 		isrow = target.get_field_lis(si1)
-		for si2 in xrange(source.nspaces):
+		for si2 in range(source.nspaces):
 			iscol = source.get_field_lis(si2) 
 			if (si1,si2) in blocklist:
 				submat = get_block(mat,isrow,iscol)
@@ -204,27 +203,32 @@ class OneForm():
 		self.vector = self.space.get_composite_da().createGlobalVec()
 		self.vector.set(0.0)
 		self.lvectors = []
-		for si in xrange(self.space.nspaces):
-			for ci in xrange(self.space.get_space(si).ncomp):
-				for bi in xrange(self.space.get_space(si).npatches):
+		for si in range(self.space.nspaces):
+			for ci in range(self.space.get_space(si).ncomp):
+				for bi in range(self.space.get_space(si).npatches):
 					self.lvectors.append(self.space.get_space(si).get_da(ci,bi).createLocalVector())
 		
 		#compile local assembly kernels
 		idx_kernels = compile_form(F)
 		
-		self.local_assembly_kernels = {}
-		for idx,subkernels in idx_kernels:
-			self.local_assembly_kernels[idx] = subkernels
+		#self.local_assembly_kernels = {}
+		#for idx,subkernels in idx_kernels:
+			#self.local_assembly_kernels[idx] = subkernels
+		self.local_assembly_idx = []
+		self.local_assembly_kernels = []
+		for idx,kernels in idx_kernels:
+			self.local_assembly_idx.append(idx)
+			self.local_assembly_kernels.append(kernels)
 
 	#BROKEN- NAMES STUFF...
 	def output(self,view,ts=None):
 		with self.space.composite_da.getAccess(self.vector) as splitglobalvec:
 			k = 0 #this gives the index into the list of names
-			for si in xrange(self.space.nspaces):
+			for si in range(self.space.nspaces):
 				soff = self.space.get_space_offset(si)
-				for ci in xrange(self.space.get_space(si).ncomp):
+				for ci in range(self.space.get_space(si).ncomp):
 					coff = self.space.get_space(si).get_component_offset(ci)
-					for bi in xrange(self.space.get_space(si).nblocks):
+					for bi in range(self.space.get_space(si).nblocks):
 						if not (ts == None):
 							tname = self.names[k] + str(bi) + '_' + str(ts)
 						else:
@@ -258,9 +262,11 @@ class OneForm():
 			lvec.set(0.0)
 			
 		#assemble
-		blocklist = self.local_assembly_kernels.keys()
-		kernellist = self.local_assembly_kernels.values()
-		for si1 in xrange(self.space.nspaces):
+		#blocklist = self.local_assembly_kernels.keys()
+		#kernellist = self.local_assembly_kernels.values()
+		blocklist = self.local_assembly_idx
+		kernellist = self.local_assembly_kernels
+		for si1 in range(self.space.nspaces):
 			soff = self.space.get_space_offset(si1)
 			if (si1,) in blocklist:
 				bindex = blocklist.index((si1,))
@@ -301,21 +307,32 @@ class TwoForm():
 		self.Jp = Jp
 
 		#compile local assembly kernels
-		idx_kernels = compile_form(J)
-		self.mat_local_assembly_kernels = {}
-		for idx,subkernels in idx_kernels:
-			self.mat_local_assembly_kernels[idx] = subkernels
+		idx_kernels = compile_form(self.J)
+		#self.mat_local_assembly_kernels = {}
+		#for idx,subkernels in idx_kernels:
+			#self.mat_local_assembly_kernels[idx] = subkernels
+		self.mat_local_assembly_idx = []
+		self.mat_local_assembly_kernels = []
+		for idx,kernels in idx_kernels:
+			self.mat_local_assembly_idx.append(idx)
+			self.mat_local_assembly_kernels.append(kernels)
 		
 		if not self.Jp == None:
 			idx_kernels = compile_form(self.Jp)
-			self.pmat_local_assembly_kernels = {}
-			for idx,subkernels in idx_kernels:
-				self.pmat_local_assembly_kernels[idx] = subkernels
-		
+			#self.pmat_local_assembly_kernels = {}
+			#for idx,subkernels in idx_kernels:
+				#self.pmat_local_assembly_kernels[idx] = subkernels
+			self.pmat_local_assembly_idx = []
+			self.pmat_local_assembly_kernels = []
+			for idx,kernels in idx_kernels:
+				self.pmat_local_assembly_idx.append(idx)
+				self.pmat_local_assembly_kernels.append(kernels)
 		#create matrices
-		self.mat = create_matrix(mat_type,self.target,self.source,self.mat_local_assembly_kernels.keys(),self.mat_local_assembly_kernels.values())
+		#self.mat = create_matrix(mat_type,self.target,self.source,self.mat_local_assembly_kernels.keys(),self.mat_local_assembly_kernels.values())
+		self.mat = create_matrix(mat_type,self.target,self.source,self.mat_local_assembly_idx,self.mat_local_assembly_kernels)
 		if not self.Jp == None:
-			self.pmat = create_matrix(pmat_type,self.target,self.source,self.pmat_local_assembly_kernels.keys(),self.pmat_local_assembly_kernels.values())
+			#self.pmat = create_matrix(pmat_type,self.target,self.source,self.pmat_local_assembly_kernels.keys(),self.pmat_local_assembly_kernels.values())
+			self.pmat = create_matrix(pmat_type,self.target,self.source,self.pmat_local_assembly_idx,self.pmat_local_assembly_kernels)
 			
 	def destroy(self):
 		self.mat.destroy() #DOES DESTROYING A NEST AUTOMATICALLY DESTROY THE SUB MATRICES?
@@ -334,13 +351,13 @@ class TwoForm():
 		if not ((self.Jconstant == True) and (self.Jassembled == True)):
 			
 			#assemble
-			self._assemblehelper(J,self.mat_type,self.mat_local_assembly_kernels.keys(),self.mat_local_assembly_kernels.values())
+			self._assemblehelper(J,self.mat_type,self.mat_local_assembly_idx,self.mat_local_assembly_kernels)
 			self.Jassembled = True		
 
 		if (not (self.Jp == None)) and (not ((self.Pconstant == True) and (self.Passembled == True))):
 
 			#assemble
-			self._assemblehelper(P,self.pmat_type,self.pmat_local_assembly_kernels.keys(),self.pmat_local_assembly_kernels.values())
+			self._assemblehelper(P,self.pmat_type,self.pmat_local_assembly_idx,self.pmat_local_assembly_kernels)
 			self.Passembled = True
 
 		#restore the old active field
@@ -366,6 +383,7 @@ class ZeroForm():
 	def __init__(self,E):
 		self.E = E
 		idx_kernels = compile_form(E)
+		#SHOULD THIS BE [0][0]?
 		self.kernellist = idx_kernels[0][1] #This works because we only have 1 idx (0-forms have no arguments) and therefore only 1 kernel list
 		self.value = 0.
 		self.mesh = self.E.ufl_domain()
