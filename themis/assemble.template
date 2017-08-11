@@ -1,6 +1,4 @@
-#ifdef SWIG
-%include "petsc4py/petsc4py.i"
-#endif
+
 
 //THIS CAN MAYBE CHANGE/BE ELIMINATED NOW
  {% if formdim >= 1 %}
@@ -47,7 +45,6 @@ data_formvec_{{ ci }}[kk][jj][ii] += vals_{{ ci }} s1_{{ci}}_indices;
 #include <petsc.h>
 #include "math.h"
 #include <stdio.h>
-#include <numpy/arrayobject.h>
 
 //Actual kernel snippet
 		{{ kernelstr }}

@@ -1,6 +1,6 @@
 from petscshim import PETSc
-import instant
-from compilation_options import *
+# import instant
+# from compilation_options import *
 import numpy as np
 from functionspace import FunctionSpace
 from function import Function
@@ -9,9 +9,6 @@ from ufl import Mesh, FiniteElement, interval, VectorElement, quadrilateral
 
 # THIS IS AN UGLY HACK NEEDED BECAUSE OWNERSHIP RANGES ARGUMENT TO petc4py DMDA_CREATE is BROKEN
 decompfunction_code = r"""
-#ifdef SWIG
-%include "petsc4py/petsc4py.i"
-#endif
 
 #include <petsc.h>
 
@@ -58,11 +55,11 @@ return 0;
 }
 """
 
-decompfunction = instant.build_module(code=decompfunction_code,
-                                      include_dirs=include_dirs,
-                                      library_dirs=library_dirs,
-                                      libraries=libraries,
-                                      swig_include_dirs=swig_include_dirs).decompfunction
+from assembly import CompiledKernel
+import ctypes
+
+decompfunction = CompiledKernel(decompfunction_code, "decompfunction", cppargs=["-O3"], argtypes=[ctypes.c_voidp, ctypes.c_voidp,
+                                ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ], restype=ctypes.c_int)
 
 
 class MeshBase(Mesh):
@@ -94,7 +91,7 @@ class MeshBase(Mesh):
         if self.ndim == 2:
             ndofs_per_cell.append(1)
             bdx.append(0)
-        decompfunction(self._cell_das[b], da, self.ndim, ndofs_per_cell[0], ndofs_per_cell[1], ndofs_per_cell[2], int(bdx[0]), int(bdx[1]), int(bdx[2]))
+        decompfunction([self._cell_das[b], da], [self.ndim, ndofs_per_cell[0], ndofs_per_cell[1], ndofs_per_cell[2], int(bdx[0]), int(bdx[1]), int(bdx[2])])
         da.setUp()
 
         return da
@@ -123,13 +120,7 @@ class MeshBase(Mesh):
         return self._cell_das[b]
 
     def output(self, view):
-        for b in range(self._npatches):
-            da_output(self._cell_das[b], self.name + '.da.'+str(b))
-            da_output(self._edgex_das[b], self.name + '.edgex.da.'+str(b))
-            if self.ndim >= 2:
-                da_output(self._edgey_das[b], self.name + '.edgey.da.'+str(b))
-            if self.ndim >= 3:
-                da_output(self._edgez_das[b], self.name + '.edgez.da.'+str(b))
+        pass
 
     def destroy(self):
         for b in range(self.npatches):
@@ -202,18 +193,18 @@ class SingleBlockMesh(MeshBase):
         # print self.cell_da.getProcSizes()
         edgex_da = PETSc.DMDA().create(dim=self.ndim, dof=1, sizes=edgex_nxs, proc_sizes=cell_da.getProcSizes(), boundary_type=self._blist, stencil_type=PETSc.DMDA.StencilType.BOX, stencil_width=1, setup=False)
         # THIS IS AN UGLY HACK NEEDED BECAUSE OWNERSHIP RANGES ARGUMENT TO petc4py DMDA_CREATE is BROKEN
-        decompfunction(cell_da, edgex_da, self.ndim, 1, 1, 1, bdx, 0, 0)
+        decompfunction([cell_da, edgex_da], [self.ndim, 1, 1, 1, bdx, 0, 0])
         edgex_da.setUp()
 
         if self.ndim >= 2:
             edgey_da = PETSc.DMDA().create(dim=self.ndim, dof=1, sizes=edgey_nxs, proc_sizes=cell_da.getProcSizes(), boundary_type=self._blist, stencil_type=PETSc.DMDA.StencilType.BOX, stencil_width=1, setup=False)
             # THIS IS AN UGLY HACK NEEDED BECAUSE OWNERSHIP RANGES ARGUMENT TO petc4py DMDA_CREATE is BROKEN
-            decompfunction(cell_da, edgey_da, self.ndim, 1, 1, 1, 0, bdy, 0)
+            decompfunction([cell_da, edgey_da], [self.ndim, 1, 1, 1, 0, bdy, 0])
             edgey_da.setUp()
         if self.ndim >= 3:
             edgez_da = PETSc.DMDA().create(dim=self.ndim, dof=1, sizes=edgez_nxs, proc_sizes=cell_da.getProcSizes(), boundary_type=self._blist, stencil_type=PETSc.DMDA.StencilType.BOX, stencil_width=1, setup=False)
             # THIS IS AN UGLY HACK NEEDED BECAUSE OWNERSHIP RANGES ARGUMENT TO petc4py DMDA_CREATE is BROKEN
-            decompfunction(cell_da, edgez_da, self.ndim, 1, 1, 1, 0, 0, bdz)
+            decompfunction([cell_da, edgez_da], [self.ndim, 1, 1, 1, 0, 0, bdz])
             edgez_da.setUp()
 
         self._cell_das = [cell_da, ]
