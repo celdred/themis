@@ -1,4 +1,5 @@
-from assemble import compile_functional,extract_fields
+# from assemble import compile_functional,
+from assemble import extract_fields
 from tsfc_interface import ThemisKernel
 from petscshim import PETSc
 from codegenerator import generate_assembly_routine
@@ -7,7 +8,7 @@ from compilation_options import *
 
 from coffee import base as ast
 
-from ufl import MixedElement, TensorProductCell
+from ufl import MixedElement  # , TensorProductCell
 from ufl.corealg.map_dag import map_expr_dags
 from ufl.algorithms import extract_arguments, extract_coefficients
 
@@ -17,6 +18,7 @@ import tsfc
 import tsfc.kernel_interface.firedrake as firedrake_interface
 from tsfc.coffee import SCALAR_TYPE, generate as generate_coffee
 from tsfc.parameters import default_parameters
+
 
 def compile_element(expression, coordinates, parameters=None):
     """Generates C code for point evaluations.
@@ -108,119 +110,120 @@ def compile_element(expression, coordinates, parameters=None):
     kernel_code = builder.construct_kernel("evaluate_kernel", [result_arg, point_arg, x_arg, f_arg], body)
 
     # Fill the code template
-    extruded = isinstance(cell, TensorProductCell)
+    # extruded = isinstance(cell, TensorProductCell)
 
-    #code = {
-        #"geometric_dimension": cell.geometric_dimension(),
-        #"extruded_arg": ", %s nlayers" % as_cstr(IntType) if extruded else "",
-        #"nlayers": ", f->n_layers" if extruded else "",
-        #"IntType": as_cstr(IntType),
-    #}
+    # code = {
+    # "geometric_dimension": cell.geometric_dimension(),
+    # "extruded_arg": ", %s nlayers" % as_cstr(IntType) if extruded else "",
+    # "nlayers": ", f->n_layers" if extruded else "",
+    # "IntType": as_cstr(IntType),
+    # }
 
-    #evaluate_template_c = """static inline void wrap_evaluate(double *result, double *X, double *coords, %(IntType)s *coords_map, double *f, %(IntType)s *f_map%(extruded_arg)s, %(IntType)s cell);
+    # evaluate_template_c = """static inline void wrap_evaluate(double *result, double *X, double *coords, %(IntType)s *coords_map, double *f, %(IntType)s *f_map%(extruded_arg)s, %(IntType)s cell);
 
-#int evaluate(struct Function *f, double *x, double *result)
-#{
-    #struct ReferenceCoords reference_coords;
-    #%(IntType)s cell = locate_cell(f, x, %(geometric_dimension)d, &to_reference_coords, &reference_coords);
-    #if (cell == -1) {
-        #return -1;
-    #}
+# int evaluate(struct Function *f, double *x, double *result)
+# {
+    # struct ReferenceCoords reference_coords;
+    # %(IntType)s cell = locate_cell(f, x, %(geometric_dimension)d, &to_reference_coords, &reference_coords);
+    # if (cell == -1) {
+    # return -1;
+    # }
 
-    #if (!result) {
-        #return 0;
-    #}
+    # if (!result) {
+    # return 0;
+    # }
 
-    #wrap_evaluate(result, reference_coords.X, f->coords, f->coords_map, f->f, f->f_map%(nlayers)s, cell);
-    #return 0;
-#}
-#"""
+    # wrap_evaluate(result, reference_coords.X, f->coords, f->coords_map, f->f, f->f_map%(nlayers)s, cell);
+    # return 0;
+# }
+# """
 
 #    return (evaluate_template_c % code) + kernel_code.gencode()
     return kernel_code.gencode()
 
-
-	##FIX THIS
-	##create kernels with evaluate=1
-	#def eval_at_quad_pts(self):
-		#si = 0 #FIX FOR MIXED
-		#subspace = self.space.get_space(si)
-		#if self.continuity == 'H1':
-			#evalfunc = Functional('standard.functional','h1_eval',-1,geometrylist=['detJ',],evaluate=True,valstype='scalar',fields=[(self,('field',),(si,))])
-		#if self.continuity == 'L2':
-			#evalfunc = Functional('standard.functional','l2_eval',-1,geometrylist=['detJ',],evaluate=True,valstype='scalar',fields=[(self,('field',),(si,))])
-		#if self.continuity == 'Hdiv':
-			#evalfunc = Functional('standard.functional','truncated_hdiv_eval',-1,geometrylist=['detJ','J'],evaluate=True,valstype='vector',fields=[(self,('field',),(si,))])
-		#if self.continuity == 'Hcurl':
-			#evalfunc = Functional('standard.functional','hcurl_eval',-1,geometrylist=['detJ','Jinv'],evaluate=True,valstype='vector',fields=[(self,('field',),(si,))])
-		#EvaluateCoefficient(self.evalcoeff,evalfunc,self.evalquad)
-		#return evalcoeff
+    # FIX THIS
+    # create kernels with evaluate=1
+    # def eval_at_quad_pts(self):
+    # si = 0 #FIX FOR MIXED
+    # subspace = self.space.get_space(si)
+    # if self.continuity == 'H1':
+    # evalfunc = Functional('standard.functional','h1_eval',-1,geometrylist=['detJ',],evaluate=True,valstype='scalar',fields=[(self,('field',),(si,))])
+    # if self.continuity == 'L2':
+    # evalfunc = Functional('standard.functional','l2_eval',-1,geometrylist=['detJ',],evaluate=True,valstype='scalar',fields=[(self,('field',),(si,))])
+    # if self.continuity == 'Hdiv':
+    # evalfunc = Functional('standard.functional','truncated_hdiv_eval',-1,geometrylist=['detJ','J'],evaluate=True,valstype='vector',fields=[(self,('field',),(si,))])
+    # if self.continuity == 'Hcurl':
+    # evalfunc = Functional('standard.functional','hcurl_eval',-1,geometrylist=['detJ','Jinv'],evaluate=True,valstype='vector',fields=[(self,('field',),(si,))])
+    # EvaluateCoefficient(self.evalcoeff,evalfunc,self.evalquad)
+    # return evalcoeff
 
 
 class EmptyClass():
-	pass
+    pass
 
-#MIXED SPACES NEED TO BE CLEVER WITH HOW THEY USE FIELDS
-#PROBABLY HAVE A SPACE ARGUMENT HERE
-#THIS TAKES I THINK AN SI ARGUMENT AND A CONTINUITY ARGUMENT...
+# MIXED SPACES NEED TO BE CLEVER WITH HOW THEY USE FIELDS
+# PROBABLY HAVE A SPACE ARGUMENT HERE
+# THIS TAKES I THINK AN SI ARGUMENT AND A CONTINUITY ARGUMENT...
 
-def create_evaluate_kernel(mesh,field,quad,name):
-	
-	test = compile_element(field,mesh.coordinates)
-	print test
-	
-	fakekernel = EmptyClass()
-	fakekernel.ast = ''
-	fakekernel.integral_type = 'cell'
-	fakekernel.oriented = False
-	fakekernel.coefficient_numbers = [0,] #FIX FOR ACTUAL FUNCTIONAL...
-	
-	kernel = ThemisKernel(fakekernel)
 
-	kernel.formdim = -1
-	kernel.evaluate = 1
-	kernel.name = name
-	kernel.mesh = mesh
-	kernel.coefficient_map = {} #FIX FOR ACTUAL FUNCTIONAL...
-	kernel.coefficients = [] #FIX FOR ACTUAL FUNCTIONAL...
-	kernel.quad = quad
-	
-	return kernel
-	
-def EvaluateCoefficient(coefficient,kernel):
-	with PETSc.Log.Stage(coefficient.name() + '_assemble'):
+def create_evaluate_kernel(mesh, field, quad, name):
 
-		with PETSc.Log.Event('compile'):
-			if not kernel.assemblycompiled:
-				mesh = coefficient.mesh
-				
-				#THIS NEEDS SOME SORT OF CACHING CHECK!
-				assembly_routine = generate_assembly_routine(mesh,None,None,kernel)
-				assembly_routine = assembly_routine.encode('ascii','ignore')
-				kernel.assemble_function= instant.build_module( code=assembly_routine,
-					  include_dirs=include_dirs,
-					  library_dirs=library_dirs,
-					  libraries=libraries,
-					  init_code = '    import_array();',
-					  cppargs=['-O3',],
-					  swig_include_dirs=swig_include_dirs).evaluate
-		        kernel.assemblycompiled = True
-		                         
-		#scatter fields into local vecs
-		with PETSc.Log.Event('extract'):
-			fieldargs_list = extract_fields(kernel)
+    test = compile_element(field, mesh.coordinates)
+    print(test)
 
-		#evaluate
-		with PETSc.Log.Event('evaluate'):
-			for bi in range(coefficient.mesh.npatches):
-				if kernel.integral_type == 'cell':
-					da = coefficient.mesh.get_cell_da(bi)
-				#if kernel.integral_type == 'facet' and functional.facet_direc == 'x':
-					#da = coefficient.mesh.edgex_das[bi]
-				#if kernel.integral_type == 'facet' and functional.facet_direc == 'y':
-					#da = coefficient.mesh.edgey_das[bi]
-				#if kernel.integral_type == 'facet' and functional.facet_direc == 'z':
-					#da = coefficient.mesh.edgez_das[bi]
-					
-				#BROKEN FOR MULTIPATCH- FIELD ARGS LIST NEEDS A BI INDEX
-				kernel.assemble_function(da,*([coefficient.dms[bi],coefficient.vecs[bi]] + fieldargs_list))
+    fakekernel = EmptyClass()
+    fakekernel.ast = ''
+    fakekernel.integral_type = 'cell'
+    fakekernel.oriented = False
+    fakekernel.coefficient_numbers = [0, ]  # FIX FOR ACTUAL FUNCTIONAL...
+
+    kernel = ThemisKernel(fakekernel)
+
+    kernel.formdim = -1
+    kernel.evaluate = 1
+    kernel.name = name
+    kernel.mesh = mesh
+    kernel.coefficient_map = {}  # FIX FOR ACTUAL FUNCTIONAL...
+    kernel.coefficients = []  # FIX FOR ACTUAL FUNCTIONAL...
+    kernel.quad = quad
+
+    return kernel
+
+
+def EvaluateCoefficient(coefficient, kernel):
+    with PETSc.Log.Stage(coefficient.name() + '_assemble'):
+
+        with PETSc.Log.Event('compile'):
+            if not kernel.assemblycompiled:
+                mesh = coefficient.mesh
+
+                # THIS NEEDS SOME SORT OF CACHING CHECK!
+                assembly_routine = generate_assembly_routine(mesh, None, None, kernel)
+                assembly_routine = assembly_routine.encode('ascii', 'ignore')
+                kernel.assemble_function = instant.build_module(code=assembly_routine,
+                                                                include_dirs=include_dirs,
+                                                                library_dirs=library_dirs,
+                                                                libraries=libraries,
+                                                                init_code='    import_array();',
+                                                                cppargs=['-O3', ],
+                                                                swig_include_dirs=swig_include_dirs).evaluate
+                kernel.assemblycompiled = True
+
+        # scatter fields into local vecs
+        with PETSc.Log.Event('extract'):
+            fieldargs_list = extract_fields(kernel)
+
+        # evaluate
+        with PETSc.Log.Event('evaluate'):
+            for bi in range(coefficient.mesh.npatches):
+                if kernel.integral_type == 'cell':
+                    da = coefficient.mesh.get_cell_da(bi)
+                # if kernel.integral_type == 'facet' and functional.facet_direc == 'x':
+                    # da = coefficient.mesh.edgex_das[bi]
+                # if kernel.integral_type == 'facet' and functional.facet_direc == 'y':
+                    # da = coefficient.mesh.edgey_das[bi]
+                # if kernel.integral_type == 'facet' and functional.facet_direc == 'z':
+                    # da = coefficient.mesh.edgez_das[bi]
+
+                # BROKEN FOR MULTIPATCH- FIELD ARGS LIST NEEDS A BI INDEX
+                kernel.assemble_function(da, *([coefficient.dms[bi], coefficient.vecs[bi]] + fieldargs_list))

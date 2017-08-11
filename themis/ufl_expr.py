@@ -1,19 +1,23 @@
-from ufl import Argument
+# from ufl import Argument
 from ufl.split_functions import split
 
-from ufl.assertions import ufl_assert
-from ufl.algorithms import extract_arguments, extract_coefficients
+# from ufl.assertions import ufl_assert
+# from ufl.algorithms import  extract_coefficients
+from ufl.algorithms import extract_arguments
 
 import ufl
 from function import Function
 
+
 class Argument(ufl.Argument):
-	def function_space(self):
-		return self.ufl_function_space()
+    def function_space(self):
+        return self.ufl_function_space()
 
 ####################
-#THESE ARE FROM FIREDRAKE
-#NEED ATTRIBUTION 
+# THESE ARE FROM FIREDRAKE
+# NEED ATTRIBUTION
+
+
 def TestFunction(function_space, part=None):
     """Build a test function on the specified function space.
     :arg function_space: the :class:`.FunctionSpace` to build the test
@@ -71,11 +75,11 @@ def derivative(form, u, du=None, coefficient_derivatives=None):
         wrong (instead one should have written ``split(u)``).
     See also :func:`ufl.derivative`.
     """
-   #EVENTUALLY ADD THIS CHECKING BACK IN!
-   # if set(extract_coefficients(form)) & set(u.split()):
+    # EVENTUALLY ADD THIS CHECKING BACK IN!
+    # if set(extract_coefficients(form)) & set(u.split()):
     #    raise ValueError("Taking derivative of form wrt u, but form contains coefficients from u.split()."
-     #                    "\nYou probably meant to write split(u) when defining your form.")
-    
+    #                    "\nYou probably meant to write split(u) when defining your form.")
+
     if du is None:
         if isinstance(u, Function):
             V = u.function_space()
@@ -109,9 +113,7 @@ def adjoint(form, reordered_arguments=None):
                                         number=u.number(),
                                         part=u.part()))
     return ufl.adjoint(form, reordered_arguments)
-    
-#NEED A WRAPPER FOR CONSTANT/VECTOR CONSTANT/TENSOR CONSTANT
-#MAYBE- SEE WHAT FIREDRAKE DOES HERE!
-#CONSTANT IS A FIREDRAKE THING THAT NEEDS THINKING ABOUT..
 
-
+# NEED A WRAPPER FOR CONSTANT/VECTOR CONSTANT/TENSOR CONSTANT
+# MAYBE- SEE WHAT FIREDRAKE DOES HERE!
+# CONSTANT IS A FIREDRAKE THING THAT NEEDS THINKING ABOUT..

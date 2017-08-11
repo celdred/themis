@@ -10,7 +10,7 @@ if sys.version_info < (3, 5):
 
 setup(name="Themis",
       version="0.1",
-      description="patch-structured Gelerkin toolkit",
+      description="patch-structured Galerkin framework",
       author="Chris Eldred and others",
       author_email="chris.eldred@gmail.com",
       url="",

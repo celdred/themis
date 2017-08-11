@@ -2,7 +2,7 @@
 %include "petsc4py/petsc4py.i"
 #endif
 
-
+//THIS CAN MAYBE CHANGE/BE ELIMINATED NOW
  {% if formdim >= 1 %}
  {% for ci in range(nci1) %}
 #define s1_{{ci}}_indices [lz + {{  nbasis1_z[ci]  }} * (ly + {{ nbasis1_y[ci]  }} * lx)]
@@ -17,6 +17,8 @@
 #define s2_{{ci}}_indices_moff [ci2off + mz + {{  nbasis2_z[ci]  }} * (my + {{ nbasis2_y[ci]  }} * mx)]
  {% endfor %}
 {% endif %}
+
+//THIS CAN MAYBE CHANGE NOW?
 
 {%macro SETVALS(ci) -%}
 //THIS ORDERING OF ROWS IS THEMIS SPECIFIC...
@@ -122,10 +124,6 @@ PetscScalar evaluate(DM da {{ valsargs }} {{ fieldargs }} {{ constantargs }})
    {% endfor %}
  {% endif %}
 
-const   PetscScalar wts_x[{{ npts_x }}] = {{ wts_x }};
-const   PetscScalar wts_y[{{ npts_y }}] = {{ wts_y }};
-const   PetscScalar wts_z[{{ npts_z }}] = {{ wts_z }};
-
  {% if formdim == 2 %}
   {% for ci2 in range(nci2) %}
 const   PetscInt offsets2_x_{{ ci2 }}[{{ nbasis2_x[ci2] }}] = {{ offsets2_x[ci2] }};
@@ -134,12 +132,7 @@ const   PetscInt offsets2_z_{{ ci2 }}[{{ nbasis2_z[ci2] }}] = {{ offsets2_z[ci2]
 const   PetscInt offset_mult2_x_{{ ci2 }}[{{ nbasis2_x[ci2] }}] = {{ offset_mult2_x[ci2] }};
 const   PetscInt offset_mult2_y_{{ ci2 }}[{{ nbasis2_y[ci2] }}] = {{ offset_mult2_y[ci2] }};
 const   PetscInt offset_mult2_z_{{ ci2 }}[{{ nbasis2_z[ci2] }}] = {{ offset_mult2_z[ci2] }};
-const   PetscScalar basis2_x_{{ ci2 }}[{{ nbasis2_x[ci2] }}][{{ npts_x }}] = {{ basis2_x[ci2] }};
-const   PetscScalar basis2_y_{{ ci2 }}[{{ nbasis2_y[ci2] }}][{{ npts_y }}] = {{ basis2_y[ci2] }};
-const   PetscScalar basis2_z_{{ ci2 }}[{{ nbasis2_z[ci2] }}][{{ npts_z }}] = {{ basis2_z[ci2] }};
-const   PetscScalar derivs2_x_{{ ci2 }}[{{ nbasis2_x[ci2] }}][{{ npts_x }}] = {{ derivs2_x[ci2] }};
-const   PetscScalar derivs2_y_{{ ci2 }}[{{ nbasis2_y[ci2] }}][{{ npts_y }}] = {{ derivs2_y[ci2] }};
-const   PetscScalar derivs2_z_{{ ci2 }}[{{ nbasis2_z[ci2] }}][{{ npts_z }}] = {{ derivs2_z[ci2] }};
+
   {% endfor %}
   {% endif %}
  {% if formdim >= 1 %}
@@ -150,12 +143,7 @@ const   PetscInt offsets1_z_{{ ci1 }}[{{ nbasis1_z[ci1] }}] = {{ offsets1_z[ci1]
 const   PetscInt offset_mult1_x_{{ ci1 }}[{{ nbasis1_x[ci1] }}] = {{ offset_mult1_x[ci1] }};
 const   PetscInt offset_mult1_y_{{ ci1 }}[{{ nbasis1_y[ci1] }}] = {{ offset_mult1_y[ci1] }};
 const   PetscInt offset_mult1_z_{{ ci1 }}[{{ nbasis1_z[ci1] }}] = {{ offset_mult1_z[ci1] }};
-const   PetscScalar basis1_x_{{ ci1 }}[{{ nbasis1_x[ci1] }}][{{ npts_x }}] = {{ basis1_x[ci1] }};
-const   PetscScalar basis1_y_{{ ci1 }}[{{ nbasis1_y[ci1] }}][{{ npts_y }}] = {{ basis1_y[ci1] }};
-const   PetscScalar basis1_z_{{ ci1 }}[{{ nbasis1_z[ci1] }}][{{ npts_z }}] = {{ basis1_z[ci1] }};
-const   PetscScalar derivs1_x_{{ ci1 }}[{{ nbasis1_x[ci1] }}][{{ npts_x }}] = {{ derivs1_x[ci1] }};
-const   PetscScalar derivs1_y_{{ ci1 }}[{{ nbasis1_y[ci1] }}][{{ npts_y }}] = {{ derivs1_y[ci1] }};
-const   PetscScalar derivs1_z_{{ ci1 }}[{{ nbasis1_z[ci1] }}][{{ npts_z }}] = {{ derivs1_z[ci1] }};
+
   {% endfor %}
   {% endif %}
 
@@ -168,12 +156,6 @@ const   PetscInt {{field.name}}_{{k}}_offsets_z[{{ field.nbasis_z[k] }}] = {{ fi
 const   PetscInt {{field.name}}_{{k}}_offset_mult_x[{{ field.nbasis_x[k] }}] = {{ field.offset_mult_x[k] }};
 const   PetscInt {{field.name}}_{{k}}_offset_mult_y[{{ field.nbasis_y[k] }}] = {{ field.offset_mult_y[k] }};
 const   PetscInt {{field.name}}_{{k}}_offset_mult_z[{{ field.nbasis_z[k] }}] = {{ field.offset_mult_z[k] }};
-const   PetscScalar {{field.name}}_{{k}}_basis_x[{{ field.nbasis_x[k] }}][{{ npts_x }}] = {{ field.basis_x[k] }};
-const   PetscScalar {{field.name}}_{{k}}_basis_y[{{ field.nbasis_y[k] }}][{{ npts_y }}] = {{ field.basis_y[k] }};
-const   PetscScalar {{field.name}}_{{k}}_basis_z[{{ field.nbasis_z[k] }}][{{ npts_z }}] = {{ field.basis_z[k] }};
-const   PetscScalar {{field.name}}_{{k}}_derivs_x[{{ field.nbasis_x[k] }}][{{ npts_x }}] = {{ field.derivs_x[k] }};
-const   PetscScalar {{field.name}}_{{k}}_derivs_y[{{ field.nbasis_y[k] }}][{{ npts_y }}] = {{ field.derivs_y[k] }};
-const   PetscScalar {{field.name}}_{{k}}_derivs_z[{{ field.nbasis_z[k] }}][{{ npts_z }}] = {{ field.derivs_z[k] }};
 
 #define {{field.name}}_{{k}}_indices [fieldoffset + lz + {{  field.nbasis_z[k]  }} * (ly + {{ field.nbasis_y[k]  }} * lx)][d]
 
@@ -189,6 +171,9 @@ const   PetscScalar {{field.name}}_{{k}}_derivs_z[{{ field.nbasis_z[k] }}][{{ np
     {% endfor %}
   {% endfor %}
  
+ {% for tabulation in tabulations %}
+ const   PetscScalar {{ tabulation.name }}[{{ tabulation.npts }}][{{ tabulation.nbasis }}] = {{ tabulation.values }};
+ {% endfor %}
 
  {% for field in fieldlist %}
       {% for k in range(field.ncomp) %}
@@ -286,7 +271,8 @@ for (k=zs; k<zs+zm; k++) {
 		}}}
 	 {% endfor %}
 		{% endif %}
-		
+
+//THIS CAN MAYBE CHANGE/BE ELIMINATED NOW
 		//extract element dofs from local dofs
 		//THIS IS REALLY THE DIFFERENCE BETWEEN STRUCTURED AND UNSTRUCTURED
 		
@@ -350,8 +336,12 @@ for (k=zs; k<zs+zm; k++) {
 				 {% for field in fieldplusconstantslist %}
 				 ,{{field}}
 				{% endfor %}
+				 {% for tabulation in tabulations %}
+				 ,{{tabulation.name}}
+				{% endfor %}
 			);
-			
+
+//THIS CAN MAYBE CHANGE/BE ELIMINATED NOW
 			//unsplat vals
 			//THIS CAN/SHOULD BE OPTIMIZED AWAY FOR SINGLE COMPONENT STUFF
 		//THIS IS REALLY THE DIFFERENCE BETWEEN STRUCTURED AND UNSTRUCTURED

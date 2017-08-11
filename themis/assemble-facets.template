@@ -3,29 +3,28 @@
 #endif
 
 
+//Key: we define 1 = - and 2 = +
+
 {% if facet_direc == 0 %}
-#define i1 (i - 1) 
+#define i1cell (i - 1) 
 {% else %}
-#define i1 (i) 
+#define i1cell (i) 
 {% endif %}
 {% if facet_direc == 1 %}
-#define j1 (j - 1) 
+#define j1cell (j - 1) 
 {% else %}
-#define j1 (j) 
+#define j1cell (j) 
 {% endif %}
 {% if facet_direc == 2 %}
-#define k1 (k - 1) 
+#define k1cell (k - 1) 
 {% else %}
-#define k1 (k) 
+#define k1cell (k) 
 {% endif %}
 
-#define i2 (i)
-#define j2 (j)
-#define k2 (k)
+#define i2cell (i)
+#define j2cell (j)
+#define k2cell (k)
 
-//FIX THESE- THEY NEED SOME SORT OF CELL ARGUMENT I THINK...
-//OR MAYBE WE PUT THAT INTO ci1off?
-//OR A NEW CELL OFFSET?
  {% if formdim >= 1 %}
  {% for ci in range(nci1) %}
 #define s1_{{ci}}_indices [lz + {{  nbasis1_z[ci]  }} * (ly + {{ nbasis1_y[ci]  }} * lx)]
@@ -33,7 +32,7 @@
 #define s1_{{ci}}_indices_noff [ci1off + nz + {{  nbasis1_z[ci]  }} * (ny + {{ nbasis1_y[ci]  }} * nx)]
  {% endfor %}
  {% endif %}
-  {% if formdim == 2 %}
+ {% if formdim == 2 %}
  {% for ci in range(nci2) %}
 #define s2_{{ci}}_indices [lz + {{  nbasis2_z[ci]  }} * (ly + {{ nbasis2_y[ci]  }} * lx)]
 #define s2_{{ci}}_indices_m [mz + {{  nbasis2_z[ci]  }} * (my + {{ nbasis2_y[ci]  }} * mx)]
@@ -41,19 +40,20 @@
  {% endfor %}
 {% endif %}
 
+
+//Works because we have already unsplatted vals from kernel into vals1/vals2
 {%macro SETVALS(ci,cell) -%}
-//THIS ORDERING OF ROWS IS THEMIS SPECIFIC...
-//ALSO MAKE THIS ACCESS MACRO SPECIFIC- ie we should be able to swap between C and Fortran ordering!
+
 {% if cell == 1 %}
- #define kk	(k1 * offset_mult1_z_{{ ci }}[lz] + offsets1_z_{{ ci }}[lz])
- #define jj (j1 * offset_mult1_y_{{ ci }}[ly] + offsets1_y_{{ ci }}[ly])
- #define ii (i1 * offset_mult1_x_{{ ci }}[lx] + offsets1_x_{{ ci }}[lx])
+ #define kk	(k1cell * offset_mult1_z_{{ ci }}[lz] + offsets1_z_{{ ci }}[lz])
+ #define jj (j1cell * offset_mult1_y_{{ ci }}[ly] + offsets1_y_{{ ci }}[ly])
+ #define ii (i1cell * offset_mult1_x_{{ ci }}[lx] + offsets1_x_{{ ci }}[lx])
  #define vals vals1_{{ ci }}
  {% endif %}
  {% if cell == 2 %}
- #define kk	(k2 * offset_mult1_z_{{ ci }}[lz] + offsets1_z_{{ ci }}[lz])
- #define jj (j2 * offset_mult1_y_{{ ci }}[ly] + offsets1_y_{{ ci }}[ly])
- #define ii (i2 * offset_mult1_x_{{ ci }}[lx] + offsets1_x_{{ ci }}[lx])
+ #define kk	(k2cell * offset_mult1_z_{{ ci }}[lz] + offsets1_z_{{ ci }}[lz])
+ #define jj (j2cell * offset_mult1_y_{{ ci }}[ly] + offsets1_y_{{ ci }}[ly])
+ #define ii (i2cell * offset_mult1_x_{{ ci }}[lx] + offsets1_x_{{ ci }}[lx])
   #define vals vals2_{{ ci }}
  {% endif %}
 for (lx=0;lx<{{ nbasis1_x[ci] }};lx++) {
@@ -96,7 +96,13 @@ PetscScalar assemble(DM da {{ fieldargs }} {{ constantargs }})
 {
 
  {% if formdim == 2 %}
- PetscScalar vals[{{ nbasis1_total }} * 2][{{ nbasis2_total }} * 2] = { {0.,},};
+ {% if facet_type == 'interior' %}
+ PetscScalar vals[{{ nbasis1_total }} * 2][{{ nbasis2_total }} * 2] = { {0.,},}; 
+ {% endif %}
+ {% if facet_type == 'exterior' %}
+ PetscScalar vals[{{ nbasis1_total }}][{{ nbasis2_total }}] = { {0.,},}; 
+ {% endif %}
+
  {% for ci1 in range(nci1) %}
  {% for ci2 in range(nci2) %}
   PetscScalar	vals11_{{ ci1 }}_{{ ci2 }}[{{ nbasis1_x[ci1] }} * {{ nbasis1_y[ci1] }} * {{ nbasis1_z[ci1] }}][{{ nbasis2_x[ci2] }} * {{ nbasis2_y[ci2] }} * {{ nbasis2_z[ci2] }}] = { {0.,},};
@@ -105,6 +111,7 @@ PetscScalar assemble(DM da {{ fieldargs }} {{ constantargs }})
   PetscScalar	vals22_{{ ci1 }}_{{ ci2 }}[{{ nbasis1_x[ci1] }} * {{ nbasis1_y[ci1] }} * {{ nbasis1_z[ci1] }}][{{ nbasis2_x[ci2] }} * {{ nbasis2_y[ci2] }} * {{ nbasis2_z[ci2] }}] = { {0.,},};
  {% endfor %}
  {% endfor %}
+ 
   {% for ci2 in range(nci2) %}
    PetscInt     cols1_{{ ci2 }}[{{ nbasis2_x[ci2] }} * {{ nbasis2_y[ci2]  }} * {{ nbasis2_z[ci2]  }}];
    PetscInt     cols2_{{ ci2 }}[{{ nbasis2_x[ci2] }} * {{ nbasis2_y[ci2]  }} * {{ nbasis2_z[ci2]  }}];
@@ -116,7 +123,13 @@ PetscScalar assemble(DM da {{ fieldargs }} {{ constantargs }})
  {% endif %}
  
  {% if formdim == 1 %}
+  {% if facet_type == 'interior' %}
  PetscScalar vals[{{ nbasis1_total }} * 2] = {0.,};
+ {% endif %}
+ {% if facet_type == 'exterior' %}
+ PetscScalar vals[{{ nbasis1_total }}] = {0.,};
+ {% endif %}
+
  {% for ci1 in range(nci1) %}
  PetscScalar	vals1_{{ ci1 }}[{{ nbasis1_x[ci1] }} * {{ nbasis1_y[ci1] }} * {{ nbasis1_z[ci1] }}]= {0.,};
  PetscScalar	vals2_{{ ci1 }}[{{ nbasis1_x[ci1] }} * {{ nbasis1_y[ci1] }} * {{ nbasis1_z[ci1] }}]= {0.,};
@@ -159,10 +172,6 @@ PetscScalar assemble(DM da {{ fieldargs }} {{ constantargs }})
    {% endfor %}
  {% endif %}
 
-const   PetscScalar wts_x[{{ npts_x }}] = {{ wts_x }};
-const   PetscScalar wts_y[{{ npts_y }}] = {{ wts_y }};
-const   PetscScalar wts_z[{{ npts_z }}] = {{ wts_z }};
-
  {% if formdim == 2 %}
   {% for ci2 in range(nci2) %}
 const   PetscInt offsets2_x_{{ ci2 }}[{{ nbasis2_x[ci2] }}] = {{ offsets2_x[ci2] }};
@@ -171,12 +180,6 @@ const   PetscInt offsets2_z_{{ ci2 }}[{{ nbasis2_z[ci2] }}] = {{ offsets2_z[ci2]
 const   PetscInt offset_mult2_x_{{ ci2 }}[{{ nbasis2_x[ci2] }}] = {{ offset_mult2_x[ci2] }};
 const   PetscInt offset_mult2_y_{{ ci2 }}[{{ nbasis2_y[ci2] }}] = {{ offset_mult2_y[ci2] }};
 const   PetscInt offset_mult2_z_{{ ci2 }}[{{ nbasis2_z[ci2] }}] = {{ offset_mult2_z[ci2] }};
-const   PetscScalar basis2_x_{{ ci2 }}[{{ nbasis2_x[ci2] }}][{{ npts_x }}] = {{ basis2_x[ci2] }};
-const   PetscScalar basis2_y_{{ ci2 }}[{{ nbasis2_y[ci2] }}][{{ npts_y }}] = {{ basis2_y[ci2] }};
-const   PetscScalar basis2_z_{{ ci2 }}[{{ nbasis2_z[ci2] }}][{{ npts_z }}] = {{ basis2_z[ci2] }};
-const   PetscScalar derivs2_x_{{ ci2 }}[{{ nbasis2_x[ci2] }}][{{ npts_x }}] = {{ derivs2_x[ci2] }};
-const   PetscScalar derivs2_y_{{ ci2 }}[{{ nbasis2_y[ci2] }}][{{ npts_y }}] = {{ derivs2_y[ci2] }};
-const   PetscScalar derivs2_z_{{ ci2 }}[{{ nbasis2_z[ci2] }}][{{ npts_z }}] = {{ derivs2_z[ci2] }};
   {% endfor %}
   {% endif %}
  {% if formdim >= 1 %}
@@ -187,12 +190,6 @@ const   PetscInt offsets1_z_{{ ci1 }}[{{ nbasis1_z[ci1] }}] = {{ offsets1_z[ci1]
 const   PetscInt offset_mult1_x_{{ ci1 }}[{{ nbasis1_x[ci1] }}] = {{ offset_mult1_x[ci1] }};
 const   PetscInt offset_mult1_y_{{ ci1 }}[{{ nbasis1_y[ci1] }}] = {{ offset_mult1_y[ci1] }};
 const   PetscInt offset_mult1_z_{{ ci1 }}[{{ nbasis1_z[ci1] }}] = {{ offset_mult1_z[ci1] }};
-const   PetscScalar basis1_x_{{ ci1 }}[{{ nbasis1_x[ci1] }}][{{ npts_x }}] = {{ basis1_x[ci1] }};
-const   PetscScalar basis1_y_{{ ci1 }}[{{ nbasis1_y[ci1] }}][{{ npts_y }}] = {{ basis1_y[ci1] }};
-const   PetscScalar basis1_z_{{ ci1 }}[{{ nbasis1_z[ci1] }}][{{ npts_z }}] = {{ basis1_z[ci1] }};
-const   PetscScalar derivs1_x_{{ ci1 }}[{{ nbasis1_x[ci1] }}][{{ npts_x }}] = {{ derivs1_x[ci1] }};
-const   PetscScalar derivs1_y_{{ ci1 }}[{{ nbasis1_y[ci1] }}][{{ npts_y }}] = {{ derivs1_y[ci1] }};
-const   PetscScalar derivs1_z_{{ ci1 }}[{{ nbasis1_z[ci1] }}][{{ npts_z }}] = {{ derivs1_z[ci1] }};
   {% endfor %}
   {% endif %}
 
@@ -205,15 +202,7 @@ const   PetscInt {{field.name}}_{{k}}_offsets_z[{{ field.nbasis_z[k] }}] = {{ fi
 const   PetscInt {{field.name}}_{{k}}_offset_mult_x[{{ field.nbasis_x[k] }}] = {{ field.offset_mult_x[k] }};
 const   PetscInt {{field.name}}_{{k}}_offset_mult_y[{{ field.nbasis_y[k] }}] = {{ field.offset_mult_y[k] }};
 const   PetscInt {{field.name}}_{{k}}_offset_mult_z[{{ field.nbasis_z[k] }}] = {{ field.offset_mult_z[k] }};
-const   PetscScalar {{field.name}}_{{k}}_basis_x[{{ field.nbasis_x[k] }}][{{ npts_x }}] = {{ field.basis_x[k] }};
-const   PetscScalar {{field.name}}_{{k}}_basis_y[{{ field.nbasis_y[k] }}][{{ npts_y }}] = {{ field.basis_y[k] }};
-const   PetscScalar {{field.name}}_{{k}}_basis_z[{{ field.nbasis_z[k] }}][{{ npts_z }}] = {{ field.basis_z[k] }};
-const   PetscScalar {{field.name}}_{{k}}_derivs_x[{{ field.nbasis_x[k] }}][{{ npts_x }}] = {{ field.derivs_x[k] }};
-const   PetscScalar {{field.name}}_{{k}}_derivs_y[{{ field.nbasis_y[k] }}][{{ npts_y }}] = {{ field.derivs_y[k] }};
-const   PetscScalar {{field.name}}_{{k}}_derivs_z[{{ field.nbasis_z[k] }}][{{ npts_z }}] = {{ field.derivs_z[k] }};
 
-//THIS NEEDS FIXING I THINK
-//SHOULD CORRESPOND TO KERNEL INPUT ORDERING...
 #define {{field.name}}_{{k}}_indices [fieldoffset + lz + {{  field.nbasis_z[k]  }} * (ly + {{ field.nbasis_y[k]  }} * lx)][d]
 
  {% if ndim == 1 %}
@@ -228,7 +217,27 @@ const   PetscScalar {{field.name}}_{{k}}_derivs_z[{{ field.nbasis_z[k] }}][{{ np
     {% endfor %}
   {% endfor %}
 
-	//*************************************//		
+ {% for tabulation in tabulations %}
+ const   PetscScalar {{ tabulation.name }}[{{ tabulation.npts }}][{{ tabulation.nbasis }}] = {{ tabulation.values }};
+ {% endfor %}
+ 
+	//*************************************//	
+
+	//get DMDA ranges
+   {% if formdim >= 1 %}
+       {% for ci1 in range(nci1) %}
+  ierr = DMDAGetGhostCorners(s1da_{{ ci1 }},&x1s_{{ ci1 }},&y1s_{{ ci1 }},&z1s_{{ ci1 }},&x1m_{{ ci1 }},&y1m_{{ ci1 }},&z1m_{{ ci1 }});CHKERRQ(ierr);
+      {% endfor %}
+    {% endif %}
+    {% if formdim >= 2 %}   
+         {% for ci2 in range(nci2) %}
+  ierr = DMDAGetGhostCorners(s2da_{{ ci2 }},&x2s_{{ ci2 }},&y2s_{{ ci2 }},&z2s_{{ ci2 }},&x2m_{{ ci2 }},&y2m_{{ ci2 }},&z2m_{{ ci2 }});CHKERRQ(ierr);
+       {% endfor %}
+      {% endif %}
+  ierr = DMDAGetCorners(da,&xs,&ys,&zs,&xm,&ym,&zm);CHKERRQ(ierr);
+  ierr = DMDAGetInfo(da,0,&xmax,&ymax,&zmax,0,0,0,0,0,0,0,0,0);CHKERRQ(ierr);
+  
+//printf("%i %i %i : %i %i %i\n",xs,xm,xmax,ys,ym,ymax);
 
 //determine if we own the upper/lower boundary
 {% if facet_direc == 0 %}
@@ -282,21 +291,6 @@ if (lower_boundary == 0) PetscFunctionReturn(0);
     {% endif %}
 	//*************************************//		
 
-	//get DMDA ranges
-   {% if formdim >= 1 %}
-       {% for ci1 in range(nci1) %}
-  ierr = DMDAGetGhostCorners(s1da_{{ ci1 }},&x1s_{{ ci1 }},&y1s_{{ ci1 }},&z1s_{{ ci1 }},&x1m_{{ ci1 }},&y1m_{{ ci1 }},&z1m_{{ ci1 }});CHKERRQ(ierr);
-      {% endfor %}
-    {% endif %}
-    {% if formdim >= 2 %}   
-         {% for ci2 in range(nci2) %}
-  ierr = DMDAGetGhostCorners(s2da_{{ ci2 }},&x2s_{{ ci2 }},&y2s_{{ ci2 }},&z2s_{{ ci2 }},&x2m_{{ ci2 }},&y2m_{{ ci2 }},&z2m_{{ ci2 }});CHKERRQ(ierr);
-       {% endfor %}
-      {% endif %}
-  ierr = DMDAGetCorners(da,&xs,&ys,&zs,&xm,&ym,&zm);CHKERRQ(ierr);
-  ierr = DMDAGetInfo(da,0,&xmax,&ymax,&zmax,0,0,0,0,0,0,0,0,0);CHKERRQ(ierr);
-	//*************************************//		
-
  //here i/j/k represent the EDGE indices, and i1/i2. are the left/right CELLS associated with that edge
 //in parallel just need to be careful with loop bounds in "active" dimension
 //for periodic interior, everything is fine
@@ -308,19 +302,19 @@ if (lower_boundary == 0) PetscFunctionReturn(0);
 
 {% if facet_type == 'interior' %}
 {% if facet_direc == 0 %}
-{% if (bcs[0] != 'periodic') %}
+{% if (bcs[0] == 'nonperiodic') %}
 if (lower_boundary == 1) xs = xs+1;
 xm = xm - upper_boundary - lower_boundary;
 {% endif %}
 {% endif %}
 {% if facet_direc == 1 %}
-{% if (bcs[1] != 'periodic') %}
+{% if (bcs[1] == 'nonperiodic') %}
 if (lower_boundary == 1) ys = ys+1;
 ym = ym - upper_boundary - lower_boundary;
 {% endif %}
 {% endif %}
 {% if facet_direc == 2 %}
-{% if (bcs[2] != 'periodic') %}
+{% if (bcs[2] == 'nonperiodic') %}
 if (lower_boundary == 1) zs = zs+1;
 zm = zm - upper_boundary - lower_boundary;
 {% endif %}
@@ -359,14 +353,50 @@ if (upper_boundary == 1) zs = zs+zm-1; zm = 1;
 
 {% endif %}
 
-//set the exterior dir ie the correct cell to use (right cell = 2 for lower, left cell = 1 for upper)
-{% if facet_type == 'exterior' and facet_exterior_boundary == 'lower' %}
-{% set exterior_dir = 2 %}
-{% endif %}
-{% if facet_type == 'exterior' and facet_exterior_boundary == 'upper' %}
-{% set exterior_dir = 1 %}
-{% endif %}
 	//*************************************//		
+
+//set facet number
+
+//THIS IS BROKEN FOR EXTRUDED MESHES, I THINK
+{% if facet_type == 'exterior' %}
+	{% if facet_exterior_boundary == 'lower' and facet_direc == 0 %}
+	const unsigned int facet_number[1] = {0,};
+	{% endif %}
+	{% if facet_exterior_boundary == 'upper' and facet_direc == 0 %}
+	const unsigned int facet_number[1] = {1,};
+	{% endif %}
+	{% if facet_exterior_boundary == 'lower' and facet_direc == 1 %}
+	const unsigned int facet_number[1] = {2,};
+	{% endif %}
+	{% if facet_exterior_boundary == 'upper' and facet_direc == 1 %}
+	const unsigned int facet_number[1] = {3,};
+	{% endif %}
+	//3D STUFF IS POSSIBLY BROKEN?
+	{% if facet_exterior_boundary == 'lower' and facet_direc == 2 %}
+	const unsigned int facet_number[1] = {4,};
+	{% endif %}
+	{% if facet_exterior_boundary == 'upper' and facet_direc == 2 %}
+	const unsigned int facet_number[1] = {5,};
+	{% endif %}	
+{% endif %}
+
+//THIS IS BROKEN FOR EXTRUDED MESHES, I THINK
+{% if facet_type == 'interior' %}
+	{% if facet_direc == 0 %}
+	const unsigned int facet_number[2] = {0,1};
+	{% endif %}
+	{% if facet_direc == 1 %}
+	const unsigned int facet_number[2] = {2,3};
+	{% endif %}
+	//3D STUFF IS POSSIBLY BROKEN?
+	{% if facet_direc == 2 %}
+	const unsigned int facet_number[2] = {4,5};
+	{% endif %}
+{% endif %}
+
+//printf(" {{ facet_type }} %i\n",{{ facet_direc }});
+//printf(" {{ facet_exterior_boundary }} \n");
+//printf("%i %i %i %i : %i %i\n",xs,xm,ys,ym,lower_boundary,upper_boundary);
 
 //loop over edges
 for (k=zs; k<zs+zm; k++) {
@@ -374,26 +404,19 @@ for (k=zs; k<zs+zm; k++) {
       for (i=xs; i<xs+xm; i++) {
 		
 			//*************************************//		
-
+		//printf("%i %i %i\n",i,j,k);
 		//compute rows and cols
-		//THESE ROWS/COLS ARE THEMIS SPECIFIC RIGHT NOW
-		//THIS CAN BE SWITCHED TO FiNaT TENSOR PRODUCT SPECIFIC ORDER
-		
-		//THIS SHOULD BE SWAPPABLE BETWEEN C AND FORTRAN STYLE ORDERINGS...
-		
-		//THIS IS REALLY THE DIFFERENCE BETWEEN STRUCTURED AND UNSTRUCTURED
-
+	
 		 {% if formdim == 2 %}
-	{% if facet_type == 'interior' or exterior_dir == 1 %}
+	{% if facet_type == 'interior' or facet_exterior_boundary == 'upper' %}
 		 //1
        {% for ci1 in range(nci1) %}
 		for (lx=0;lx<{{ nbasis1_x[ci1] }};lx++) {
 		for (ly=0;ly<{{ nbasis1_y[ci1] }};ly++) {
 		for (lz=0;lz<{{ nbasis1_z[ci1] }};lz++) {
-			icoord = i1 * offset_mult1_x_{{ ci1 }}[lx] + offsets1_x_{{ ci1 }}[lx] - x1s_{{ ci1 }};
-			jcoord = j1 * offset_mult1_y_{{ ci1 }}[ly] + offsets1_y_{{ ci1 }}[ly] - y1s_{{ ci1 }};
-			kcoord = k1 * offset_mult1_z_{{ ci1 }}[lz] + offsets1_z_{{ ci1 }}[lz] - z1s_{{ ci1 }};
-
+			icoord = i1cell * offset_mult1_x_{{ ci1 }}[lx] + offsets1_x_{{ ci1 }}[lx] - x1s_{{ ci1 }};
+			jcoord = j1cell * offset_mult1_y_{{ ci1 }}[ly] + offsets1_y_{{ ci1 }}[ly] - y1s_{{ ci1 }};
+			kcoord = k1cell * offset_mult1_z_{{ ci1 }}[lz] + offsets1_z_{{ ci1 }}[lz] - z1s_{{ ci1 }};
 			rows1_{{ ci1 }} s1_{{ci1}}_indices =  icoord + x1m_{{ ci1 }}*(jcoord + y1m_{{ ci1 }}*kcoord);
 		}}}
       {% endfor %}
@@ -402,24 +425,23 @@ for (k=zs; k<zs+zm; k++) {
 		for (lx=0;lx<{{ nbasis2_x[ci2] }};lx++) {
 		for (ly=0;ly<{{ nbasis2_y[ci2] }};ly++) {
 		for (lz=0;lz<{{ nbasis2_z[ci2] }};lz++) {
-			icoord = i1 * offset_mult2_x_{{ ci2 }}[lx] + offsets2_x_{{ ci2 }}[lx] - x2s_{{ ci2 }};
-			jcoord = j1 * offset_mult2_y_{{ ci2 }}[ly] + offsets2_y_{{ ci2 }}[ly] - y2s_{{ ci2 }};
-			kcoord = k1 * offset_mult2_z_{{ ci2 }}[lz] + offsets2_z_{{ ci2 }}[lz] - z2s_{{ ci2 }};
+			icoord = i1cell * offset_mult2_x_{{ ci2 }}[lx] + offsets2_x_{{ ci2 }}[lx] - x2s_{{ ci2 }};
+			jcoord = j1cell * offset_mult2_y_{{ ci2 }}[ly] + offsets2_y_{{ ci2 }}[ly] - y2s_{{ ci2 }};
+			kcoord = k1cell * offset_mult2_z_{{ ci2 }}[lz] + offsets2_z_{{ ci2 }}[lz] - z2s_{{ ci2 }};
 			cols1_{{ ci2 }} s2_{{ci2}}_indices =  icoord + x2m_{{ ci2 }}*(jcoord + y2m_{{ ci2 }}*kcoord);
 		}}}
 	 {% endfor %}
 		{% endif %}
 		
-		{% if facet_type == 'interior' or exterior_dir == 2 %}
+		{% if facet_type == 'interior' or facet_exterior_boundary == 'lower' %}
 		//2
        {% for ci1 in range(nci1) %}
 		for (lx=0;lx<{{ nbasis1_x[ci1] }};lx++) {
 		for (ly=0;ly<{{ nbasis1_y[ci1] }};ly++) {
 		for (lz=0;lz<{{ nbasis1_z[ci1] }};lz++) {
-			icoord = i2 * offset_mult1_x_{{ ci1 }}[lx] + offsets1_x_{{ ci1 }}[lx] - x1s_{{ ci1 }};
-			jcoord = j2 * offset_mult1_y_{{ ci1 }}[ly] + offsets1_y_{{ ci1 }}[ly] - y1s_{{ ci1 }};
-			kcoord = k2 * offset_mult1_z_{{ ci1 }}[lz] + offsets1_z_{{ ci1 }}[lz] - z1s_{{ ci1 }};
-
+			icoord = i2cell * offset_mult1_x_{{ ci1 }}[lx] + offsets1_x_{{ ci1 }}[lx] - x1s_{{ ci1 }};
+			jcoord = j2cell * offset_mult1_y_{{ ci1 }}[ly] + offsets1_y_{{ ci1 }}[ly] - y1s_{{ ci1 }};
+			kcoord = k2cell * offset_mult1_z_{{ ci1 }}[lz] + offsets1_z_{{ ci1 }}[lz] - z1s_{{ ci1 }};
 			rows2_{{ ci1 }} s1_{{ci1}}_indices =  icoord + x1m_{{ ci1 }}*(jcoord + y1m_{{ ci1 }}*kcoord);
 		}}}
       {% endfor %}
@@ -428,9 +450,9 @@ for (k=zs; k<zs+zm; k++) {
 		for (lx=0;lx<{{ nbasis2_x[ci2] }};lx++) {
 		for (ly=0;ly<{{ nbasis2_y[ci2] }};ly++) {
 		for (lz=0;lz<{{ nbasis2_z[ci2] }};lz++) {
-			icoord = i2 * offset_mult2_x_{{ ci2 }}[lx] + offsets2_x_{{ ci2 }}[lx] - x2s_{{ ci2 }};
-			jcoord = j2 * offset_mult2_y_{{ ci2 }}[ly] + offsets2_y_{{ ci2 }}[ly] - y2s_{{ ci2 }};
-			kcoord = k2 * offset_mult2_z_{{ ci2 }}[lz] + offsets2_z_{{ ci2 }}[lz] - z2s_{{ ci2 }};
+			icoord = i2cell * offset_mult2_x_{{ ci2 }}[lx] + offsets2_x_{{ ci2 }}[lx] - x2s_{{ ci2 }};
+			jcoord = j2cell * offset_mult2_y_{{ ci2 }}[ly] + offsets2_y_{{ ci2 }}[ly] - y2s_{{ ci2 }};
+			kcoord = k2cell * offset_mult2_z_{{ ci2 }}[lz] + offsets2_z_{{ ci2 }}[lz] - z2s_{{ ci2 }};
 			cols2_{{ ci2 }} s2_{{ci2}}_indices =  icoord + x2m_{{ ci2 }}*(jcoord + y2m_{{ ci2 }}*kcoord);
 		}}}
 	 {% endfor %}
@@ -442,37 +464,46 @@ for (k=zs; k<zs+zm; k++) {
 			//*************************************//		
 
 		//extract element dofs from local dofs
-		//THIS IS REALLY THE DIFFERENCE BETWEEN STRUCTURED AND UNSTRUCTURED
-		
-		//THIS IS A COPY- PROBABLY BAD
-		//BUT INDIRECT MEMORY ACCESS IS LIKELY JUST AS BAD, SO...
-		//SEE HPGMG CODE- I THINK THERE ARE SOME NICE EXTRACT ROUTINES IN THERE?
 		
 		//I THINK WE CAN REPLACE THE WHOLE IDEA OF OFFSETS AND OFFSET MULTS WITH START/END AND A SINGLE MULTIPLIER
 		//ALL HARD CODED
 		//THIS WILL BE MUCH CLEANER, and likely faster
 		//ESPECIALLY SINCE WE ARE TENSOR PRODUCT!
 		//I THINK ALL THE ELEMENTS WE ARE INTERESTED IN WORK LIKE THIS...
-		
-		//can really optimize this...
-		
-		//THIS IS DONE IN THEMIS SPECIFIC ORDER RIGHT NOW...
-		//THIS CAN BE SWITCHED TO FiNaT TENSOR PRODUCT SPECIFIC ORDER
-
-		
+				
 		 {% for field in fieldlist %}
+
 		 		fieldoffset = 0;
+		 //For interior facet this is organized as + (2) followed by - (1)
+		 {% if facet_type == 'interior' %}
+		 {% set ijklist = [('i2cell','j2cell','k2cell'),('i1cell','j1cell','k1cell'),]%}
+		 {% endif %}
+		 {% if facet_type == 'exterior' and facet_exterior_boundary == 'upper' %}
+		 {% set ijklist = [('i1cell','j1cell','k1cell'),]%}
+		 {% endif %}
+		 {% if facet_type == 'exterior' and facet_exterior_boundary == 'lower' %}
+		 {% set ijklist = [('i2cell','j2cell','k2cell'),]%}
+		 {% endif %}
+		 
+		 		//printf("starting field {{ field.name }} extraction\n");
+
+		 {% for i,j,k in ijklist %}
+		 #define ic {{ i }}
+		 #define jc {{ j }}
+		 #define kc {{ k }}
+
+		//printf("%i %i %i\n", ic,jc,kc);
+		
 		{% for k in range(field.ncomp) %}
 		{%set offset_mult = field.name~'_'~k ~'_offset_mult' %}
 		{%set offset = field.name~'_'~k ~'_offsets' %}
-		#define ii (i1*{{ offset_mult }}_x[lx] + {{ offset }}_x[lx]) 
-		#define jj (j1*{{ offset_mult }}_y[ly] + {{ offset }}_y[ly]) 
-		#define kk (k1*{{ offset_mult }}_z[lz] + {{ offset }}_z[lz]) 
+		#define ii (ic*{{ offset_mult }}_x[lx] + {{ offset }}_x[lx]) 
+		#define jj (jc*{{ offset_mult }}_y[ly] + {{ offset }}_y[ly]) 
+		#define kk (kc*{{ offset_mult }}_z[lz] + {{ offset }}_z[lz]) 
 		for (lx=0;lx<{{ field.nbasis_x[k] }};lx++){
 		for (ly=0;ly<{{ field.nbasis_y[k] }};ly++){
 		for (lz=0;lz<{{ field.nbasis_z[k] }};lz++){
 		for (d=0;d<{{ field.ndofs }};d++){
-			//THE INDICES FOR VALS ARE BROKEN HERE...INDICSE FOR DATA ARE FINE THOUGH
 		{% if ndim == 1 %}
 		{{field.name}}_vals {{field.name}}_{{k}}_indices = data_{{field.name}}_{{k}} [ii][d];
 		{% endif %}
@@ -485,35 +516,17 @@ for (k=zs; k<zs+zm; k++) {
 		}}}}
 		#undef ii
 		#undef jj
-		#undef kk
-		#define ii (i2*{{ offset_mult }}_x[lx] + {{ offset }}_x[lx]) 
-		#define jj (j2*{{ offset_mult }}_y[ly] + {{ offset }}_y[ly]) 
-		#define kk (k2*{{ offset_mult }}_z[lz] + {{ offset }}_z[lz]) 
-		for (lx=0;lx<{{ field.nbasis_x[k] }};lx++){
-		for (ly=0;ly<{{ field.nbasis_y[k] }};ly++){
-		for (lz=0;lz<{{ field.nbasis_z[k] }};lz++){
-		for (d=0;d<{{ field.ndofs }};d++){
-			//THE INDICES FOR VALS ARE BROKEN HERE...INDICSE FOR DATA ARE FINE THOUGH
-		{% if ndim == 1 %}
-		{{field.name}}_vals {{field.name}}_{{k}}_indices = data_{{field.name}}_{{k}} [ii][d];
-		{% endif %}
-		{% if ndim == 2 %}
-		{{field.name}}_vals {{field.name}}_{{k}}_indices = data_{{field.name}}_{{k}} [jj][ii][d];
-		{% endif %}
-		{% if ndim == 3 %}
-		{{field.name}}_vals {{field.name}}_{{k}}_indices = data_{{field.name}}_{{k}} [kk][jj][ii][d];
-		{% endif %}
-		}}}}
-		#undef ii
-		#undef jj
-		#undef kk		
-		fieldoffset = fieldoffset + {{ field.nbasis_x[k] }} * {{ field.nbasis_y[k] }} * {{ field.nbasis_z[k] }} * 2;
-		//WHAT IS THE CORRET ORDER THAT STUFF GOES INTO KERNELS?
-		//I THINK IT IS ALL FIELD VALS ON 1 SIDE, THEN ALL FIELD VALS ON THE OTHER SIDE
-		//NOT SURE THOUGH..
-		//THEN THE LOOP ORDERING HERE NEEDS TO CHANGE
-		//IE DO ALL COMPONENTS ON SIDE 1, THEN ALL COMPONENTS ON SIDE 2!!!
+		#undef kk	
+		fieldoffset = fieldoffset + {{ field.nbasis_x[k] }} * {{ field.nbasis_y[k] }} * {{ field.nbasis_z[k] }};
 		{% endfor %}
+
+		#undef ic
+		#undef jc
+		#undef kc	
+		{% endfor %}
+
+		//printf("field {{ field.name }} extraced\n");
+
 		{% endfor %}
 		
 			//*************************************//		
@@ -522,10 +535,20 @@ for (k=zs; k<zs+zm; k++) {
 		{% if not kernelstr == '' %}
 		
 		    {% if formdim == 2 %}
+			 {% if facet_type == 'interior' %}
+	ierr = PetscMemzero(vals,sizeof(PetscScalar[{{ nbasis1_total }} * 2][{{ nbasis2_total }} * 2])); CHKERRQ(ierr);
+					{% endif %}
+	 {% if facet_type == 'exterior' %}
 	ierr = PetscMemzero(vals,sizeof(PetscScalar[{{ nbasis1_total }}][{{ nbasis2_total }}])); CHKERRQ(ierr);
 				{% endif %}
+				{% endif %}
 		    {% if formdim == 1 %}
+			 {% if facet_type == 'interior' %}
+	ierr = PetscMemzero(vals,sizeof(PetscScalar[{{ nbasis1_total }} * 2])); CHKERRQ(ierr);
+					{% endif %}
+	 {% if facet_type == 'exterior' %}
 	ierr = PetscMemzero(vals,sizeof(PetscScalar[{{ nbasis1_total }}])); CHKERRQ(ierr);
+					{% endif %}
 				{% endif %}
 		    {% if formdim == 0 %}
 		    vals[0] = 0.0;
@@ -533,30 +556,37 @@ for (k=zs; k<zs+zm; k++) {
 		{{kernelname}}(vals
 				 {% for field in fieldplusconstantslist %}
 				 ,{{field}}
+				 				{% endfor %}
+				 ,facet_number
+				 {% for tabulation in tabulations %}
+				 ,{{tabulation.name}}
 				{% endfor %}
 			);
 	//*************************************//		
 			//unsplat vals
-		//FIX THIS- NEED TO EXTRACT VALS FOR 11,12,21,22 OR 1,2 ie both sides
 
-		//WHAT IS THE CORRET ORDER THAT STUFF COMES OUT OF KERNELS?
-		//FOR 1 FORMS, I THINK IT IS ALL VALS ON 1 SIDE, THEN ALL VALS ON THE OTHER SIDE
-		//NOT SURE THOUGH..
-		//THEN THE LOOP ORDERING HERE NEEDS TO CHANGE
-		//IE DO ALL COMPONENTS ON SIDE 1, THEN ALL COMPONENTS ON SIDE 2!!!
+		//for interior facet this is all 4 vals (2 for 1-forms)
+		//for exterior facet this is just 1 set of vals
 		
-		//WHAT ABOUT 2-FORMS?
-		//IS IT 11,12,21,22??
-		//OR SOMETHING DIFFERENT?
-		
-			//THIS CAN/SHOULD BE OPTIMIZED AWAY FOR SINGLE COMPONENT STUFF
-		//THIS IS REALLY THE DIFFERENCE BETWEEN STRUCTURED AND UNSTRUCTURED
-
-				//BROKEN- NEEDS TO DO VALS11/12/21/22
 	 {% if formdim == 2 %}
-	   ci1off = 0;
+		 {% if facet_type == 'interior' %}
+		 {% set celllist1 = [(2,0),(1,nbasis1_total)]%}
+		 {% set celllist2 = [(2,0),(1,nbasis2_total)]%}
+		 {% endif %}
+		 {% if facet_type == 'exterior' and facet_exterior_boundary == 'upper' %}
+		 {% set celllist1 = [(1,0),]%}
+		 {% set celllist2 = [(1,0),]%}
+		 {% endif %}
+		 {% if facet_type == 'exterior' and facet_exterior_boundary == 'lower' %}
+		 {% set celllist1 = [(2,0),]%}
+		 {% set celllist2 = [(2,0),]%}
+		 {% endif %}
+		 
+	{% for cell1,offset1 in celllist1 %}
+	{% for cell2,offset2 in celllist2 %}
+	   ci1off = {{ offset1 }};
        {% for ci1 in range(nci1) %}
-       ci2off = 0;
+       ci2off = {{ offset2 }};
        {% for ci2 in range(nci2) %}
         for (nx=0;nx<{{ nbasis1_x[ci1] }};nx++) {
 		for (ny=0;ny<{{ nbasis1_y[ci1] }};ny++) {
@@ -564,35 +594,50 @@ for (k=zs; k<zs+zm; k++) {
 		for (mx=0;mx<{{ nbasis2_x[ci2] }};mx++) {
 		for (my=0;my<{{ nbasis2_y[ci2] }};my++) {
 		for (mz=0;mz<{{ nbasis2_z[ci2] }};mz++) {
-			
-       vals_{{ ci1 }}_{{ ci2 }} s1_{{ci1}}_indices_n s2_{{ci2}}_indices_m = vals s1_{{ci1}}_indices_noff s2_{{ci2}}_indices_moff;
-       
+       vals{{ cell1 }}{{ cell2 }}_{{ ci1 }}_{{ ci2 }} s1_{{ci1}}_indices_n s2_{{ci2}}_indices_m = vals s1_{{ci1}}_indices_noff s2_{{ci2}}_indices_moff;
    }}}}}}
    ci2off = ci2off + {{ nbasis2_x[ci2] }} * {{ nbasis2_y[ci2] }} * {{ nbasis2_z[ci2] }};
 				{% endfor %}
 			ci1off = ci1off + {{ nbasis1_x[ci1] }} * {{ nbasis1_y[ci1] }} * {{ nbasis1_z[ci1] }};
 				{% endfor %}
+				{% endfor %}
+				{% endfor %}
+
 				{% endif %}
 				
-				//BROKEN- NEEDS TO DO BOTH VALS1 and VALS2...
+				
+				
 					    {% if formdim == 1 %}
-					    ci1off = 0;
+		 {% if facet_type == 'interior' %}
+		 {% set celllist1 = [(2,0),(1,nbasis1_total)]%}
+		 {% endif %}
+		 {% if facet_type == 'exterior' and facet_exterior_boundary == 'upper' %}
+		 {% set celllist1 = [(1,0),]%}
+		 {% endif %}
+		 {% if facet_type == 'exterior' and facet_exterior_boundary == 'lower' %}
+		 {% set celllist1 = [(2,0),]%}
+		 {% endif %}
+		 
+	{% for cell1,offset1 in celllist1 %}
+
+			ci1off = {{ offset1 }};
 		       {% for ci1 in range(nci1) %}
         for (nx=0;nx<{{ nbasis1_x[ci1] }};nx++) {
 		for (ny=0;ny<{{ nbasis1_y[ci1] }};ny++) {
 		for (nz=0;nz<{{ nbasis1_z[ci1] }};nz++) {
-			vals1_{{ ci1 }} s1_{{ci1}}_indices_n = vals s1_{{ci1}}_indices_noff;
+			vals{{ cell1 }}_{{ ci1 }} s1_{{ci1}}_indices_n = vals s1_{{ci1}}_indices_noff;
 		}}}
 						ci1off = ci1off + {{ nbasis1_x[ci1] }} * {{ nbasis1_y[ci1] }} * {{ nbasis1_z[ci1] }};
 				{% endfor %}
-				{% endif %}
+						{% endfor %}
 		{% endif %}
-		
+				{% endif %} //closes the whole kernel + unplat if
+
 			//*************************************//		
 
 		//Put the element tensor into the local tensor
 {% if formdim == 2 %}
-		{% if facet_type == 'interior' or exterior_dir == 1 %}        
+		{% if facet_type == 'interior' or facet_exterior_boundary == 'upper' %}        
 		       {% for ci1 in range(nci1) %}
        {% for ci2 in range(nci2) %}
         ierr = MatSetValuesLocal(formmat_{{ ci1 }}_{{ ci2 }},{{ nbasis1_x[ci1] }} * {{ nbasis1_y[ci1] }} * {{ nbasis1_z[ci1] }},rows1_{{ ci1 }},{{ nbasis2_x[ci2] }} * {{ nbasis2_y[ci2] }} * {{ nbasis2_z[ci2] }},cols1_{{ ci2 }},*vals11_{{ ci1 }}_{{ ci2 }},ADD_VALUES);CHKERRQ(ierr);
@@ -600,7 +645,7 @@ for (k=zs; k<zs+zm; k++) {
 	 {% endfor %}
 		{% endif %}
 
-		{% if facet_type == 'interior' or exterior_dir == 2 %}        
+		{% if facet_type == 'interior' or facet_exterior_boundary == 'lower' %}        
 		       {% for ci1 in range(nci1) %}
        {% for ci2 in range(nci2) %}
         ierr = MatSetValuesLocal(formmat_{{ ci1 }}_{{ ci2 }},{{ nbasis1_x[ci1] }} * {{ nbasis1_y[ci1] }} * {{ nbasis1_z[ci1] }},rows2_{{ ci1 }},{{ nbasis2_x[ci2] }} * {{ nbasis2_y[ci2] }} * {{ nbasis2_z[ci2] }},cols2_{{ ci2 }},*vals22_{{ ci1 }}_{{ ci2 }},ADD_VALUES);CHKERRQ(ierr);
@@ -609,8 +654,6 @@ for (k=zs; k<zs+zm; k++) {
 		{% endif %}
 
 		{% if facet_type == 'interior' %}        
-        ierr = MatSetValuesLocal(A,{{ nbasis1_x }} * {{ nbasis1_y }} * {{ nbasis1_z }},rows1,{{ nbasis2_x }} * {{ nbasis2_y }} * {{ nbasis2_z }},cols2,*vals2,ADD_VALUES);CHKERRQ(ierr);
-        ierr = MatSetValuesLocal(A,{{ nbasis1_x }} * {{ nbasis1_y }} * {{ nbasis1_z }},rows2,{{ nbasis2_x }} * {{ nbasis2_y }} * {{ nbasis2_z }},cols1,*vals3,ADD_VALUES);CHKERRQ(ierr);
 		       {% for ci1 in range(nci1) %}
        {% for ci2 in range(nci2) %}
         ierr = MatSetValuesLocal(formmat_{{ ci1 }}_{{ ci2 }},{{ nbasis1_x[ci1] }} * {{ nbasis1_y[ci1] }} * {{ nbasis1_z[ci1] }},rows1_{{ ci1 }},{{ nbasis2_x[ci2] }} * {{ nbasis2_y[ci2] }} * {{ nbasis2_z[ci2] }},cols2_{{ ci2 }},*vals12_{{ ci1 }}_{{ ci2 }},ADD_VALUES);CHKERRQ(ierr);
@@ -622,12 +665,12 @@ for (k=zs; k<zs+zm; k++) {
 		{% endif %}
 
 		{% if formdim == 1 %}
-		{% if facet_type == 'interior' or exterior_dir == 1 %}        
+		{% if facet_type == 'interior' or facet_exterior_boundary == 'upper' %}        
 		 {% for ci1 in range(nci1) %}
 		{{ SETVALS(ci1,1) }}
 		{% endfor %}
 		{% endif %}
-		{% if facet_type == 'interior' or exterior_dir == 2 %}        
+		{% if facet_type == 'interior' or facet_exterior_boundary == 'lower' %}        
 		 {% for ci1 in range(nci1) %}
 		{{ SETVALS(ci1,2) }}
 		{% endfor %}
