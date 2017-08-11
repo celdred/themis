@@ -34,9 +34,9 @@ class CompiledKernel(object):
 
         self.funptr = funptr
 
-    def __call__(self, da, petsc_args, constant_args):
+    def __call__(self, petsc_args, constant_args):
         args = [p.handle for p in petsc_args] + constant_args
-        return self.funptr(da.handle, *args)
+        return self.funptr(*args)
 
 
 def compile_functional(kernel, tspace, sspace, mesh):
@@ -229,7 +229,7 @@ def AssembleTwoForm(mat, tspace, sspace, kernel, zeroassembly=False):
 
             for da, assemblefunc in zip(kernel.dalist, kernel.assemblyfunc_list):
                 # BROKEN FOR MULTIPATCH- FIELD ARGS LIST NEEDS A BI INDEX
-                assemblefunc(da, submatlist + tdalist + sdalist + kernel.fieldargs_list, kernel.constantargs_list)
+                assemblefunc([da, ] + submatlist + tdalist + sdalist + kernel.fieldargs_list, kernel.constantargs_list)
 
             # restore sub matrices
             k = 0
@@ -272,7 +272,7 @@ def AssembleZeroForm(mesh, kernellist):
 
                 # BROKEN FOR MULTIPATCH- FIELD ARGS LIST NEEDS A BI INDEX
                 for da, assemblefunc in zip(kernel.dalist, kernel.assemblyfunc_list):
-                    lvalue = assemblefunc(da, kernel.fieldargs_list, kernel.constantargs_list)
+                    lvalue = assemblefunc([da, ] + kernel.fieldargs_list, kernel.constantargs_list)
 
                 if PETSc.COMM_WORLD.Get_size() == 1:
                     value = value + lvalue
@@ -317,7 +317,7 @@ def AssembleOneForm(veclist, space, kernel):
 
             # BROKEN FOR MULTIPATCH- FIELD ARGS LIST NEEDS A BI INDEX
             for da, assemblefunc in zip(kernel.dalist, kernel.assemblyfunc_list):
-                assemblefunc(da, veclist + tdalist + kernel.fieldargs_list, kernel.constantargs_list)
+                assemblefunc([da, ] + veclist + tdalist + kernel.fieldargs_list, kernel.constantargs_list)
 
 
 def compute_1d_bounds(ci1, ci2, i, elem1, elem2, ncell, ndofs, interior_facet, bc, ranges1, ranges2):
