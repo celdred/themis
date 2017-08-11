@@ -1,14 +1,42 @@
 import numpy as np
 from petscshim import PETSc
 from codegenerator import generate_assembly_routine
-import instant
-from compilation_options import *
+# import instant
+# from compilation_options import *
 # from tsfc_interface import compile_form
 # from ufl import VectorElement
 from mpi4py import MPI
 from function import Function
 from constant import Constant
 import functools
+
+from pyop2.utils import get_petsc_dir
+from pyop2 import compilation
+import ctypes
+
+
+class CompiledKernel(object):
+    base_cppargs = ["-I%s/include" % d for d in get_petsc_dir()]
+    base_ldargs = ["-L%s/lib" % d for d in get_petsc_dir()] + ["-Wl,-rpath,%s/lib" % d for d in get_petsc_dir()] + ["-lpetsc", "-lm"]
+
+    def __init__(self, source, function_name, restype=ctypes.c_int, cppargs=None, argtypes=None, comm=None):
+        if cppargs is None:
+            cppargs = self.base_cppargs
+        else:
+            cppargs = cppargs + self.base_cppargs
+
+        funptr = compilation.load(source, "c", function_name,
+                                  cppargs=cppargs,
+                                  ldargs=self.base_ldargs,
+                                  restype=restype,
+                                  argtypes=argtypes,
+                                  comm=comm)
+
+        self.funptr = funptr
+
+    def __call__(self, da, petsc_args, constant_args):
+        args = [p.handle for p in petsc_args] + constant_args
+        return self.funptr(da.handle, *args)
 
 
 def compile_functional(kernel, tspace, sspace, mesh):
@@ -61,34 +89,21 @@ def compile_functional(kernel, tspace, sspace, mesh):
     # ADD EXTRUDED MESH SUPPORT HERE
     # ADD SUBDOMAIN SUPPORT IN EXTERIOR FACET INTEGRALS- SHOULD CORRESPOND TO HOW FIREDRAKE DOES STUFF IN UTILITY MESHES...
 
-    # THIS NEEDS SOME SORT OF CACHING CHECK!
-    kernel.assemblyfunc_list = []
-
-    for facet_direc, facet_exterior_boundary in zip(facet_direc_list, facet_exterior_boundary_list):
-        kernel.facet_direc = facet_direc
-        kernel.facet_exterior_boundary = facet_exterior_boundary
-
-        assembly_routine = generate_assembly_routine(mesh, tspace, sspace, kernel)
-        # assembly_routine = assembly_routine.encode('ascii','ignore')
-        assembly_function = instant.build_module(code=assembly_routine,
-                                                 include_dirs=include_dirs,
-                                                 library_dirs=library_dirs,
-                                                 libraries=libraries,
-                                                 init_code='    import_array();',
-                                                 cppargs=['-O3', ],
-                                                 swig_include_dirs=swig_include_dirs).assemble
-        kernel.assemblyfunc_list.append(assembly_function)
-
     # create field args list: matches construction used in codegenerator.py
+
+# MAYBE THIS SHOULD REALLY BE PART OF CODE GENERATOR.PY?
 
     kernel.fieldargs_list = []
     kernel.constantargs_list = []
+    fieldargtypeslist = []
+    constantargtypeslist = []
 
-    if not kernel.zero:
-
-        # append coordinates
+    # append coordinates
+    if not kernel.zero:  # don't build any field args stuff for zero kernel
         kernel.fieldargs_list.append(kernel.mesh.coordinates.function_space().get_da(0, 0))  # THIS BREAKS FOR MULTIPATCH MESHES
         kernel.fieldargs_list.append(kernel.mesh.coordinates._lvectors[0])  # THIS BREAKS FOR MULTIPATCH MESHES
+        fieldargtypeslist.append(ctypes.c_voidp)
+        fieldargtypeslist.append(ctypes.c_voidp)
 
         for fieldindex in kernel.coefficient_map:
 
@@ -100,6 +115,50 @@ def compile_functional(kernel, tspace, sspace, mesh):
                     for ci in range(fspace.ncomp):
                         kernel.fieldargs_list.append(fspace.get_da(ci, bi))
                         kernel.fieldargs_list.append(field.get_lvec(si, ci, bi))
+                        fieldargtypeslist.append(ctypes.c_voidp)  # DA
+                        fieldargtypeslist.append(ctypes.c_voidp)  # Vec
+            if isinstance(field, Constant):
+                constantargtypeslist.append(ctypes.c_double)
+
+    # THIS NEEDS SOME SORT OF CACHING CHECK- BASICALLY WE SHOULDN'T REALLY RE-GENERATE THE BIG C STRING EVERY TIME...
+    kernel.assemblyfunc_list = []
+    tensorlist = []
+
+    if (tspace is not None) and (sspace is not None):  # 2-form
+
+            for ci1 in range(tspace.ncomp):  # Mat
+                for ci2 in range(sspace.ncomp):
+                    for bi in range(mesh.npatches):
+                        tensorlist.append(ctypes.c_voidp)
+            for ci1 in range(tspace.ncomp):  # tda
+                for bi in range(mesh.npatches):
+                    tensorlist.append(ctypes.c_voidp)
+            for ci2 in range(sspace.ncomp):  # sda
+                for bi in range(mesh.npatches):
+                    tensorlist.append(ctypes.c_voidp)
+
+    if (tspace is not None) and (sspace is None):  # 1-form
+
+            for ci1 in range(tspace.ncomp):  # Vec
+                for bi in range(mesh.npatches):
+                    tensorlist.append(ctypes.c_voidp)
+            for ci1 in range(tspace.ncomp):  # tda
+                for bi in range(mesh.npatches):
+                    tensorlist.append(ctypes.c_voidp)
+
+    argtypeslist = [ctypes.c_voidp, ] + tensorlist + fieldargtypeslist + constantargtypeslist
+
+    restype = ctypes.c_int
+    if (tspace is None) and (sspace is None):
+        restype = ctypes.c_double  # 0-form
+
+    for facet_direc, facet_exterior_boundary in zip(facet_direc_list, facet_exterior_boundary_list):
+        kernel.facet_direc = facet_direc
+        kernel.facet_exterior_boundary = facet_exterior_boundary
+
+        assembly_routine = generate_assembly_routine(mesh, tspace, sspace, kernel)
+        assembly_function = CompiledKernel(assembly_routine, "assemble", cppargs=["-O3"], argtypes=argtypeslist, restype=restype)
+        kernel.assemblyfunc_list.append(assembly_function)
 
     if not kernel.zero:
         kernel.assemblycompiled = True
@@ -170,7 +229,7 @@ def AssembleTwoForm(mat, tspace, sspace, kernel, zeroassembly=False):
 
             for da, assemblefunc in zip(kernel.dalist, kernel.assemblyfunc_list):
                 # BROKEN FOR MULTIPATCH- FIELD ARGS LIST NEEDS A BI INDEX
-                assemblefunc(da, *(submatlist + tdalist + sdalist + kernel.fieldargs_list + kernel.constantargs_list))
+                assemblefunc(da, submatlist + tdalist + sdalist + kernel.fieldargs_list, kernel.constantargs_list)
 
             # restore sub matrices
             k = 0
@@ -213,7 +272,7 @@ def AssembleZeroForm(mesh, kernellist):
 
                 # BROKEN FOR MULTIPATCH- FIELD ARGS LIST NEEDS A BI INDEX
                 for da, assemblefunc in zip(kernel.dalist, kernel.assemblyfunc_list):
-                    lvalue = assemblefunc(da, *(kernel.fieldargs_list + kernel.constantargs_list))
+                    lvalue = assemblefunc(da, kernel.fieldargs_list, kernel.constantargs_list)
 
                 if PETSc.COMM_WORLD.Get_size() == 1:
                     value = value + lvalue
@@ -258,7 +317,7 @@ def AssembleOneForm(veclist, space, kernel):
 
             # BROKEN FOR MULTIPATCH- FIELD ARGS LIST NEEDS A BI INDEX
             for da, assemblefunc in zip(kernel.dalist, kernel.assemblyfunc_list):
-                assemblefunc(da, *(veclist + tdalist + kernel.fieldargs_list + kernel.constantargs_list))
+                assemblefunc(da, veclist + tdalist + kernel.fieldargs_list, kernel.constantargs_list)
 
 
 def compute_1d_bounds(ci1, ci2, i, elem1, elem2, ncell, ndofs, interior_facet, bc, ranges1, ranges2):
