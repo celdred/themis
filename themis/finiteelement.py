@@ -13,7 +13,7 @@ from quadrature import ThemisQuadratureNumerical
 
 
 class ThemisElement():
-    def __init__(self, elem):
+    def __init__(self, elem,sptsH1=None,sptsL2=None):
 
         # THESE SPTS SHOULD REALLY BE DIFFERENT VARIANTS I THINK...
         # THIS IS USEFUL MOSTLY FOR DISPERSION STUFF
@@ -108,9 +108,15 @@ class ThemisElement():
         family_to_continuity['Q'] = 'H1'
         family_to_continuity['CG'] = 'H1'
         family_to_continuity['Lagrange'] = 'H1'
+        family_to_continuity['RTCF'] = 'Hdiv'
+        family_to_continuity['RTCE'] = 'Hcurl'
         variant_to_elemname = {}
         variant_to_elemname['feecH1'] = 'CG'
         variant_to_elemname['feecL2'] = 'DG'
+        variant_to_elemname['mseH1'] = 'CMSE'
+        variant_to_elemname['mseL2'] = 'DMSE'
+        variant_to_elemname['qbH1'] = 'CQB'
+        variant_to_elemname['qbL2'] = 'DQB'
         variant_to_elemname['mgdH1'] = 'CGD'
         variant_to_elemname['mgdL2'] = 'DGD'
         # variant_to_elemname['chrisH1'] = 'CG' #REMOVE
@@ -121,15 +127,15 @@ class ThemisElement():
         degree = elem.degree()
         variant = elem.variant()
 
-        # print(variant,elem.family(),degree)
+        #print(variant,elem.family(),degree)
 
         self._cont = family_to_continuity[elem.family()]
         self._elemnamelist = []
         self._degreelist = []
         self._contlist = []
 
-        # if elem.variant() is None:
-        # variant = ''
+        #if elem.variant() is None
+		#	variant = ''
         if elem.cell().cellname() == 'interval':
             self._ncomp = 1
             cont = family_to_continuity[elem.family()]
@@ -187,8 +193,10 @@ class ThemisElement():
 
                 # this works because degree has already been adjusted when setting up degreelist
                 if variant == 'feec':
-                    sptsL2 = ThemisQuadratureNumerical('gll', [degree+1]).get_pts()[0]
-                    sptsH1 = ThemisQuadratureNumerical('gll', [degree+1]).get_pts()[0]
+                    if sptsL2 is None:
+                        sptsL2 = ThemisQuadratureNumerical('gll', [degree+1]).get_pts()[0]
+                    if sptsH1 is None:
+                        sptsH1 = ThemisQuadratureNumerical('gll', [degree+1]).get_pts()[0]
 
                 # compute number of shape functions in each direction (=nbasis); and number of degrees of freedom per element
                 self._nbasis[ci].append(degree + 1)
@@ -322,44 +330,44 @@ class ThemisElement():
             dlist.append(adjderiv2)
         return dlist
 
-    # THESE ARE IN ORDER BASIS,QUAD
+    # NOTE ORDER HERE IS QUADPT, BASIS
     def get_basis_exact(self, ci, direc, x):
 
         xsymb = sympy.var('x')
         symbas = self._basis[ci][direc]
-        basis_funcs = sympy.zeros(len(symbas), len(x))
+        basis_funcs = sympy.zeros(len(x),len(symbas))
         for i in range(len(symbas)):
             for j in range(len(x)):
-                if symbas[i] == 0.5:  # check for the constant basis function
-                    basis_funcs[i, j] = sympy.Rational(1, 2)
+                if symbas[i] == 1.0:  # check for the constant basis function
+                    basis_funcs[j, i] = sympy.Rational(1, 1)
                 else:
-                    basis_funcs[i, j] = symbas[i].subs(xsymb, x[j])
+                    basis_funcs[j, i] = symbas[i].subs(xsymb, x[j])
         return basis_funcs
 
-    # THESE ARE IN ORDER BASIS,QUAD
+    # NOTE ORDER HERE IS QUADPT, BASIS
     def get_derivs_exact(self, ci, direc, x):
         xsymb = sympy.var('x')
         symbas = self._derivs[ci][direc]
-        basis_derivs = sympy.zeros(len(symbas), len(x))
+        basis_derivs = sympy.zeros(len(x),len(symbas))
         for i in range(len(symbas)):
             for j in range(len(x)):
                 if symbas[i] == 0:  # check for the constant deriv function
-                    basis_derivs[i, j] = 0
+                    basis_derivs[j, i] = 0
                 else:
-                    basis_derivs[i, j] = symbas[i].subs(xsymb, x[j])
+                    basis_derivs[j, i] = symbas[i].subs(xsymb, x[j])
         return basis_derivs
 
-    # THESE ARE IN ORDER BASIS,QUAD
+    # NOTE ORDER HERE IS QUADPT, BASIS
     def get_derivs2_exact(self, ci, direc, x):
         xsymb = sympy.var('x')
         symbas = self._derivs2[ci][direc]
-        basis_derivs2 = sympy.zeros(len(symbas), len(x))
+        basis_derivs2 = sympy.zeros(len(x),len(symbas))
         for i in range(len(symbas)):
             for j in range(len(x)):
                 if symbas[i] == 0:  # check for the constant deriv2 function
-                    basis_derivs2[i, j] = 0
+                    basis_derivs2[j, i] = 0
                 else:
-                    basis_derivs2[i, j] = symbas[i].subs(xsymb, x[j])
+                    basis_derivs2[j, i] = symbas[i].subs(xsymb, x[j])
         return basis_derivs2
 
     # NOTE ORDER HERE IS QUADPT, BASIS
@@ -368,8 +376,8 @@ class ThemisElement():
         symbas = self._basis[ci][direc]
         basis_funcs = np.zeros((x.shape[0], len(symbas)))
         for i in range(len(symbas)):
-            if symbas[i] == 0.5:  # check for the constant basis function
-                basis_funcs[:, i] = 0.5
+            if symbas[i] == 1.0:  # check for the constant basis function
+                basis_funcs[:, i] = 1.0
             else:
                 basis = sympy.lambdify(xsymb, symbas[i], "numpy")
                 basis_funcs[:, i] = np.squeeze(basis(x))
@@ -474,7 +482,8 @@ def _DG_basis(order, spts):
         # spts = [0,]
         # SCALES SPTS TO [0,1]
         # spts = [0.5,]
-        symbas.append(sympy.Rational(1, 2))
+        spts = [sympy.Rational(1,2),]
+        symbas.append(sympy.Rational(1, 1))
         derivs.append(sympy.Rational(1, 1) * 0)
         derivs2.append(sympy.Rational(1, 1) * 0)
 
@@ -514,6 +523,7 @@ def _CG_interaction_cells(ncell, bc, interior_facet, order):
     if interior_facet:
         interaction_cells[:, 0] = leftmost_bound - 1
         interaction_cells[:, 1] = rightmost_bound + 1
+    #print('cg',interaction_cells)
     return interaction_cells
 
 
@@ -527,6 +537,7 @@ def _DG_interaction_cells(ncell, bc, interior_facet, order):
     if interior_facet:
         interaction_cells[:, 0] = rightmost_bound - 1
         interaction_cells[:, 1] = rightmost_bound + 1
+    #print('dg',interaction_cells)
     return interaction_cells
 
 
@@ -543,7 +554,7 @@ def _CGD_basis(order):
     p = a * np.arange(order+1) + b
 
 # SCALES "SPTS" TO [0,1]
-    p = 0.5 * p + 0.5
+    p = sympy.Rational(1,2) * p + sympy.Rational(1,2)
     # spts = [-1,1]
     spts = [0, 1]
     for i in range(0, order+1):
@@ -566,22 +577,29 @@ def _DGD_basis(order):
     b = -(order+1)
     p = a * np.arange(order+2) + b
 # SCALES "SPTS" TO [0,1]
-    p = 0.5 * p + 0.5
+    p = sympy.Rational(1,2) * p + sympy.Rational(1,2)
     # spts = [0,]
-    spts = [0.5, ]
-    for i in range(0, order+2):
-        cg_symbas.append(lagrange_poly_support(i, p, xsymb))
+    spts = [sympy.Rational(1,2), ]
+    
+    if order >=1:
+        for i in range(0, order+2):
+            cg_symbas.append(lagrange_poly_support(i, p, xsymb))
 
-    symbas.append(sympy.diff(-cg_symbas[0]))
-    derivs.append(sympy.diff(symbas[0]))
-    derivs2.append(sympy.diff(sympy.diff(symbas[0])))
-    for i in range(1, order+1):
-        dN = sympy.diff(cg_symbas[i])
-        basis = symbas[i-1] - dN
-        symbas.append(basis)
-        derivs.append(sympy.diff(basis))
-        derivs2.append(sympy.diff(sympy.diff(basis)))
+        symbas.append(sympy.diff(-cg_symbas[0]))
+        derivs.append(sympy.diff(symbas[0]))
+        derivs2.append(sympy.diff(sympy.diff(symbas[0])))
+        for i in range(1, order+1):
+            dN = sympy.diff(cg_symbas[i])
+            basis = symbas[i-1] - dN
+            symbas.append(basis)
+            derivs.append(sympy.diff(basis))
+            derivs2.append(sympy.diff(sympy.diff(basis)))
 
+    else:
+        symbas.append(sympy.Rational(1, 1))
+        derivs.append(sympy.Rational(1, 1) * 0)
+        derivs2.append(sympy.Rational(1, 1) * 0)
+        
     return symbas, derivs, derivs2, spts
 
 
@@ -592,7 +610,7 @@ def _CGD_offset_info(order):
 
 
 def _DGD_offset_info(order):
-    offsets = np.arange(-(order)//2, (order)/2+1, 1, dtype=np.int32)  # THIS MIGHT BE WRONG!
+    offsets = np.arange(-(order)//2, (order)/2+1, 1, dtype=np.int32)
     offset_multiplier = np.ones(offsets.shape, dtype=np.int32)
     return offsets, offset_multiplier
 
@@ -613,7 +631,7 @@ def _CGD_interaction_cells(ncell, bc, interior_facet, order):
     interaction_cells = np.zeros((ncell+off, 2), dtype=np.int32)
     ilist = np.arange(0, interaction_cells.shape[0])
     interaction_cells[:, :] = np.expand_dims(ilist, axis=1) + np.expand_dims(interaction_offsets, axis=0)
-
+    #print('cgd',interaction_cells)
     return interaction_cells
 
 # ADD FACET INTEGRAL STUFF
@@ -622,7 +640,7 @@ def _CGD_interaction_cells(ncell, bc, interior_facet, order):
 def _DGD_interaction_cells(ncell, bc, interior_facet, order):
 
     leftmost = -(order-1)//2
-    rightmost = (order-1)//2
+    rightmost = (order-1)//2+1 #ADDED 1 HERE
     if interior_facet:
         leftmost = leftmost - 1
         rightmost = rightmost + 1
@@ -630,6 +648,7 @@ def _DGD_interaction_cells(ncell, bc, interior_facet, order):
     interaction_cells = np.zeros((ncell, 2), dtype=np.int32)
     ilist = np.arange(0, interaction_cells.shape[0])
     interaction_cells[:, :] = np.expand_dims(ilist, axis=1) + np.expand_dims(interaction_offsets, axis=0)
+    #print('dgd',interaction_cells)
     return interaction_cells
 
 

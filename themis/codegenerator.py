@@ -29,7 +29,7 @@ class TabObject():
 
 def generate_assembly_routine(mesh, space1, space2, kernel):
     # load templates
-    templateLoader = jinja2.FileSystemLoader(searchpath=["../../gitrepo/themis", ])
+    templateLoader = jinja2.FileSystemLoader(searchpath=["../../gitrepo/themis","../gitrepo/themis" ])
 
     # create environment
     templateEnv = jinja2.Environment(loader=templateLoader, trim_blocks=True)
@@ -203,12 +203,12 @@ def generate_assembly_routine(mesh, space1, space2, kernel):
         # BROKEN FOR VECTOR/TENSOR CONSTANTS
 
     # This is just a Coefficient, but we are putting data INTO it!
-    if kernel.evaluate:
-        vals_args_string = ''
-        dmname = 'DM da_vals'
-        vecname = 'Vec evals'
-        vals_args_string = vals_args_string + ', ' + dmname
-        vals_args_string = vals_args_string + ', ' + vecname
+#    if kernel.evaluate:
+ #       vals_args_string = ''
+  #      dmname = 'DM da_vals'
+  #      vecname = 'Vec evals'
+   #     vals_args_string = vals_args_string + ', ' + dmname
+   #     vals_args_string = vals_args_string + ', ' + vecname
 
     tabulations = []
 
@@ -348,11 +348,11 @@ def generate_assembly_routine(mesh, space1, space2, kernel):
     templateVars['fieldplusconstantslist'] = fieldplusconstantslist
     templateVars['constantargs'] = constant_args_string
 
-    if kernel.evaluate:
-        templateVars['evaluate'] = 1
-        templateVars['valsargs'] = vals_args_string
-    else:
-        templateVars['evaluate'] = 0
+#    if kernel.evaluate:
+#        templateVars['evaluate'] = 1
+#        templateVars['valsargs'] = vals_args_string
+#    else:
+    templateVars['evaluate'] = 0
 
     # FIX THIS- HOW DO WE DETERMINE MATRIX FREE?
     # HOW ARE MATRIX-FREE KERNELS SUPPORTED?
@@ -361,6 +361,132 @@ def generate_assembly_routine(mesh, space1, space2, kernel):
     # templateVars['matrixfree'] = 1
     # else:
     # templateVars['matrixfree'] = 0
+
+    # Process template to produce source code
+    outputText = template.render(templateVars)
+
+    return outputText
+
+
+def generate_evaluate_routine(mesh, kernel):
+    # load templates
+    templateLoader = jinja2.FileSystemLoader(searchpath=["../../gitrepo/themis","../gitrepo/themis" ])
+
+    # create environment
+    templateEnv = jinja2.Environment(loader=templateLoader, trim_blocks=True)
+    templateVars = {}
+
+    ndims = mesh.ndim
+
+    # read the template
+    template = templateEnv.get_template('evaluate.template')
+
+    # load fields info, including coordinates
+    field_args_string = ''
+    fieldobjs = []
+
+
+    # get the list of fields
+    fieldlist = []
+    fieldlist.append((mesh.coordinates, 0))
+    for fieldindex in kernel.coefficient_map:
+        field = kernel.coefficients[fieldindex]
+        if field.name() == mesh.coordinates.name():
+            evalfieldindex = 0
+            continue
+        else:
+            evalfieldindex = 1
+        for si in range(field.function_space().nspaces):
+            fieldlist.append((field, si))
+
+
+    pts = kernel.quad.get_pts()
+    
+    for field, si in fieldlist:
+        fspace = field.function_space().get_space(si)
+        fieldobj = FieldObject()
+        fieldobj.name = field.name() + '_' + str(si)
+        fieldobj.nbasis_x = []
+        fieldobj.nbasis_y = []
+        fieldobj.nbasis_z = []
+        fieldobj.offsets_x = []
+        fieldobj.offsets_y = []
+        fieldobj.offsets_z = []
+        fieldobj.offset_mult_x = []
+        fieldobj.offset_mult_y = []
+        fieldobj.offset_mult_z = []
+        fieldobj.basis_x = []
+        fieldobj.basis_y = []
+        fieldobj.basis_z = []
+        fieldobj.derivs_x = []
+        fieldobj.derivs_y = []
+        fieldobj.derivs_z = []
+        
+        fieldobj.ndofs = fspace.get_space(si).themis_element().ndofs()
+        for ci in range(fspace.get_space(si).ncomp):
+            elem = fspace.get_space(si).themis_element()
+
+            # THESE SHOULD EVENTUALLY TAKE A BLOCK INDEX
+            ofx, ofmx = elem.get_offsets(ci, 0)
+            ofy, ofmy = elem.get_offsets(ci, 1)
+            ofz, ofmz = elem.get_offsets(ci, 2)
+            bx = elem.get_basis(ci,0,pts[0])
+            by = elem.get_basis(ci,1,pts[1])
+            bz = elem.get_basis(ci,2,pts[2])
+            dx = elem.get_derivs(ci,0,pts[0])
+            dy = elem.get_derivs(ci,1,pts[1])
+            dz = elem.get_derivs(ci,2,pts[2])
+            fieldobj.offsets_x.append(a_to_cinit_string(ofx))
+            fieldobj.offsets_y.append(a_to_cinit_string(ofy))
+            fieldobj.offsets_z.append(a_to_cinit_string(ofz))
+            fieldobj.offset_mult_x.append(a_to_cinit_string(ofmx))
+            fieldobj.offset_mult_y.append(a_to_cinit_string(ofmy))
+            fieldobj.offset_mult_z.append(a_to_cinit_string(ofmz))
+
+            fieldobj.basis_x.append(a_to_cinit_string(bx))
+            fieldobj.basis_y.append(a_to_cinit_string(by))
+            fieldobj.basis_z.append(a_to_cinit_string(bz))
+            fieldobj.derivs_x.append(a_to_cinit_string(dx))
+            fieldobj.derivs_y.append(a_to_cinit_string(dy))
+            fieldobj.derivs_z.append(a_to_cinit_string(dz))
+            
+            fieldobj.nbasis_x.append(len(ofx))
+            fieldobj.nbasis_y.append(len(ofy))
+            fieldobj.nbasis_z.append(len(ofz))
+
+            dmname = 'DM da_' + fieldobj.name + '_' + str(ci)
+            vecname = 'Vec ' + fieldobj.name + '_' + str(ci)
+            field_args_string = field_args_string + ', ' + dmname
+            field_args_string = field_args_string + ', ' + vecname
+        fieldobj.nbasis_total = np.sum(np.array(fieldobj.nbasis_x, dtype=np.int32) * np.array(fieldobj.nbasis_y, dtype=np.int32) * np.array(fieldobj.nbasis_z, dtype=np.int32))
+        fieldobj.ncomp = fspace.get_space(si).ncomp
+        #print(fieldobj.name,fieldobj.basis_z[0],pts[2])
+        fieldobjs.append(fieldobj)
+
+
+    vals_args_string = ''
+    dmname = 'DM da_vals'
+    vecname = 'Vec evals'
+    vals_args_string = vals_args_string + ', ' + dmname
+    vals_args_string = vals_args_string + ', ' + vecname
+
+    # Specify the input variables for the template
+
+    templateVars['ndim'] = ndims
+
+
+    # fields
+    templateVars['fieldlist'] = fieldobjs
+    templateVars['fieldargs'] = field_args_string
+
+    templateVars['npts_x'] = kernel.quad.nquadpts[0]
+    templateVars['npts_y'] = kernel.quad.nquadpts[1]
+    templateVars['npts_z'] = kernel.quad.nquadpts[2]
+
+    templateVars['valsargs'] = vals_args_string
+    templateVars['valstype'] = kernel.ctype
+    templateVars['evaltype'] = kernel.etype
+    templateVars['evalfield'] = fieldobjs[evalfieldindex]
 
     # Process template to produce source code
     outputText = template.render(templateVars)

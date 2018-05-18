@@ -31,6 +31,8 @@ def create_matrix(mat_type, target, source, blocklist, kernellist):
                     # this catches bugs in pre-allocation and the initial assembly by locking the non-zero structure
                     matrices[si1][si2].setOption(PETSc.Mat.Option.NEW_NONZERO_LOCATION_ERR, False)
                     matrices[si1][si2].setOption(PETSc.Mat.Option.UNUSED_NONZERO_LOCATION_ERR, False)
+                    matrices[si1][si2].setOption(PETSc.Mat.Option.NEW_NONZERO_ALLOCATION_ERR, False)
+
                     # These are for zeroRows- the first keeps the non-zero structure when zeroing rows, the 2nd tells PETSc that the process only zeros owned rows
                     matrices[si1][si2].setOption(PETSc.Mat.Option.KEEP_NONZERO_PATTERN, True)
                     matrices[si1][si2].setOption(PETSc.Mat.Option.NO_OFF_PROC_ZERO_ROWS, False)

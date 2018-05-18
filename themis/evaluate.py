@@ -1,229 +1,91 @@
-# from assemble import compile_functional,
-from assemble import extract_fields
-from tsfc_interface import ThemisKernel
 from petscshim import PETSc
-from codegenerator import generate_assembly_routine
-import instant
-from compilation_options import *
+from assembly import extract_fields,compile_functional
+import numpy as np
 
-from coffee import base as ast
+class QuadCoefficient():
+    def __init__(self, mesh, ctype, etype, evalfield, quad, name='xquad'):
+        self.ctype = ctype
+        self.etype = etype
+        self.npatches = mesh.npatches
+        self.mesh = mesh
+        self.evalfield = evalfield
+# NEED A GOOD DEFAULT NAME HERE!!!
+        self._name = name
 
-from ufl import MixedElement  # , TensorProductCell
-from ufl.corealg.map_dag import map_expr_dags
-from ufl.algorithms import extract_arguments, extract_coefficients
+        self.vecs = []
+        self.dms = []
+        self.shapes = []
+        for bi in range(self.npatches):
+            dm = mesh.get_cell_da(bi)
+            nquadlist = quad.get_nquad()
+            nquad = np.prod(nquadlist)
+            localnxs = mesh.get_local_nxny(bi)
+            shape = list(localnxs)
+            shape.append(nquadlist[0])
+            shape.append(nquadlist[1])
+            shape.append(nquadlist[2])
 
-import gem
+            if ctype == 'scalar':
+                newdm = dm.duplicate(dof=nquad)
+            if ctype == 'vector':
+                newdm = dm.duplicate(dof=nquad*mesh.ndim)
+                shape.append(mesh.ndim)
+            if ctype == 'tensor':
+                newdm = dm.duplicate(dof=nquad*mesh.ndims*mesh.ndim)
+                shape.append(mesh.ndim)
+                shape.append(mesh.ndim)
 
-import tsfc
-import tsfc.kernel_interface.firedrake as firedrake_interface
-from tsfc.coffee import SCALAR_TYPE, generate as generate_coffee
-from tsfc.parameters import default_parameters
+            self.dms.append(newdm)
+            self.shapes.append(shape)
+            self.vecs.append(self.dms[bi].createGlobalVector())
 
+        self.evalkernel = EvalKernel(mesh,evalfield,quad,ctype,etype,name)
+        
+    def getarray(self, bi):
+        arr = self.dms[bi].getVecArray(self.vecs[bi])[:]
+        arr = np.reshape(arr, self.shapes[bi])
+        return arr
 
-def compile_element(expression, coordinates, parameters=None):
-    """Generates C code for point evaluations.
+    def name(self):
+        return self._name
+        
+    def evaluate(self):
+        EvaluateCoefficient(self,self.evalkernel)
 
-    :arg expression: UFL expression
-    :arg coordinates: coordinate field
-    :arg parameters: form compiler parameters
-    :returns: C code as string
-    """
-    if parameters is None:
-        parameters = default_parameters()
-    else:
-        _ = default_parameters()
-        _.update(parameters)
-        parameters = _
+class EvalKernel():
+    def __init__(self,mesh,field, quad, ctype,etype,name):
+        
+        self.integral_type = 'cell'
+        self.oriented = False
+        self.coefficient_numbers = [0, ]
+        self.coefficient_map = [0,] 
+        self.zero = False
+        self.assemblycompiled = False
+        self.evaluate = True
+        
+        self.ctype = ctype
+        self.etype = etype
+        self.name = name
+        self.mesh = mesh
+        self.coefficients = [field,]  
+        self.quad = quad
+        
+def EvaluateCoefficient(coefficient, evalkernel):
+    with PETSc.Log.Stage(coefficient.name() + '_evaluate'):
 
-    # No arguments, please!
-    if extract_arguments(expression):
-        return ValueError("Cannot interpolate UFL expression with Arguments!")
-
-    # Apply UFL preprocessing
-    expression = tsfc.ufl_utils.preprocess_expression(expression)
-
-    # Collect required coefficients
-    coefficient, = extract_coefficients(expression)
-
-    # Point evaluation of mixed coefficients not supported here
-    if type(coefficient.ufl_element()) == MixedElement:
-        raise NotImplementedError("Cannot point evaluate mixed elements yet!")
-
-    # Replace coordinates (if any)
-    domain = expression.ufl_domain()
-    assert coordinates.ufl_domain() == domain
-    expression = tsfc.ufl_utils.replace_coordinates(expression, coordinates)
-
-    # Initialise kernel builder
-    builder = firedrake_interface.KernelBuilderBase()
-    x_arg = builder._coefficient(coordinates, "x")
-    f_arg = builder._coefficient(coefficient, "f")
-
-    # TODO: restore this for expression evaluation!
-    # expression = ufl_utils.split_coefficients(expression, builder.coefficient_split)
-
-    # Translate to GEM
-    cell = domain.ufl_cell()
-    dim = cell.topological_dimension()
-    point = gem.Variable('X', (dim,))
-    point_arg = ast.Decl(SCALAR_TYPE, ast.Symbol('X', rank=(dim,)))
-
-    config = dict(interface=builder,
-                  ufl_cell=coordinates.ufl_domain().ufl_cell(),
-                  precision=parameters["precision"],
-                  point_indices=(),
-                  point_expr=point)
-    # TODO: restore this for expression evaluation!
-    # config["cellvolume"] = cellvolume_generator(coordinates.ufl_domain(), coordinates, config)
-    context = tsfc.fem.GemPointContext(**config)
-
-    # Abs-simplification
-    expression = tsfc.ufl_utils.simplify_abs(expression)
-
-    # Translate UFL -> GEM
-    translator = tsfc.fem.Translator(context)
-    result, = map_expr_dags(translator, [expression])
-
-    tensor_indices = ()
-    if expression.ufl_shape:
-        tensor_indices = tuple(gem.Index() for s in expression.ufl_shape)
-        return_variable = gem.Indexed(gem.Variable('R', expression.ufl_shape), tensor_indices)
-        result_arg = ast.Decl(SCALAR_TYPE, ast.Symbol('R', rank=expression.ufl_shape))
-        result = gem.Indexed(result, tensor_indices)
-    else:
-        return_variable = gem.Indexed(gem.Variable('R', (1,)), (0,))
-        result_arg = ast.Decl(SCALAR_TYPE, ast.Symbol('R', rank=(1,)))
-
-    # Unroll
-    max_extent = parameters["unroll_indexsum"]
-    if max_extent:
-        def predicate(index):
-            return index.extent <= max_extent
-        result, = gem.optimise.unroll_indexsum([result], predicate=predicate)
-
-    # Translate GEM -> COFFEE
-    result, = gem.impero_utils.preprocess_gem([result])
-    impero_c = gem.impero_utils.compile_gem([(return_variable, result)], tensor_indices)
-    body = generate_coffee(impero_c, {}, parameters["precision"])
-
-    # Build kernel tuple
-    kernel_code = builder.construct_kernel("evaluate_kernel", [result_arg, point_arg, x_arg, f_arg], body)
-
-    # Fill the code template
-    # extruded = isinstance(cell, TensorProductCell)
-
-    # code = {
-    # "geometric_dimension": cell.geometric_dimension(),
-    # "extruded_arg": ", %s nlayers" % as_cstr(IntType) if extruded else "",
-    # "nlayers": ", f->n_layers" if extruded else "",
-    # "IntType": as_cstr(IntType),
-    # }
-
-    # evaluate_template_c = """static inline void wrap_evaluate(double *result, double *X, double *coords, %(IntType)s *coords_map, double *f, %(IntType)s *f_map%(extruded_arg)s, %(IntType)s cell);
-
-# int evaluate(struct Function *f, double *x, double *result)
-# {
-    # struct ReferenceCoords reference_coords;
-    # %(IntType)s cell = locate_cell(f, x, %(geometric_dimension)d, &to_reference_coords, &reference_coords);
-    # if (cell == -1) {
-    # return -1;
-    # }
-
-    # if (!result) {
-    # return 0;
-    # }
-
-    # wrap_evaluate(result, reference_coords.X, f->coords, f->coords_map, f->f, f->f_map%(nlayers)s, cell);
-    # return 0;
-# }
-# """
-
-#    return (evaluate_template_c % code) + kernel_code.gencode()
-    return kernel_code.gencode()
-
-    # FIX THIS
-    # create kernels with evaluate=1
-    # def eval_at_quad_pts(self):
-    # si = 0 #FIX FOR MIXED
-    # subspace = self.space.get_space(si)
-    # if self.continuity == 'H1':
-    # evalfunc = Functional('standard.functional','h1_eval',-1,geometrylist=['detJ',],evaluate=True,valstype='scalar',fields=[(self,('field',),(si,))])
-    # if self.continuity == 'L2':
-    # evalfunc = Functional('standard.functional','l2_eval',-1,geometrylist=['detJ',],evaluate=True,valstype='scalar',fields=[(self,('field',),(si,))])
-    # if self.continuity == 'Hdiv':
-    # evalfunc = Functional('standard.functional','truncated_hdiv_eval',-1,geometrylist=['detJ','J'],evaluate=True,valstype='vector',fields=[(self,('field',),(si,))])
-    # if self.continuity == 'Hcurl':
-    # evalfunc = Functional('standard.functional','hcurl_eval',-1,geometrylist=['detJ','Jinv'],evaluate=True,valstype='vector',fields=[(self,('field',),(si,))])
-    # EvaluateCoefficient(self.evalcoeff,evalfunc,self.evalquad)
-    # return evalcoeff
-
-
-class EmptyClass():
-    pass
-
-# MIXED SPACES NEED TO BE CLEVER WITH HOW THEY USE FIELDS
-# PROBABLY HAVE A SPACE ARGUMENT HERE
-# THIS TAKES I THINK AN SI ARGUMENT AND A CONTINUITY ARGUMENT...
-
-
-def create_evaluate_kernel(mesh, field, quad, name):
-
-    test = compile_element(field, mesh.coordinates)
-    print(test)
-
-    fakekernel = EmptyClass()
-    fakekernel.ast = ''
-    fakekernel.integral_type = 'cell'
-    fakekernel.oriented = False
-    fakekernel.coefficient_numbers = [0, ]  # FIX FOR ACTUAL FUNCTIONAL...
-
-    kernel = ThemisKernel(fakekernel)
-
-    kernel.formdim = -1
-    kernel.evaluate = 1
-    kernel.name = name
-    kernel.mesh = mesh
-    kernel.coefficient_map = {}  # FIX FOR ACTUAL FUNCTIONAL...
-    kernel.coefficients = []  # FIX FOR ACTUAL FUNCTIONAL...
-    kernel.quad = quad
-
-    return kernel
-
-
-def EvaluateCoefficient(coefficient, kernel):
-    with PETSc.Log.Stage(coefficient.name() + '_assemble'):
-
+        #compile the kernel
         with PETSc.Log.Event('compile'):
-            if not kernel.assemblycompiled:
-                mesh = coefficient.mesh
-
-                # THIS NEEDS SOME SORT OF CACHING CHECK!
-                assembly_routine = generate_assembly_routine(mesh, None, None, kernel)
-                assembly_routine = assembly_routine.encode('ascii', 'ignore')
-                kernel.assemble_function = instant.build_module(code=assembly_routine,
-                                                                include_dirs=include_dirs,
-                                                                library_dirs=library_dirs,
-                                                                libraries=libraries,
-                                                                init_code='    import_array();',
-                                                                cppargs=['-O3', ],
-                                                                swig_include_dirs=swig_include_dirs).evaluate
-                kernel.assemblycompiled = True
+            if not evalkernel.assemblycompiled:
+                compile_functional(evalkernel, None, None, coefficient.mesh)
 
         # scatter fields into local vecs
         with PETSc.Log.Event('extract'):
-            fieldargs_list = extract_fields(kernel)
+            extract_fields(evalkernel)
 
         # evaluate
         with PETSc.Log.Event('evaluate'):
-            for bi in range(coefficient.mesh.npatches):
-                if kernel.integral_type == 'cell':
-                    da = coefficient.mesh.get_cell_da(bi)
-                # if kernel.integral_type == 'facet' and functional.facet_direc == 'x':
-                    # da = coefficient.mesh.edgex_das[bi]
-                # if kernel.integral_type == 'facet' and functional.facet_direc == 'y':
-                    # da = coefficient.mesh.edgey_das[bi]
-                # if kernel.integral_type == 'facet' and functional.facet_direc == 'z':
-                    # da = coefficient.mesh.edgez_das[bi]
+            for da, assemblefunc in zip(evalkernel.dalist, evalkernel.assemblyfunc_list):
+                # BROKEN FOR MULTIPATCH- COEFFICIENT DMS/VEC AND FIELD ARGS LIST NEEDS A BI INDEX
+                assemblefunc([da, ] +  [coefficient.dms[0],coefficient.vecs[0]] + evalkernel.fieldargs_list, evalkernel.constantargs_list)
 
-                # BROKEN FOR MULTIPATCH- FIELD ARGS LIST NEEDS A BI INDEX
-                kernel.assemble_function(da, *([coefficient.dms[bi], coefficient.vecs[bi]] + fieldargs_list))
+
