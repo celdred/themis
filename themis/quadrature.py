@@ -1,5 +1,5 @@
 import sympy
-from lagrange import gauss_lobatto, gauss_legendre  # lagrange_poly_support
+from lagrange import gauss_lobatto, gauss_legendre,lagrange_poly_support
 import numpy as np
 from finat.quadrature import TensorProductQuadratureRule
 
@@ -41,6 +41,10 @@ class ThemisQuadratureNumerical(ThemisQuadrature):
             quad = GaussLobattoLegendre1D
         if qtype == 'gl':
             quad = GaussLegendre1D
+        if qtype == 'newtoncotesopen':
+            quad = NewtonCotesOpen1D
+        if qtype == 'pascal':
+            quad = Pascal1D
         # ADD MANY MORE QUAD TYPES HERE!
 
         if len(nquadptslist) == 1:
@@ -61,9 +65,9 @@ class ThemisQuadratureExact(ThemisQuadrature):
 
         self.exact = True
         self.finatquad = None
-        if qtype == 'gll':
+        if qtype == 'gllexact':
             quad = GaussLobattoLegendre1DExact
-        if qtype == 'gl':
+        if qtype == 'glexact':
             quad = GaussLegendre1DExact
 
         if len(nquadptslist) == 1:
@@ -75,7 +79,6 @@ class ThemisQuadratureExact(ThemisQuadrature):
         self.wts = []
         for npts in nquadptslist:
             pt, wt = quad(npts)
-
             for i in range(len(pt)):
                 pt[i] = rescale_pts_exact(pt[i])
                 wt[i] = rescale_wts_exact(wt[i])
@@ -125,6 +128,27 @@ class ThemisQuadratureFinat(ThemisQuadrature):
         self.nquadpts = np.array(nquadptslist, dtype=np.int32)
 
 
+##### ALL OF THESE QUADRATURE RULES ARE DEFINED ON THE INTERVAL -1,1 ########
+
+def NewtonCotesOpen1D(n):
+
+	pts = np.linspace(-1.,1.,n+2)
+	pts = pts[1:-1]
+	wts = np.zeros((n))
+	x = sympy.var('x')
+	for i in range(n):
+		li = lagrange_poly_support(i,pts,x)
+		wts[i] = sympy.integrate(li,(x,-1.,1.))
+		
+	return pts,wts
+
+#NOTE: THIS RULE IS INTENDED ONLY FOR PLOTTING, AND THEREFORE WTS IS USELESS
+def Pascal1D(n):
+	pts = np.linspace(-1.,1.,2*n+1)
+	pts = pts[1:-1:2]
+	wts = np.zeros((n))
+	return pts,wts
+	
 def GaussLegendre1D(n):
 
     pts = np.array(gauss_legendre(n), dtype=np.float64)

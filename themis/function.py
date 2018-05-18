@@ -2,51 +2,6 @@ from ufl import Coefficient
 from petscshim import PETSc
 import numpy as np
 
-# NEED A GOOD DEFAULT NAME HERE!!!
-
-
-class QuadCoefficient():
-    def __init__(self, mesh, ctype, quad, name='xquad'):
-        self.ctype = ctype
-        self.npatches = mesh.npatches
-        self.mesh = mesh
-        self._name = name
-
-        self.vecs = []
-        self.dms = []
-        self.shapes = []
-        for bi in range(self.npatches):
-            dm = mesh.get_cell_da(bi)
-            nquadlist = quad.get_nquad()
-            nquad = np.prod(nquadlist)
-            localnxs = mesh.get_local_nxny(bi)
-            shape = list(localnxs)
-            shape.append(nquadlist[0])
-            shape.append(nquadlist[1])
-            shape.append(nquadlist[2])
-
-            if ctype == 'scalar':
-                newdm = dm.duplicate(dof=nquad)
-            if ctype == 'vector':
-                newdm = dm.duplicate(dof=nquad*mesh.ndim)
-                shape.append(mesh.ndim)
-            if ctype == 'tensor':
-                newdm = dm.duplicate(dof=nquad*mesh.ndims*mesh.ndim)
-                shape.append(mesh.ndim)
-                shape.append(mesh.ndim)
-
-            self.dms.append(newdm)
-            self.shapes.append(shape)
-            self.vecs.append(self.dms[bi].createGlobalVector())
-
-    def getarray(self, bi):
-        arr = self.dms[bi].getVecArray(self.vecs[bi])[:]
-        arr = np.reshape(arr, self.shapes[bi])
-        return arr
-
-    def name(self):
-        return self._name
-
 
 class SplitFunction():
     # NEED A GOOD DEFAULT NAME HERE!!!

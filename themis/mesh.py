@@ -221,11 +221,9 @@ class SingleBlockMesh(MeshBase):
             celem = coordelem
         else:
             if len(nxs) == 1:
-                # celem = FiniteElement("DG",interval,1) #FIX THIS- HOW SHOULD WE DEFAULT HERE?
-                celem = FiniteElement("DG", interval, 1, variant='feec')  # FIX THIS- HOW SHOULD WE DEFAULT HERE?
+                celem = FiniteElement("DG", interval, 1, variant='feec')
             if len(nxs) == 2:
-                # celem = FiniteElement("DG",quadrilateral,1) #FIX THIS- HOW SHOULD WE DEFAULT HERE?
-                celem = FiniteElement("DG", quadrilateral, 1, variant='feec')  # FIX THIS- HOW SHOULD WE DEFAULT HERE?
+                celem = FiniteElement("DG", quadrilateral, 1, variant='feec')
             if len(nxs) == 3:
                 raise ValueError("3D NEEDS TO BE A TENSOR PRODUCT ELEMENT- FIX THIS!")
         celem = VectorElement(celem, dim=self.ndim)

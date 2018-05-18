@@ -1,5 +1,6 @@
 from petscshim import PETSc
-from function import Function, SplitFunction, QuadCoefficient
+from function import Function, SplitFunction
+from evaluate import QuadCoefficient
 from firedrake import hdf5interface as h5i
 import numpy as np
 
@@ -70,6 +71,9 @@ class Checkpoint():
         self._write_timestep_attr(group)
 
         self.viewer.pushGroup(group)
+        
+        #arr = field._vector.getArray()
+        #print(name,np.max(arr),np.min(arr))
         with field.space.get_composite_da().getAccess(field._vector) as splitglobalvec:
             silist = range(field.space.nspaces)
             if isinstance(field, SplitFunction):
@@ -81,6 +85,10 @@ class Checkpoint():
                     for bi in range(field.space.get_space(si).npatches):
                         splitglobalvec[bi+soff+coff].setName(name + '_' + str(si) + '_' + str(ci) + '_' + str(bi))
                         self.viewer.view(obj=splitglobalvec[bi+soff+coff])
+        arr = field._vector.getArray()
+        #print(name,np.max(arr),np.min(arr))
+        #print(group)
+        #print(dir(self.h5file))                   
         self.viewer.popGroup()
 
     def load(self, field, name=None):
@@ -183,5 +191,7 @@ class Checkpoint():
 
     def close(self):
         """Close the checkpoint file (flushing any pending writes)"""
-        self.h5file.flush()
         self.viewer.destroy()
+        del self.viewer
+        self.h5file.flush()
+        del self.h5file

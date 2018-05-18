@@ -1,6 +1,6 @@
 import numpy as np
 from petscshim import PETSc
-from codegenerator import generate_assembly_routine
+from codegenerator import generate_assembly_routine,generate_evaluate_routine
 # import instant
 # from compilation_options import *
 # from tsfc_interface import compile_form
@@ -9,6 +9,7 @@ from mpi4py import MPI
 from function import Function
 from constant import Constant
 import functools
+#import time
 
 from pyop2.utils import get_petsc_dir
 from pyop2 import compilation
@@ -120,7 +121,7 @@ def compile_functional(kernel, tspace, sspace, mesh):
             if isinstance(field, Constant):
                 constantargtypeslist.append(ctypes.c_double)
 
-    # THIS NEEDS SOME SORT OF CACHING CHECK- BASICALLY WE SHOULDN'T REALLY RE-GENERATE THE BIG C STRING EVERY TIME...
+# THIS NEEDS SOME SORT OF CACHING CHECK- BASICALLY WE SHOULDN'T REALLY RE-GENERATE THE BIG C STRING EVERY TIME...
     kernel.assemblyfunc_list = []
     tensorlist = []
 
@@ -145,7 +146,11 @@ def compile_functional(kernel, tspace, sspace, mesh):
             for ci1 in range(tspace.ncomp):  # tda
                 for bi in range(mesh.npatches):
                     tensorlist.append(ctypes.c_voidp)
-
+                    
+    if kernel.evaluate == True:
+        tensorlist.append(ctypes.c_voidp) # DM
+        tensorlist.append(ctypes.c_voidp) # Vec
+		
     argtypeslist = [ctypes.c_voidp, ] + tensorlist + fieldargtypeslist + constantargtypeslist
 
     restype = ctypes.c_int
@@ -156,7 +161,10 @@ def compile_functional(kernel, tspace, sspace, mesh):
         kernel.facet_direc = facet_direc
         kernel.facet_exterior_boundary = facet_exterior_boundary
 
-        assembly_routine = generate_assembly_routine(mesh, tspace, sspace, kernel)
+        if kernel.evaluate == True:
+            assembly_routine = generate_evaluate_routine(mesh, kernel)
+        else:
+            assembly_routine = generate_assembly_routine(mesh, tspace, sspace, kernel)
         assembly_function = CompiledKernel(assembly_routine, "assemble", cppargs=["-O3"], argtypes=argtypeslist, restype=restype)
         kernel.assemblyfunc_list.append(assembly_function)
 
@@ -195,15 +203,20 @@ def AssembleTwoForm(mat, tspace, sspace, kernel, zeroassembly=False):
             kernel.zero = True
         # compile functional IFF form not already compiled
         # also extract coefficient and geometry args lists
+        #time1 = time.time()
         with PETSc.Log.Event('compile'):
             if not kernel.assemblycompiled:
                 compile_functional(kernel, tspace, sspace, mesh)
-
+        #print('compiled-2',time.time()-time1,zeroassembly)
+		
         # scatter fields into local vecs
+        #time1 = time.time()
         with PETSc.Log.Event('extract'):
             extract_fields(kernel)
+        #print('extracted-2',time.time()-time1,zeroassembly)
 
         # assemble
+        #time1 = time.time()
         with PETSc.Log.Event('assemble'):
 
             # THIS STUFF IS BROKEN FOR MULTIPATCH MESHES
@@ -243,6 +256,7 @@ def AssembleTwoForm(mat, tspace, sspace, kernel, zeroassembly=False):
 
         if zeroassembly:
             kernel.zero = False
+        #print('assembled-2',time.time()-time1,zeroassembly)
 
 
 def AssembleZeroForm(mesh, kernellist):
@@ -296,15 +310,20 @@ def AssembleOneForm(veclist, space, kernel):
 
         # compile functional IFF form not already compiled
         # also extract coefficient and geometry args lists
+        #time1 = time.time()
         with PETSc.Log.Event('compile'):
             if not kernel.assemblycompiled:
                 compile_functional(kernel, space, None, mesh)
+        #print('compiled-1',time.time()-time1)
 
         # scatter fields into local vecs
+        #time1 = time.time()
         with PETSc.Log.Event('extract'):
             extract_fields(kernel)
+        #print('extracted-1',time.time()-time1)
 
         # assemble
+        #time1 = time.time()
         with PETSc.Log.Event('assemble'):
             # BROKEN FOR MULTIPATCH MESHES
             # SHOULD DO 1 ASSEMBLY PER PATCH
@@ -318,6 +337,7 @@ def AssembleOneForm(veclist, space, kernel):
             # BROKEN FOR MULTIPATCH- FIELD ARGS LIST NEEDS A BI INDEX
             for da, assemblefunc in zip(kernel.dalist, kernel.assemblyfunc_list):
                 assemblefunc([da, ] + veclist + tdalist + kernel.fieldargs_list, kernel.constantargs_list)
+        #print('assembled-1',time.time()-time1)
 
 
 def compute_1d_bounds(ci1, ci2, i, elem1, elem2, ncell, ndofs, interior_facet, bc, ranges1, ranges2):
@@ -405,7 +425,8 @@ def two_form_preallocate_opt(mesh, space1, space2, ci1, ci2, bi, interior_x, int
 
     # see http://stackoverflow.com/questions/17138393/numpy-outer-product-of-n-vectors
 
-    # print(dnnzarr)
+    #print(dnnzarr)
+    #print(onnzarr)
 
     return dnnzarr, onnzarr
 
