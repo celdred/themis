@@ -37,7 +37,7 @@ Our primary scientific focus is atmospheric dynamical cores, and our choice of a
 * New compatible Galerkin families: mimetic spectral element, isogeometric differential forms
 * Multi-block, structured grids
 * Geometric multigrid
-* Improved preconditioner support and solver composition
+* Support for composable preconditioners
 * Mimetic Galerkin Difference specific preconditioners
 * Isogeometric analyis specific preconditioners
 * Improved support for matrix-free operator evaluation
