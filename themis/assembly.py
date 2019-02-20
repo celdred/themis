@@ -48,47 +48,100 @@ def compile_functional(kernel, tspace, sspace, mesh):
     facet_exterior_boundary_list = []
 
     if kernel.integral_type == 'cell':
-        kernel.dalist.append(mesh.get_cell_da(0))
+        kernel.dalist.append(mesh.get_cell_da())
         facet_direc_list.append('')
         facet_exterior_boundary_list.append('')
 
     if kernel.integral_type == 'interior_facet':
-        kernel.dalist.append(mesh._edgex_das[0])
+        kernel.dalist.append(mesh._edgex_da)
         facet_direc_list.append(0)
         facet_exterior_boundary_list.append('')
         if mesh.ndim >= 2:
-            kernel.dalist.append(mesh._edgey_das[0])
+            kernel.dalist.append(mesh._edgey_da)
             facet_direc_list.append(1)
             facet_exterior_boundary_list.append('')
         if mesh.ndim >= 3:
-            kernel.dalist.append(mesh._edgez_das[0])
+            kernel.dalist.append(mesh._edgez_da)
             facet_direc_list.append(2)
             facet_exterior_boundary_list.append('')
 
     if kernel.integral_type == 'exterior_facet':
-        kernel.dalist.append(mesh._edgex_das[0])
-        kernel.dalist.append(mesh._edgex_das[0])
-        facet_direc_list.append(0)
-        facet_exterior_boundary_list.append('upper')
-        facet_direc_list.append(0)
-        facet_exterior_boundary_list.append('lower')
-        if mesh.ndim >= 2:
-            kernel.dalist.append(mesh._edgey_das[0])
-            kernel.dalist.append(mesh._edgey_das[0])
+        if mesh.bcs[0] == 'nonperiodic':
+            kernel.dalist.append(mesh._edgex_da)
+            kernel.dalist.append(mesh._edgex_da)
+            facet_direc_list.append(0)
+            facet_exterior_boundary_list.append('upper')
+            facet_direc_list.append(0)
+            facet_exterior_boundary_list.append('lower')
+        if mesh.ndim >= 2 and mesh.bcs[1] == 'nonperiodic':
+            kernel.dalist.append(mesh._edgey_da)
+            kernel.dalist.append(mesh._edgey_da)
             facet_direc_list.append(1)
             facet_exterior_boundary_list.append('upper')
             facet_direc_list.append(1)
             facet_exterior_boundary_list.append('lower')
-        if mesh.ndim >= 3:
-            kernel.dalist.append(mesh._edgez_das[0])
-            kernel.dalist.append(mesh._edgez_das[0])
+        if mesh.ndim >= 3 and mesh.bcs[2] == 'nonperiodic':
+            kernel.dalist.append(mesh._edgez_da)
+            kernel.dalist.append(mesh._edgez_da)
             facet_direc_list.append(2)
             facet_exterior_boundary_list.append('upper')
             facet_direc_list.append(2)
             facet_exterior_boundary_list.append('lower')
 
-    # ADD EXTRUDED MESH SUPPORT HERE
-    # ADD SUBDOMAIN SUPPORT IN EXTERIOR FACET INTEGRALS- SHOULD CORRESPOND TO HOW FIREDRAKE DOES STUFF IN UTILITY MESHES...
+    if kernel.integral_type == 'interior_facet_vert': # side facets
+        kernel.dalist.append(mesh._edgex_da)
+        facet_direc_list.append(0)
+        facet_exterior_boundary_list.append('')
+        if mesh.extrusion_dim == 2:
+            kernel.dalist.append(mesh._edgey_da)
+            facet_direc_list.append(1)
+            facet_exterior_boundary_list.append('')
+            
+    if kernel.integral_type == 'interior_facet_horiz': # extruded facets
+        if mesh.extrusion_dim == 1:
+            kernel.dalist.append(mesh._edgey_da)
+            facet_direc_list.append(1)
+            facet_exterior_boundary_list.append('')
+        if mesh.extrusion_dim == 2:
+            kernel.dalist.append(mesh._edgez_da)
+            facet_direc_list.append(2)
+            facet_exterior_boundary_list.append('')
+            
+    if kernel.integral_type == 'exterior_facet_vert': # side exterior facets
+        if mesh.bcs[0] == 'nonperiodic':
+            kernel.dalist.append(mesh._edgex_da)
+            kernel.dalist.append(mesh._edgex_da)
+            facet_direc_list.append(0)
+            facet_exterior_boundary_list.append('upper')
+            facet_direc_list.append(0)
+            facet_exterior_boundary_list.append('lower')
+        if mesh.extrusion_dim == 2 and mesh.bcs[1] == 'nonperiodic':
+            kernel.dalist.append(mesh._edgey_da)
+            kernel.dalist.append(mesh._edgey_da)
+            facet_direc_list.append(1)
+            facet_exterior_boundary_list.append('upper')
+            facet_direc_list.append(1)
+            facet_exterior_boundary_list.append('lower')
+            
+    if kernel.integral_type == 'exterior_facet_top': # extruded exterior facet top
+        if mesh.extrusion_dim == 1:
+            kernel.dalist.append(mesh._edgey_da)
+            facet_direc_list.append(1)
+            facet_exterior_boundary_list.append('upper')
+        if mesh.extrusion_dim == 2:
+            kernel.dalist.append(mesh._edgez_da)
+            facet_direc_list.append(2)
+            facet_exterior_boundary_list.append('upper')
+                 
+    if kernel.integral_type == 'exterior_facet_bottom': # extruded exterior facet bottom
+        if mesh.extrusion_dim == 1:
+            kernel.dalist.append(mesh._edgey_da)
+            facet_direc_list.append(1)
+            facet_exterior_boundary_list.append('lower')
+        if mesh.extrusion_dim == 2:
+            kernel.dalist.append(mesh._edgez_da)
+            facet_direc_list.append(2)
+            facet_exterior_boundary_list.append('lower')
 
     # create field args list: matches construction used in codegenerator.py
 
@@ -101,8 +154,8 @@ def compile_functional(kernel, tspace, sspace, mesh):
 
     # append coordinates
     if not kernel.zero:  # don't build any field args stuff for zero kernel
-        kernel.fieldargs_list.append(kernel.mesh.coordinates.function_space().get_da(0, 0))  # THIS BREAKS FOR MULTIPATCH MESHES
-        kernel.fieldargs_list.append(kernel.mesh.coordinates._lvectors[0])  # THIS BREAKS FOR MULTIPATCH MESHES
+        kernel.fieldargs_list.append(kernel.mesh.coordinates.function_space().get_da(0))
+        kernel.fieldargs_list.append(kernel.mesh.coordinates._lvectors[0])
         fieldargtypeslist.append(ctypes.c_voidp)
         fieldargtypeslist.append(ctypes.c_voidp)
 
@@ -112,10 +165,9 @@ def compile_functional(kernel, tspace, sspace, mesh):
             if isinstance(field, Function):
                 for si in range(field.function_space().nspaces):
                     fspace = field.function_space().get_space(si)
-                    bi = 0  # BROKEN FOR MULTIPATCH
                     for ci in range(fspace.ncomp):
-                        kernel.fieldargs_list.append(fspace.get_da(ci, bi))
-                        kernel.fieldargs_list.append(field.get_lvec(si, ci, bi))
+                        kernel.fieldargs_list.append(fspace.get_da(ci))
+                        kernel.fieldargs_list.append(field.get_lvec(si, ci))
                         fieldargtypeslist.append(ctypes.c_voidp)  # DA
                         fieldargtypeslist.append(ctypes.c_voidp)  # Vec
             if isinstance(field, Constant):
@@ -129,23 +181,18 @@ def compile_functional(kernel, tspace, sspace, mesh):
 
             for ci1 in range(tspace.ncomp):  # Mat
                 for ci2 in range(sspace.ncomp):
-                    for bi in range(mesh.npatches):
-                        tensorlist.append(ctypes.c_voidp)
+                    tensorlist.append(ctypes.c_voidp)
             for ci1 in range(tspace.ncomp):  # tda
-                for bi in range(mesh.npatches):
-                    tensorlist.append(ctypes.c_voidp)
+                tensorlist.append(ctypes.c_voidp)
             for ci2 in range(sspace.ncomp):  # sda
-                for bi in range(mesh.npatches):
-                    tensorlist.append(ctypes.c_voidp)
+                tensorlist.append(ctypes.c_voidp)
 
     if (tspace is not None) and (sspace is None):  # 1-form
 
             for ci1 in range(tspace.ncomp):  # Vec
-                for bi in range(mesh.npatches):
-                    tensorlist.append(ctypes.c_voidp)
+                tensorlist.append(ctypes.c_voidp)
             for ci1 in range(tspace.ncomp):  # tda
-                for bi in range(mesh.npatches):
-                    tensorlist.append(ctypes.c_voidp)
+                tensorlist.append(ctypes.c_voidp)
                     
     if kernel.evaluate == True:
         tensorlist.append(ctypes.c_voidp) # DM
@@ -172,7 +219,6 @@ def compile_functional(kernel, tspace, sspace, mesh):
         kernel.assemblycompiled = True
 
 
-# BROKEN FOR MULTIPATCH
 def extract_fields(kernel):
 
     if not kernel.zero:
@@ -219,40 +265,39 @@ def AssembleTwoForm(mat, tspace, sspace, kernel, zeroassembly=False):
         #time1 = time.time()
         with PETSc.Log.Event('assemble'):
 
-            # THIS STUFF IS BROKEN FOR MULTIPATCH MESHES
-            # SHOULD REALLY DO 1 ASSEMBLY PER PATCH
             # get the list of das
             tdalist = []
             for ci1 in range(tspace.ncomp):
-                for bi in range(mesh.npatches):
-                    tdalist.append(tspace.get_da(ci1, bi))
+                tdalist.append(tspace.get_da(ci1))
             sdalist = []
             for ci2 in range(sspace.ncomp):
-                for bi in range(mesh.npatches):
-                    sdalist.append(sspace.get_da(ci2, bi))
+                sdalist.append(sspace.get_da(ci2))
 
             # get the block sub matrices
             submatlist = []
             for ci1 in range(tspace.ncomp):
                 for ci2 in range(sspace.ncomp):
-                    for bi in range(mesh.npatches):
-                        isrow_block = tspace.get_component_block_lis(ci1, bi)
-                        iscol_block = sspace.get_component_block_lis(ci2, bi)
-                        submatlist.append(mat.getLocalSubMatrix(isrow_block, iscol_block))
+                    isrow_block = tspace.get_component_block_lis(ci1)
+                    iscol_block = sspace.get_component_block_lis(ci2)
+                    submatlist.append(mat.getLocalSubMatrix(isrow_block, iscol_block))
 
             for da, assemblefunc in zip(kernel.dalist, kernel.assemblyfunc_list):
-                # BROKEN FOR MULTIPATCH- FIELD ARGS LIST NEEDS A BI INDEX
+                #PETSc.Sys.Print('assembling 2-form',kernel.integral_type,da)
+                #PETSc.Sys.Print(submatlist)
+                #PETSc.Sys.Print(tdalist)
+                #PETSc.Sys.Print(sdalist)
+                #PETSc.Sys.Print(kernel.fieldargs_list)
+                #PETSc.Sys.Print(kernel.constantargs_list)
                 assemblefunc([da, ] + submatlist + tdalist + sdalist + kernel.fieldargs_list, kernel.constantargs_list)
 
             # restore sub matrices
             k = 0
             for ci1 in range(tspace.ncomp):
                 for ci2 in range(sspace.ncomp):
-                    for bi in range(mesh.npatches):
-                        isrow_block = tspace.get_component_block_lis(ci1, bi)
-                        iscol_block = sspace.get_component_block_lis(ci2, bi)
-                        mat.restoreLocalSubMatrix(isrow_block, iscol_block, submatlist[k])
-                        k = k+1
+                    isrow_block = tspace.get_component_block_lis(ci1)
+                    iscol_block = sspace.get_component_block_lis(ci2)
+                    mat.restoreLocalSubMatrix(isrow_block, iscol_block, submatlist[k])
+                    k = k+1
 
         if zeroassembly:
             kernel.zero = False
@@ -281,10 +326,7 @@ def AssembleZeroForm(mesh, kernellist):
 
             # assemble the form
             with PETSc.Log.Event('assemble'):
-                # BROKEN FOR MULTIPATCH MESHES
-                # SHOULD DO 1 ASSEMBLY PER PATCH
 
-                # BROKEN FOR MULTIPATCH- FIELD ARGS LIST NEEDS A BI INDEX
                 for da, assemblefunc in zip(kernel.dalist, kernel.assemblyfunc_list):
                     lvalue = assemblefunc([da, ] + kernel.fieldargs_list, kernel.constantargs_list)
 
@@ -325,17 +367,19 @@ def AssembleOneForm(veclist, space, kernel):
         # assemble
         #time1 = time.time()
         with PETSc.Log.Event('assemble'):
-            # BROKEN FOR MULTIPATCH MESHES
-            # SHOULD DO 1 ASSEMBLY PER PATCH
 
             # get the list of das
             tdalist = []
             for ci1 in range(space.ncomp):
-                for bi in range(mesh.npatches):
-                    tdalist.append(space.get_da(ci1, bi))
+                tdalist.append(space.get_da(ci1))
 
-            # BROKEN FOR MULTIPATCH- FIELD ARGS LIST NEEDS A BI INDEX
             for da, assemblefunc in zip(kernel.dalist, kernel.assemblyfunc_list):
+                #PETSc.Sys.Print('assembling 1-form',kernel.integral_type,da)
+                #PETSc.Sys.Print(veclist)
+                #PETSc.Sys.Print(tdalist)
+                #PETSc.Sys.Print(kernel.fieldargs_list)
+                #PETSc.Sys.Print(kernel.constantargs_list)
+                #PETSc.Sys.Print(kernel.fieldargs_list[0].getGhostRanges())
                 assemblefunc([da, ] + veclist + tdalist + kernel.fieldargs_list, kernel.constantargs_list)
         #print('assembled-1',time.time()-time1)
 
@@ -372,32 +416,32 @@ def compute_1d_bounds(ci1, ci2, i, elem1, elem2, ncell, ndofs, interior_facet, b
 # THIS IS BROKEN FOR VECTOR SPACES
 # NEED TO MULTIPLY BY NDOFS (maybe ndofs^ndim?) I THINK...
 # ALSO SIZING ON DNNZ AND NNZ ARRAYS IS BROKEN FOR VECTOR SPACES
-def two_form_preallocate_opt(mesh, space1, space2, ci1, ci2, bi, interior_x, interior_y, interior_z):
+def two_form_preallocate_opt(mesh, space1, space2, ci1, ci2, interior_x, interior_y, interior_z):
 
     elem1 = space1.themis_element()
     elem2 = space2.themis_element()
 
-    space1_ranges = space1.get_xy(ci1, bi)
-    space2_ranges = np.array(space2.get_xy(ci2, bi), dtype=np.int32)
-    nx1s = space1.get_local_nxny(ci1, bi)
+    space1_ranges = space1.get_xy(ci1)
+    space2_ranges = np.array(space2.get_xy(ci2), dtype=np.int32)
+    nx1s = space1.get_local_nxny(ci1)
 
     # swidth = space2.get_da(ci2, bi).getStencilWidth()
 
     # xyzmaxs_space2 = space2.get_nxny(ci2, bi)
 
     # compute i bounds
-    dnnz_x, nnz_x = compute_1d_bounds(ci1, ci2, 0, elem1, elem2, mesh.nxs[bi][0], nx1s[0], interior_x, mesh.bcs[0], space1_ranges[0], space2_ranges[0])
+    dnnz_x, nnz_x = compute_1d_bounds(ci1, ci2, 0, elem1, elem2, mesh.nxs[0], nx1s[0], interior_x, mesh.bcs[0], space1_ranges[0], space2_ranges[0])
 
     # compute j bounds
     if mesh.ndim >= 2:
-        dnnz_y, nnz_y = compute_1d_bounds(ci1, ci2, 1, elem1, elem2, mesh.nxs[bi][1], nx1s[1], interior_y, mesh.bcs[1], space1_ranges[1], space2_ranges[1])
+        dnnz_y, nnz_y = compute_1d_bounds(ci1, ci2, 1, elem1, elem2, mesh.nxs[1], nx1s[1], interior_y, mesh.bcs[1], space1_ranges[1], space2_ranges[1])
 
     # compute k bounds
     if mesh.ndim == 3:
-        dnnz_z, nnz_z = compute_1d_bounds(ci1, ci2, 2, elem1, elem2, mesh.nxs[bi][2], nx1s[2], interior_z, mesh.bcs[2], space1_ranges[2], space2_ranges[2])
+        dnnz_z, nnz_z = compute_1d_bounds(ci1, ci2, 2, elem1, elem2, mesh.nxs[2], nx1s[2], interior_z, mesh.bcs[2], space1_ranges[2], space2_ranges[2])
 
     # fix periodic boundaries when there is only 1 processor in that direction
-    nprocs = mesh._cell_das[bi].getProcSizes()
+    nprocs = mesh._cell_da.getProcSizes()
     # for bc,nproc in zip(mesh.bcs,nprocs):
     if (mesh.bcs[0] == 'periodic') and (nprocs[0] == 1):
         dnnz_x = nnz_x

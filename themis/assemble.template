@@ -59,10 +59,6 @@ PetscErrorCode assemble(DM da {{ subveclist }} {{ s1dalist }} {{ fieldargs }} {{
 PetscScalar assemble(DM da {{ fieldargs }} {{ constantargs }})
 {% endif %}
 
-{% if evaluate == 1 %}
-PetscScalar evaluate(DM da {{ valsargs }} {{ fieldargs }} {{ constantargs }})
-{% endif %}
-
 {
 
  {% if formdim == 2 %}
@@ -197,41 +193,6 @@ const   PetscInt {{field.name}}_{{k}}_offset_mult_z[{{ field.nbasis_z[k] }}] = {
        {% endfor %}
       {% endif %}
   ierr = DMDAGetCorners(da,&xs,&ys,&zs,&xm,&ym,&zm);CHKERRQ(ierr);
-
-//create vals pointer for evaluate
-{% if evaluate == 1 %}
-#define quadss [qz + {{ npts_z }} * (qy + {{ npts_y }} * qx)]
-#define quadsv(d1) [d1 + {{ ndim }} * (qz + {{ npts_z }} * (qy + {{ npts_y }} * qx))]
-#define quadst(d1,d2) [d2 + {{ ndim }} * (d1 + {{ ndim }} * (qz + {{ npts_z }} * (qy + {{ npts_y }} * qx)))]
-
- {% if ndim == 1 %}
- #define SCALARINDICES [i] quadss
- #define VECTORINDICES(d1) [i] quadsv(d1)
- #define TENSORINDICES(d1,d2) [i] quadst(d2,d1)
-  PetscScalar **data_vals;
-       {% endif %}
- {% if ndim == 2 %}
- #define SCALARINDICES [j][i] quadss
- #define VECTORINDICES(d1) [j][i] quadsv(d1)
- #define TENSORINDICES(d1,d2) [j][i] quadst(d2,d1)
-   PetscScalar ***data_vals;
-       {% endif %}
- {% if ndim == 3 %}
- #define SCALARINDICES [k][j][i] quadss
- #define VECTORINDICES(d1) [k][j][i] quadsv(d1)
- #define TENSORINDICES(d1,d2) [k][j][i] quadst(d2,d1)
-   PetscScalar ****data_vals;
-       {% endif %}
-       
-ierr = DMDAVecGetArrayDOF(da_vals , evals , &data_vals );CHKERRQ(ierr);
-{% if valstype == 'scalar' %}
- #define PVALS data_vals SCALARINDICES
-{% elif valstype == 'vector' %}
- #define PVALS(d1) data_vals VECTORINDICES(d1)
-{% elif valstype == 'tensor' %}
- #define PVALS(d1,d2) data_vals TENSORINDICES(d1,d2)
-{% endif %}
-{% endif %}
  
 for (k=zs; k<zs+zm; k++) {
    for (j=ys; j<ys+ym; j++) {
@@ -269,25 +230,8 @@ for (k=zs; k<zs+zm; k++) {
 	 {% endfor %}
 		{% endif %}
 
-//THIS CAN MAYBE CHANGE/BE ELIMINATED NOW
 		//extract element dofs from local dofs
-		//THIS IS REALLY THE DIFFERENCE BETWEEN STRUCTURED AND UNSTRUCTURED
-		
-		//THIS IS A COPY- PROBABLY BAD
-		//BUT INDIRECT MEMORY ACCESS IS LIKELY JUST AS BAD, SO...
-		//SEE HPGMG CODE- I THINK THERE ARE SOME NICE EXTRACT ROUTINES IN THERE?
-		
-		//I THINK WE CAN REPLACE THE WHOLE IDEA OF OFFSETS AND OFFSET MULTS WITH START/END AND A SINGLE MULTIPLIER
-		//ALL HARD CODED
-		//THIS WILL BE MUCH CLEANER, and likely faster
-		//ESPECIALLY SINCE WE ARE TENSOR PRODUCT!
-		//I THINK ALL THE ELEMENTS WE ARE INTERESTED IN WORK LIKE THIS...
-		
-		//can really optimize this...
-		
-		//THIS IS DONE IN THEMIS SPECIFIC ORDER RIGHT NOW...
-		//THIS CAN BE SWITCHED TO FiNaT TENSOR PRODUCT SPECIFIC ORDER
-		
+
 		 {% for field in fieldlist %}
 		 		fieldoffset = 0;
 		{% for k in range(field.ncomp) %}
@@ -338,10 +282,7 @@ for (k=zs; k<zs+zm; k++) {
 				{% endfor %}
 			);
 
-//THIS CAN MAYBE CHANGE/BE ELIMINATED NOW
 			//unsplat vals
-			//THIS CAN/SHOULD BE OPTIMIZED AWAY FOR SINGLE COMPONENT STUFF
-		//THIS IS REALLY THE DIFFERENCE BETWEEN STRUCTURED AND UNSTRUCTURED
 		
 	 {% if formdim == 2 %}
 	   ci1off = 0;
@@ -376,12 +317,6 @@ for (k=zs; k<zs+zm; k++) {
 				{% endif %}
 		{% endif %}
 		
-		
-		//functional for evaluate
-		{% if evaluate == 1 %}
-		{{ kernelstr }}
-		{% endif %}
-		
 		//Put the element tensor into the local tensor
 		{% if formdim == 2 %}
 		       {% for ci1 in range(nci1) %}
@@ -410,11 +345,6 @@ for (k=zs; k<zs+zm; k++) {
       {% endfor %}
    {% endfor %}
   
-//restore evaluate pointer
-{% if evaluate == 1 %}
-ierr = DMDAVecRestoreArrayDOF(da_vals , evals , &data_vals );CHKERRQ(ierr);
-{% endif %}
-
  {% if formdim == 1 %}
 //restore data in Vec v
 		 {% for ci1 in range(nci1) %}

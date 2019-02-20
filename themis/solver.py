@@ -241,7 +241,7 @@ def _extract_bcs(bcs):
     except TypeError:
         bcs = (bcs,)
     for bc in bcs:
-        if not isinstance(bc, DirichletBC):
+        if not (isinstance(bc, DirichletBC)):
             raise TypeError("Provided boundary condition is a '%s', not a DirichletBC" % type(bc).__name__)
     return bcs
 

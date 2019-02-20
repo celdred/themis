@@ -1,5 +1,7 @@
 import tsfc
 from formmanipulation import split_form
+import tsfc.kernel_interface.themis as themis_interface
+import numpy as np
 
 
 class ThemisKernel():
@@ -8,7 +10,6 @@ class ThemisKernel():
         self.tsfckernel = kernel
         self.ast = kernel.ast
         self.integral_type = kernel.integral_type
-        # self.oriented = kernel.oriented #DONT NEED THIS I THINK
         self.coefficient_numbers = kernel.coefficient_numbers
         self.evaluate = 0
         self.zero = False
@@ -16,58 +17,42 @@ class ThemisKernel():
 
 def compile_form(form):
 
-    # print('form')
-    # print(form)
-    # print(form.coefficients())
-    # print(form.arguments())
-    # print(form.coefficient_numbering())
-
-    # CHECK THIS- ULTIMATELY NEED A LIST OF COEFFICIENTS THAT ARE FED INTO EACH SUBFORM
-    # DO BY CREATING A DICTIONARY LINKING COEFFICIENTS AND NUMBERS
-    # I THINK THE CURRENT WILL FAIL FOR FORMS WITH FACET INTEGRALS AND COEFFICIENTS THAT APPEAR ONLY IN ONE OR THE OTHER
-
     idx_kernels_list = []
 # A map from all form coefficients to their number.
     coefficient_numbers = dict((c, n) for (n, c) in enumerate(form.coefficients()))
     for idx, f in split_form(form):
 
-        # arg = f.arguments()
-        # coeff = f.coefficients()
-        # numbering = f.coefficient_numbering()
-
-        # print(idx)
-        # print(arg)
 
         # Map local coefficient numbers (as seen inside the
         # compiler) to the global coefficient numbers
         number_map = dict((n, coefficient_numbers[c]) for (n, c) in enumerate(f.coefficients()))
 
-        tsfc_kernels = tsfc.compile_form(f)
+        tsfc_kernels = tsfc.compile_form(f, interface=themis_interface)
 
         kernels = []
         for kernel in tsfc_kernels:
-
             tkernel = ThemisKernel(kernel)
             tkernel.formdim = len(f.arguments())
-
+            
             # map kernel coefficient numbers to global coefficient numbers
             numbers = tuple(number_map[c] for c in kernel.coefficient_numbers)
             tkernel.coefficient_map = numbers
             tkernel.coefficients = form.coefficients()
-            # tkernel.name = kernel.ast.operands()[0][1] #CAN DROP THIS I THINK IF WE ARE MORE CLEVER...
             tkernel.name = kernel.ast.name
             tkernel.mesh = form.ufl_domain()
-            tkernel.finatquad = kernel.quad
+            tkernel.finatquad = kernel.quadrature_rule
 
-            # print(kernel)
             tkernel.tabulations = []
-            for tabulation in kernel.tabulations:  # THIS SHOULD HAVE A BETTER NAME
-                splittab = tabulation.split('_')
+
+            #for tabname,pts in kernel.tabulations: 
+            for tabname,shape in kernel.tabulations: 
+                splittab = tabname.split('_')
 
                 tabobj = {}
-                tabobj['name'] = tabulation
+                tabobj['name'] = tabname
 
                 # this matches the string generated in runtime_tabulated.py in FInAT
+                # ie variant_order_derivorder_{d,c}_psid_eid_restriction
                 tabobj['variant'] = splittab[1]
                 tabobj['order'] = int(splittab[2])
                 tabobj['derivorder'] = int(splittab[3])
@@ -76,7 +61,15 @@ def compile_form(form):
                     tabobj['discont'] = True
                 if splittab[5] == 'c':
                     tabobj['discont'] = False
-                tabobj['restriction'] = splittab[6]
+                # splittab[6] is the psid, which is not needed
+                #tabobj['restrict'] = splittab[7]
+                tabobj['restrict'] = splittab[6]
+                
+                #broken now
+                #tabobj['pts'] = pts
+                tabobj['shape'] = shape
+
+                
                 tkernel.tabulations.append(tabobj)
 
             kernels.append(tkernel)

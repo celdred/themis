@@ -6,13 +6,14 @@ import numpy as np
 class SplitFunction():
     # NEED A GOOD DEFAULT NAME HERE!!!
 
-    def __init__(self, space, name='xsplit', gvec=None, si=None, parentspace=None):
+    def __init__(self, space, name='x_0', gvec=None, si=0, parentspace=None, parentfunction=None):
         self.space = space
         self._name = name
         self._si = si
 
         self._vector = gvec
         self._parentspace = parentspace
+        self._parentfunction = parentfunction
 
     def assign(self, v_in):
         # v_in must be either a Function or a SplitFunction, and it must have the same space as self
@@ -35,8 +36,15 @@ class SplitFunction():
             v_in._vector.restoreSubVector(v_in._parentspace.get_field_gis(v_in._si), vecin)
         self._vector.restoreSubVector(self._parentspace.get_field_gis(self._si), subvec)
 
-
+    def name(self):
+        return self._name
+        
 class Function(Coefficient):
+
+    def copy(self):
+        newfunc = Function(self.space,self._name)
+        self._vector.copy(result=newfunc._vector)
+        return newfunc
 
     def assign(self, v_in):
         # v_in must be either a Function or a SplitFunction, and it must have the same space as self
@@ -85,18 +93,17 @@ class Function(Coefficient):
                 self._lvectors = []
                 for si in range(self.space.nspaces):
                     for ci in range(self.space.get_space(si).ncomp):
-                        for bi in range(self.space.get_space(si).npatches):
-                            self._lvectors.append(self.space.get_space(si).get_da(ci, bi).createLocalVector())
+                        self._lvectors.append(self.space.get_space(si).get_da(ci).createLocalVector())
 
             if self.space.nspaces > 1:
-                self._split = tuple(SplitFunction(self.space.get_space(i), name="%s[%d]" % (self.name(), i), gvec=self._vector, si=i, parentspace=self.space) for i in range(self.space.nspaces))
+                self._split = tuple(SplitFunction(self.space.get_space(i), name="%s_%d" % (self.name(), i), gvec=self._vector, si=i, parentspace=self.space, parentfunction=self) for i in range(self.space.nspaces))
             else:
                 self._split = (self,)
 
-    def get_lvec(self, si, ci, bi):
+    def get_lvec(self, si, ci):
         soff = self.space.get_space_offset(si)
         coff = self.space.get_space(si).get_component_offset(ci)
-        return self._lvectors[coff+soff+bi]
+        return self._lvectors[coff+soff]
 
     def name(self):
         return self._name

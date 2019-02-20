@@ -13,46 +13,45 @@ class FunctionSpace(UFLFunctionSpace):
         return self._component_offsets[ci]
 
     ################
-    # returns the GLOBAL sizes for component ci, block bi
-    def get_nxny(self, ci, bi):
-        sizes = self._da[ci][bi].getSizes()
+    # returns the GLOBAL sizes for component ci
+    def get_nxny(self, ci):
+        sizes = self._da[ci].getSizes()
         return sizes
 
-    # returns the LOCAL (WITHOUT GHOSTS) sizes for component ci, block bi
-    def get_local_nxny(self, ci, bi):
-        ranges = self._da[ci][bi].getRanges()
+    # returns the LOCAL (WITHOUT GHOSTS) sizes for component ci
+    def get_local_nxny(self, ci):
+        ranges = self._da[ci].getRanges()
         nxs = []
         for xy in ranges:
             nxs.append((xy[1] - xy[0]))
         return nxs
 
-    # returns the indices in global i/j/k space for component ci, block bi
-    def get_xy(self, ci, bi):
-        ranges = self._da[ci][bi].getRanges()
+    # returns the indices in global i/j/k space for component ci
+    def get_xy(self, ci):
+        ranges = self._da[ci].getRanges()
         return ranges
     # 3
 
-    # returns the NON-GHOSTED total number of LOCAL dofs (ie per process) for component ci, block bi
-    def get_localndofs(self, ci, bi):
-        ranges = self._da[ci][bi].getRanges()
+    # returns the NON-GHOSTED total number of LOCAL dofs (ie per process) for component ci
+    def get_localndofs(self, ci):
+        ranges = self._da[ci].getRanges()
         nelem = 1
         for xy in ranges:
             nelem = (xy[1] - xy[0]) * nelem
-        return nelem * self._da[ci][bi].getDof()
+        return nelem * self._da[ci].getDof()
 
-    # returns the GHOSTED total number of LOCAL dofs (ie per process) for component ci, block bi
-    def get_localghostedndofs(self, ci, bi):
-        ranges = self._da[ci][bi].getGhostRanges()
+    # returns the GHOSTED total number of LOCAL dofs (ie per process) for component ci
+    def get_localghostedndofs(self, ci):
+        ranges = self._da[ci].getGhostRanges()
         nelem = 1
         for xy in ranges:
             nelem = (xy[1] - xy[0]) * nelem
-        return nelem * self._da[ci][bi].getDof()
+        return nelem * self._da[ci].getDof()
 
     def destroy(self):
         for ci in range(self.ncomp):
-            for bi in range(self.npatches):
-                self._da[ci][bi].destroy()
-                self._lgmaps[ci][bi].destroy()
+            self._da[ci].destroy()
+            self._lgmaps[ci].destroy()
         self._composite_da.destroy()
 
     def output(self):
@@ -66,38 +65,38 @@ class FunctionSpace(UFLFunctionSpace):
         # lgmap_output(self.get_overall_lgmap(), self.name + '.overalllgmap')
 
     # DAs
-    # return the da for component ci, block bi
-    def get_da(self, ci, bi):
-        return self._da[ci][bi]
+    # return the da for component ci
+    def get_da(self, ci):
+        return self._da[ci]
 
     def get_composite_da(self):
         return self._composite_da
 
     # LGMAPS
-    # returns the lgmap for component ci, block bi that goes from split local component-block indices to split component-block global indices
-    def get_lgmap(self, ci, bi):
-        return self._lgmaps[ci][bi]
+    # returns the lgmap for component ci that goes from split local component indices to split component global indices
+    def get_lgmap(self, ci):
+        return self._lgmaps[ci]
 
     # returns the overal local to global map for the WHOLE SPACE
     def get_overall_lgmap(self):
         return self._overall_lgmap
 
-    # returns the lgmap for component ci, block bi of space si that goes from split local to global (FOR THIS SPACE)
+    # returns the lgmap for component ci of space si that goes from split local to global (FOR THIS SPACE)
     # This is used exclusively for boundary conditions to transforms boundary indices from split local to global (either split-fieldwise or monolithic)
-    def get_component_compositelgmap(self, si, ci, bi):
-        return self._component_lgmaps[bi + self._component_offsets[ci]]
+    def get_component_compositelgmap(self, si, ci):
+        return self._component_lgmaps[self._component_offsets[ci]]
 
     # LIS
-    # return the local IS for component ci, block bi- these are used in MatGetLocalSubMatrix
-    # This is used to get the submatrix for block bi of component ci FROM the submatrix for component ci
-    def get_component_block_lis(self, ci, bi):
-        return self._cb_lis[bi + self._component_offsets[ci]]
+    # return the local IS for component ci - these are used in MatGetLocalSubMatrix
+    # This is used to get the submatrix submatrix for component ci
+    def get_component_block_lis(self, ci):
+        return self._cb_lis[self._component_offsets[ci]]
         # return self.component_das[ci].getLocalISs()[bi]
 
     # DOES THIS WORK FOR VECTOR SPACES?
     # NO, IT DOESN'T TAKE INTO ACCOUNT THAT NDOF IS NOT EQUAL TO 1...
     # returns the SPLIT LOCAL indices of the owned portion of the physical boundary for component ci, block bi in direc
-    def get_boundary_indices(self, ci, bi, direc):
+    def get_boundary_indices(self, ci, direc):
 
         # check if this space has any nodes on the boundary for ci in direc
         direcdict = {'x-': 0, 'x+': 0, 'y-': 1, 'y+': 1, 'z-': 2, 'z+': 2}
@@ -105,9 +104,9 @@ class FunctionSpace(UFLFunctionSpace):
         if self._themiselement.get_continuity(ci, intdirec) == 'L2':
             return [-1, ]
 
-        da = self.get_da(ci, bi)
+        da = self.get_da(ci)
         ndims = self._mesh.ndim
-        nxs = self.get_nxny(ci, bi)
+        nxs = self.get_nxny(ci)
 
         corners = da.getGhostCorners()
         ranges = da.getRanges()
@@ -206,18 +205,23 @@ class FunctionSpace(UFLFunctionSpace):
         return (self, )
 
 # HOW SHOULD OUTPUT/NAMES BE HANDLED HERE?
-
-    def __init__(self, mesh, element, name='fspace'):
+    def __init__(self, mesh, element, name='fspace', si=0, parent=None):
 
         self._themiselement = ThemisElement(element)
-
+        self._uflelement = element
+		
         self.ncomp = self._themiselement.get_ncomp()
         self._mesh = mesh
         self._name = name
         self._spaces = [self, ]
         self.nspaces = 1
-        self.npatches = mesh.npatches
-
+		
+        self._si = si
+        if parent == None:
+            self._parent = self
+        else:
+            self._parent = parent
+		
         UFLFunctionSpace.__init__(self, mesh, element)
 
         # create das and lgmaps
@@ -226,22 +230,20 @@ class FunctionSpace(UFLFunctionSpace):
         self._lgmaps = []
         self._component_offsets = []
         for ci in range(self.ncomp):
-            self._component_offsets.append(self.npatches*ci)
-            das = []
-            lgmaps = []
-            for bi in range(self.npatches):
-                das.append(mesh.create_dof_map(self._themiselement, ci, bi))
-                lgmaps.append(das[bi].getLGMap())
-                self._composite_da.addDM(das[bi])
-            self._da.append(das)
-            self._lgmaps.append(lgmaps)
+            self._component_offsets.append(ci)
+            da = mesh.create_dof_map(self._themiselement, ci)
+            lgmap = da.getLGMap()
+            self._composite_da.addDM(da)
+            self._da.append(da)
+            self._lgmaps.append(lgmap)
         self._composite_da.setUp()
 
         self._component_lgmaps = self._composite_da.getLGMaps()
         self._overall_lgmap = self._composite_da.getLGMap()
         self._cb_lis = self._composite_da.getLocalISs()
-
-
+        
+        #PETSc.Sys.Print(element,self._da[0][0].getGhostRanges(),self._da[0][0].getRanges())
+        
 class MixedFunctionSpace(UFLMixedFunctionSpace):
 
     def mesh(self):
@@ -252,14 +254,21 @@ class MixedFunctionSpace(UFLMixedFunctionSpace):
         :class:`MixedFunctionSpace` is composed."""
         return self.nspaces
 
+    def sub(self,i):
+        return self._spaces[i]
+		
     def split(self):
         return self._spaces
 
-    def __init__(self, spacelist):
-        self._spaces = spacelist
+    def __init__(self, spacelist,name='mixedspace'):
+        #self._spaces = spacelist
         self.nspaces = len(spacelist)
 
         # ADD CHECK THAT ALL SPACES ARE DEFINED ON THE SAME MESH
+        self._spaces = []
+        for i,space in enumerate(spacelist):
+            self._spaces.append(FunctionSpace(spacelist[i]._mesh,spacelist[i]._uflelement,name=name+str(i),si=i,parent=self))
+
 
         UFLMixedFunctionSpace.__init__(self, *spacelist)
 
@@ -267,8 +276,7 @@ class MixedFunctionSpace(UFLMixedFunctionSpace):
         self._composite_da = PETSc.DMComposite().create()
         for si in range(self.nspaces):
             for ci in range(self.get_space(si).ncomp):
-                for bi in range(self.get_space(si).npatches):
-                    self._composite_da.addDM(self.get_space(si).get_da(ci, bi))
+                self._composite_da.addDM(self.get_space(si).get_da(ci))
         self._composite_da.setUp()
 
         # compute space offsets ie how far in a list of component until space k starts
@@ -276,14 +284,13 @@ class MixedFunctionSpace(UFLMixedFunctionSpace):
         self._space_offsets = []
         for si in range(self.nspaces):
             self._space_offsets.append(s)
-            s = s + self._spaces[si].ncomp * self._spaces[si].npatches
+            s = s + self._spaces[si].ncomp
 
         # Create correct FIELD local and global IS's since DMComposite can't handle nested DMComposites in this case
         lndofs_total = 0
         for si in range(self.nspaces):  # determine offset into global vector
             for ci in range(self.get_space(si).ncomp):
-                for bi in range(self.get_space(si).npatches):
-                    lndofs_total = lndofs_total + self.get_space(si).get_localndofs(ci, bi)
+                lndofs_total = lndofs_total + self.get_space(si).get_localndofs(ci)
 
         mpicomm = PETSc.COMM_WORLD.tompi4py()
         localcompoffset = mpicomm.scan(lndofs_total)
@@ -298,9 +305,8 @@ class MixedFunctionSpace(UFLMixedFunctionSpace):
             totalghostedspacendofs = 0
             totalspacendofs = 0
             for ci in range(self.get_space(si).ncomp):
-                for bi in range(self.get_space(si).npatches):
-                    totalghostedspacendofs = totalghostedspacendofs + self.get_space(si).get_localghostedndofs(ci, bi)
-                    totalspacendofs = totalspacendofs + self.get_space(si).get_localndofs(ci, bi)
+                totalghostedspacendofs = totalghostedspacendofs + self.get_space(si).get_localghostedndofs(ci)
+                totalspacendofs = totalspacendofs + self.get_space(si).get_localndofs(ci)
             # create a strided index set of this size starting at the correct point
             self._field_lis.append(PETSc.IS().createStride(totalghostedspacendofs, first=ghostedlocaloffset, step=1, comm=PETSc.COMM_SELF))
             self._field_gis.append(PETSc.IS().createStride(totalspacendofs, first=localcompoffset + localoffset, step=1, comm=PETSc.COMM_WORLD))
@@ -330,10 +336,10 @@ class MixedFunctionSpace(UFLMixedFunctionSpace):
     # These operate on the split COMPONENT-WISE spaces
     # returns the lgmap for component ci, block bi of space si that goes from split local to global (FOR THIS SPACE)
     # This is used exclusively for boundary conditions to transforms boundary indices from split local to global (either split or monolithic)
-    def get_component_compositelgmap(self, si, ci, bi):
+    def get_component_compositelgmap(self, si, ci):
         soff = self._space_offsets[si]
         coff = self._spaces[si]._component_offsets[ci]
-        return self._component_lgmaps[bi+soff+coff]
+        return self._component_lgmaps[soff+coff]
 
     # These operate on the split FIELD-WISE spaces
     # returns the global IS for space si- these map from split global to monolithic global
@@ -344,3 +350,50 @@ class MixedFunctionSpace(UFLMixedFunctionSpace):
     # return the local IS for space si- these are used in MatGetLocalSubMatrix
     def get_field_lis(self, si):
         return self._field_lis[si]  # composite_da_field.getLocalISs()[si]
+
+
+def make_scalar_element(mesh, family, degree, vfamily, vdegree):
+    """Build a scalar :class:`ufl.FiniteElement`.
+
+    :arg mesh: The mesh to determine the cell from.
+    :arg family: The finite element family.
+    :arg degree: The degree of the finite element.
+    :arg vfamily: The finite element in the vertical dimension
+        (extruded meshes only).
+    :arg vdegree: The degree of the element in the vertical dimension
+        (extruded meshes only).
+
+    The ``family`` argument may be an existing
+    :class:`ufl.FiniteElementBase`, in which case all other arguments
+    are ignored and the element is returned immediately.
+    """
+
+    if isinstance(family, ufl.FiniteElementBase):
+        return family
+
+    cell = mesh.ufl_cell()
+
+    if isinstance(cell, ufl.TensorProductCell) \
+       and vfamily is not None and vdegree is not None:
+        la = ufl.FiniteElement(family,
+                               cell=cell.sub_cells()[0],
+                               degree=degree)
+        # If second element was passed in, use it
+        lb = ufl.FiniteElement(vfamily,
+                               cell=ufl.interval,
+                               degree=vdegree)
+        # Now make the TensorProductElement
+        return ufl.TensorProductElement(la, lb)
+    else:
+        return ufl.FiniteElement(family, cell=cell, degree=degree)
+        
+def VectorFunctionSpace(mesh, element, dim = None, name='fspace', si=0, parent=None):
+
+    sub_element = make_scalar_element(element)
+    dim = dim or mesh.ufl_cell().geometric_dimension()
+    element = ufl.VectorElement(sub_element, dim=dim)
+    return FunctionSpace(mesh, element, name=name)
+
+#IMPLEMENT THIS!
+def TensorFunctionSpace():
+    pass

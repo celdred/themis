@@ -1,7 +1,7 @@
 import jinja2
 import numpy as np
 # from ufl import VectorElement
-from function import Function
+from function import Function,SplitFunction
 from constant import Constant
 from quadrature import ThemisQuadratureFinat
 
@@ -27,6 +27,9 @@ class TabObject():
         pass
 
 
+exterior_facet_types = ['exterior_facet', 'exterior_facet_vert', 'exterior_facet_bottom', 'exterior_facet_top']
+interior_facet_types = ['interior_facet', 'interior_facet_vert', 'interior_facet_horiz']
+
 def generate_assembly_routine(mesh, space1, space2, kernel):
     # load templates
     templateLoader = jinja2.FileSystemLoader(searchpath=["../../gitrepo/themis","../gitrepo/themis" ])
@@ -38,21 +41,21 @@ def generate_assembly_routine(mesh, space1, space2, kernel):
     ndims = mesh.ndim
 
     # read the template
-    if kernel.integral_type in ['interior_facet', 'exterior_facet']:
+    if kernel.integral_type in interior_facet_types + exterior_facet_types:
         template = templateEnv.get_template('assemble-facets.template')
     else:
         template = templateEnv.get_template('assemble.template')
 
-    if kernel.integral_type == 'interior_facet':
+    if kernel.integral_type in interior_facet_types:
         templateVars['facet_type'] = 'interior'
         templateVars['facet_direc'] = kernel.facet_direc
 
-    if kernel.integral_type == 'exterior_facet':
+    if kernel.integral_type in exterior_facet_types:
         templateVars['facet_type'] = 'exterior'
         templateVars['facet_exterior_boundary'] = kernel.facet_exterior_boundary
         templateVars['facet_direc'] = kernel.facet_direc
 
-    if kernel.integral_type in ['interior_facet', 'exterior_facet']:
+    if kernel.integral_type in interior_facet_types + exterior_facet_types:
         templateVars['bcs'] = mesh.bcs
 
     # Load element specific information- offsets/offset mult
@@ -152,7 +155,6 @@ def generate_assembly_routine(mesh, space1, space2, kernel):
                 fieldplusconstantslist.append('&' + field.name())
                 # fieldplusconstantslist.append(field.name())
                 # BROKEN FOR VECTOR/TENSOR CONSTANTS
-
     # print fieldplusconstantslist
     # print kernel.ast
 # REVISE
@@ -212,59 +214,156 @@ def generate_assembly_routine(mesh, space1, space2, kernel):
 
     tabulations = []
 
-    quad = ThemisQuadratureFinat(kernel.finatquad)
-    pts = quad.get_pts()
+    # from petscshim import PETSc
+    #PETSc.Sys.Print(kernel.finatquad)
+    #PETSc.Sys.Print(kernel.tabulations)
+    
+    # THIS IS LIKELY SUBTLY WRONG FOR UNEQUAL HORIZ + VERT...
+    # REALLY WHAT WE NEED HERE IS A CONNECTION BETWEEN THE TABULATIONS AND THE QUADRATURE
+    # IE FINAT/TSFC TELL US WHAT QUAD PTS THE RUNTIME TABULATIONS HAPPENS AT!
+    # THEN THE SHIFT AXIS AND RESTRICTION ALSO GO AWAY
+    # AND ALL THE NONSENSE BELOW FOR FACETS
+    # SO MUCH CLEANER... 
+    # quad = ThemisQuadratureFinat(kernel.finatquad)
+    # pts = quad.get_pts()
+    
 
-    # This stuff is likely WRONG for 3D/Extruded, and possibly for 1D?
-    # for 3D/extruded I think I just need to be careful for how y/z, etc. are obtained- ie quad.get_pts might return stuff in the wrong order!
-    if kernel.integral_type in ['interior_facet', 'exterior_facet']:
-        if kernel.facet_direc == 0:
-            y, _, _ = quad.get_pts()
-            one = np.ones(y.shape[0])
-            zero = np.zeros(y.shape[0])
-            pts_pos = [zero, y, None]
-            pts_neg = [one, y, None]
-        if kernel.facet_direc == 1:
-            x, _, _ = quad.get_pts()
-            one = np.ones(x.shape[0])
-            zero = np.zeros(x.shape[0])
-            pts_pos = [x, zero, None]
-            pts_neg = [x, one, None]
-    if kernel.facet_exterior_boundary == 'upper':
-        pts = pts_neg
-    if kernel.facet_exterior_boundary == 'lower':
-        pts = pts_pos
+    #if kernel.integral_type == 'cell':
 
+     #   PETSc.Sys.Print(kernel.integral_type)
+    #  PETSc.Sys.Print(pts)
+    # PETSc.Sys.Print(kernel.tabulations)            
+    # PETSc.Sys.Print(*kernel.ast.args)
+        
+    # This stuff is VERY BROKEN for EXTRUDED, and possibly also for 3D
+    # Need to talk to Firedrake people...
+    # CONNECTED ALSO TO THE FINAT QUADRATURE THOUGH...
+    
+    # if kernel.integral_type in ['interior_facet','exterior_facet']:
+        # if kernel.facet_direc == 0:
+            # y, _, _ = quad.get_pts()
+            # one = np.ones(y.shape[0])
+            # zero = np.zeros(y.shape[0])
+            # pts_pos = [zero, y, None]
+            # pts_neg = [one, y, None]
+        # if kernel.facet_direc == 1:
+            # x, _, _ = quad.get_pts()
+            # one = np.ones(x.shape[0])
+            # zero = np.zeros(x.shape[0])
+            # pts_pos = [x, zero, None]
+            # pts_neg = [x, one, None]
+    # if kernel.facet_exterior_boundary == 'upper':
+        # pts = pts_neg
+    # if kernel.facet_exterior_boundary == 'lower':
+        # pts = pts_pos
+
+    
     # print(kernel.integral_type, kernel.facet_direc,kernel.facet_exterior_boundary)
     from ufl import FiniteElement, interval
     from finiteelement import ThemisElement
+    from finat.point_set import TensorPointSet,PointSet
+
     for tabulation in kernel.tabulations:
 
-        restrict = tabulation['restriction']
-        if restrict == 'p':
-            pts = pts_pos
-        if restrict == 'm':
-            pts = pts_neg
-
+        # restrict = tabulation['restriction']
+        # if restrict == 'p':
+            # pts = pts_pos
+        # if restrict == 'm':
+            # pts = pts_neg
+        
         tabobj = TabObject()
         tabobj.name = tabulation['name']
+        
+        # get the quadrature points for the tabulation
+        shape = tabulation['shape']        
+        ps = kernel.finatquad.point_set
+        
+        if kernel.integral_type == 'cell':
+            allpts = []
+            if isinstance(ps,TensorPointSet):
+                ps1,ps2 = ps.factors
+                if isinstance(ps1,TensorPointSet):
+                    subps1,subps2 = ps1.factors
+                    allpts.append(subps1.points[:, 0])
+                    allpts.append(subps2.points[:, 0])                
+                    allpts.append(ps2.points[:, 0])                
+                else:
+                    allpts.append(ps1.points[:, 0])
+                    allpts.append(ps2.points[:, 0])
+            else:
+                allpts.append(ps.points[:, 0])
+            pts = allpts[tabulation['shiftaxis']]
+            
+        elif kernel.integral_type in exterior_facet_types + interior_facet_types:
+            restrict = tabulation['restrict'] 
 
+            if restrict == 'p': zerodim_pts = np.zeros(shape[0])
+            elif restrict == 'm': zerodim_pts = np.ones(shape[0])
+            elif restrict == '':
+                 if kernel.facet_exterior_boundary == 'upper': zerodim_pts = np.ones(shape[0])
+                 elif kernel.facet_exterior_boundary == 'lower': zerodim_pts = np.zeros(shape[0])
+                     
+            if ndims == 1: # pointwise integrals
+                allpts = [zerodim_pts,None,None]
+                     
+            elif ndims == 2: #line integrals
+                if kernel.integral_type in ['interior_facet_horiz','exterior_facet_top','exterior_facet_bottom']: # always y facets
+                    actualpts = ps.factors[0].points[:,0]
+                elif kernel.integral_type in ['interior_facet_vert','exterior_facet_vert']: #always x facets
+                    actualpts = ps.factors[1].points[:,0]
+                elif kernel.integral_type in ['interior_facet','exterior_facet']:  # x or y facets
+                    actualpts = ps.points[:,0]
+                if kernel.facet_direc == 0: # x facets
+                    allpts = [zerodim_pts, actualpts, None]
+                if kernel.facet_direc == 1: # y facets
+                    allpts = [actualpts, zerodim_pts, None]
+
+            
+            elif ndims == 3: #facet integrals
+                if kernel.integral_type in ['interior_facet_horiz','exterior_facet_top','exterior_facet_bottom']: # always z facets
+                    ptsx = ps.factors[0].factors[0].points[:,0]
+                    ptsy = ps.factors[0].factors[1].points[:,0]
+                    ptsz = zerodim_pts
+                elif kernel.integral_type in ['interior_facet_vert','exterior_facet_vert']:
+                    if kernel.facet_direc == 0: # x facets
+                        ptsy = ps.factors[0].points[:,0]
+                        ptsz = ps.factors[1].points[:,0]
+                        ptsx = zerodim_pts
+                    if kernel.facet_direc == 1: # z facets
+                        ptsx = ps.factors[0].points[:,0]
+                        ptsz = ps.factors[1].points[:,0]
+                        ptsy = zerodim_pts
+                elif kernel.integral_type in ['interior_facet','exterior_facet']:  #x, y or z facets
+                    raise NotImplementedError('Facet integrals for non-TP in 3D are not yet implemented')
+                    
+                allpts = [ptsx,ptsy,ptsz]
+                
+            pts = allpts[tabulation['shiftaxis']]
+ 
         if tabulation['discont'] is False:
             uflelem = FiniteElement("CG", interval, tabulation['order'], variant=tabulation['variant'])
         if tabulation['discont'] is True:
             uflelem = FiniteElement("DG", interval, tabulation['order'], variant=tabulation['variant'])
         tabelem = ThemisElement(uflelem)
         if tabulation['derivorder'] == 0:
-            vals = tabelem.get_basis(0, 0, pts[tabulation['shiftaxis']])
+            #vals = tabelem.get_basis(0, 0, pts[tabulation['shiftaxis']])
+            vals = tabelem.get_basis(0, 0, pts)
         if tabulation['derivorder'] == 1:
-            vals = tabelem.get_derivs(0, 0, pts[tabulation['shiftaxis']])
+            #vals = tabelem.get_derivs(0, 0, pts[tabulation['shiftaxis']])
+            vals = tabelem.get_derivs(0, 0, pts)
         if tabulation['derivorder'] == 2:
-            vals = tabelem.get_derivs2(0, 0, pts[tabulation['shiftaxis']])
+            #vals = tabelem.get_derivs2(0, 0, pts[tabulation['shiftaxis']])
+            vals = tabelem.get_derivs2(0, 0, pts)
         tabobj.values = a_to_cinit_string(vals)
         tabobj.npts = vals.shape[0]
         tabobj.nbasis = vals.shape[1]
+        
+        # sanity check
+        assert(tabulation['shape'] == vals.shape)
+        
         tabulations.append(tabobj)
-
+        #PETSc.Sys.Print(tabulation,len(pts[0]),len(pts[1]),len(pts[2]))
+    
         # print(tabulation)
         # print(uflelem)
         # print(tabulation['order'],tabobj.npts,tabobj.nbasis)
@@ -276,6 +375,12 @@ def generate_assembly_routine(mesh, space1, space2, kernel):
         # add tabulations to templateVars
     templateVars['tabulations'] = tabulations
 
+
+    if kernel.integral_type in ['interior_facet_horiz','exterior_facet_bottom','exterior_facet_top']:
+        templateVars['extruded'] = 1
+    else:
+        templateVars['extruded'] = 0
+        
     if kernel.formdim == 2:
         matlist = ''
         for ci1 in range(space1size):
@@ -293,6 +398,8 @@ def generate_assembly_routine(mesh, space1, space2, kernel):
         templateVars['kernelstr'] = kernel.ast
         templateVars['kernelname'] = kernel.name
 
+
+    
     templateVars['formdim'] = kernel.formdim
     templateVars['assemblytype'] = kernel.integral_type
 
@@ -389,16 +496,21 @@ def generate_evaluate_routine(mesh, kernel):
     # get the list of fields
     fieldlist = []
     fieldlist.append((mesh.coordinates, 0))
-    for fieldindex in kernel.coefficient_map:
-        field = kernel.coefficients[fieldindex]
+    
+    field = kernel.field
+#EVALUATION ON AN UNSPLIT MIXED FIELD SHOULD FAIL!
+    if isinstance(field,Function):
         if field.name() == mesh.coordinates.name():
             evalfieldindex = 0
-            continue
         else:
+            for si in range(field.function_space().nspaces):
+                fieldlist.append((field, si))
             evalfieldindex = 1
-        for si in range(field.function_space().nspaces):
-            fieldlist.append((field, si))
-
+    if isinstance(field,SplitFunction):
+        for si in range(field._parentfunction.function_space().nspaces):
+            fieldlist.append((field._parentfunction, si))
+        evalfieldindex = field._si + 1
+    #print(fieldlist)
 
     pts = kernel.quad.get_pts()
     

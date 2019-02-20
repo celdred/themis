@@ -55,66 +55,174 @@ C0_{{  field.name }}_{{k}}[d][qx][qy][qz] += C02_{{ field.name }}_{{k}}[d][qy][q
 
 {# ********************************************* #}
 
-{%macro l2_eval(field) -%}
-//THIS IS BROKEN AND NEEDS FIXING
+{%macro CLEAR_DERIVS(field,k) -%}
+{%set ab = a~'_'~b %}
+ierr = PetscMemzero({{ 'D01_'~field.name~'_'~k }},sizeof(PetscScalar[3][{{field.ndofs}}][{{ npts_z }}][{{field.nbasis_x[k] }}][{{ field.nbasis_y[k] }}]));CHKERRQ(ierr);
+ierr = PetscMemzero({{ 'D02_'~field.name~'_'~k }},sizeof(PetscScalar[3][{{field.ndofs}}][{{ npts_y }}][{{ npts_z }}][{{ field.nbasis_x[k] }}]));CHKERRQ(ierr);
+ierr = PetscMemzero({{ 'D0_'~field.name~'_'~k }},sizeof(PetscScalar[3][{{field.ndofs}}][{{ npts_x }}][{{ npts_y }}][{{ npts_z }}]));CHKERRQ(ierr);
+{% endmacro %}
 
-//ADD COMPUTE DETJ
-CLEAR_C0; {{ CLEAR_FIELD(field,0) }}
-{{ EXTRACT_FIELD(field,0) }}
+{# ********************************************* #}
+
+
+{%macro EXTRACT_DERIVS(field,k) -%}
+#define kk (k*{{field.name}}_{{k}}_offset_mult_z[lz] + {{field.name}}_{{k}}_offsets_z[lz]) 
+#define jj (j*{{field.name}}_{{k}}_offset_mult_y[ly] + {{field.name}}_{{k}}_offsets_y[ly]) 
+#define ii (i*{{field.name}}_{{k}}_offset_mult_x[lx] + {{field.name}}_{{k}}_offsets_x[lx]) 
+
+for (lx=0;lx<{{ field.nbasis_x[k] }};lx++){
+for (ly=0;ly<{{ field.nbasis_y[k] }};ly++){
+for (lz=0;lz<{{ field.nbasis_z[k] }};lz++){
+for (qz=0;qz<{{ npts_z }};qz++) { //loop over quadrature pts in z
+for (d=0;d<{{ field.ndofs }};d++){
+{% if ndim == 3 %}
+D01_{{ field.name }}_{{k}}[0][d][qz][lx][ly] += data_{{field.name}}_{{k}}[kk][jj][ii][d] * {{field.name}}_{{k}}_basis_z[qz][lz];
+D01_{{ field.name }}_{{k}}[1][d][qz][lx][ly] += data_{{field.name}}_{{k}}[kk][jj][ii][d] * {{field.name}}_{{k}}_basis_z[qz][lz];
+D01_{{ field.name }}_{{k}}[2][d][qz][lx][ly] += data_{{field.name}}_{{k}}[kk][jj][ii][d] * {{field.name}}_{{k}}_derivs_z[qz][lz];
+{% endif %}
+{% if ndim == 2 %}
+D01_{{ field.name }}_{{k}}[0][d][qz][lx][ly] += data_{{field.name}}_{{k}}[jj][ii][d] * {{field.name}}_{{k}}_basis_z[qz][lz];
+D01_{{ field.name }}_{{k}}[1][d][qz][lx][ly] += data_{{field.name}}_{{k}}[jj][ii][d] * {{field.name}}_{{k}}_basis_z[qz][lz];
+D01_{{ field.name }}_{{k}}[2][d][qz][lx][ly] += data_{{field.name}}_{{k}}[jj][ii][d] * {{field.name}}_{{k}}_derivs_z[qz][lz];
+{% endif %}
+{% if ndim == 1 %}
+D01_{{ field.name }}_{{k}}[0][d][qz][lx][ly] += data_{{field.name}}_{{k}}[ii][d] * {{field.name}}_{{k}}_basis_z[qz][lz];
+D01_{{ field.name }}_{{k}}[1][d][qz][lx][ly] += data_{{field.name}}_{{k}}[ii][d] * {{field.name}}_{{k}}_basis_z[qz][lz];
+D01_{{ field.name }}_{{k}}[2][d][qz][lx][ly] += data_{{field.name}}_{{k}}[ii][d] * {{field.name}}_{{k}}_derivs_z[qz][lz];
+{% endif %}
+}}}}}
+
+for (qz=0;qz<{{ npts_z }};qz++) { //loop over quadrature pts in z
+for (lx=0;lx<{{ field.nbasis_x[k] }};lx++){
+for (ly=0;ly<{{ field.nbasis_y[k] }};ly++){
+for (qy=0;qy<{{ npts_y }};qy++) { //loop over quadrature pts in y
+for (d=0;d<{{ field.ndofs }};d++){
+D02_{{ field.name }}_{{k}}[0][d][qy][qz][lx] += D01_{{ field.name }}_{{k}}[0][d][qz][lx][ly] * {{field.name}}_{{k}}_basis_y[qy][ly];
+D02_{{ field.name }}_{{k}}[1][d][qy][qz][lx] += D01_{{ field.name }}_{{k}}[1][d][qz][lx][ly] * {{field.name}}_{{k}}_derivs_y[qy][ly];
+D02_{{ field.name }}_{{k}}[2][d][qy][qz][lx] += D01_{{ field.name }}_{{k}}[2][d][qz][lx][ly] * {{field.name}}_{{k}}_basis_y[qy][ly];
+}}}}}
+
+for (qy=0;qy<{{ npts_y }};qy++) { //loop over quadrature pts in y
+for (qz=0;qz<{{ npts_z }};qz++) { //loop over quadrature pts in z
+for (lx=0;lx<{{ field.nbasis_x[k] }};lx++){
+for (qx=0;qx<{{ npts_x }};qx++) { //loop over quadrature pts in x
+for (d=0;d<{{ field.ndofs }};d++){
+D0_{{  field.name }}_{{k}}[0][d][qx][qy][qz] += D02_{{ field.name }}_{{k}}[0][d][qy][qz][lx] * {{field.name}}_{{k}}_derivs_x[qx][lx];
+D0_{{  field.name }}_{{k}}[1][d][qx][qy][qz] += D02_{{ field.name }}_{{k}}[1][d][qy][qz][lx] * {{field.name}}_{{k}}_basis_x[qx][lx];
+D0_{{  field.name }}_{{k}}[2][d][qx][qy][qz] += D02_{{ field.name }}_{{k}}[2][d][qy][qz][lx] * {{field.name}}_{{k}}_basis_x[qx][lx];
+}}}}}
+
+#undef ii
+#undef jj
+#undef kk
+{% endmacro %}
+
+{# ********************************************* #}
+
+{%macro compute_J(coords) -%}
+{{ CLEAR_DERIVS(coords,0) }}
+{{ EXTRACT_DERIVS(coords,0) }}
+
+LOOP_QUAD; LOOP_NDIM2;
+PJ[n1][n2] = D0_{{  coords.name }}_0[n2][n1][qx][qy][qz]; //NOTE flip of n1/n2
+END_NDIM2; END_QUAD;
+{% endmacro %}
+
+{# ********************************************* #}
+
+{%macro compute_detJ() -%}
+
 LOOP_QUAD;
-for (d=0;d<{{ fieldlist[1].ndofs }};d++){
-PVALS = c0_{{ field.name }}_0 / DETJ;
-}
+{% if ndim == 1 %}
+PDETJ = PJ[0][0];
+{% endif %}
+{% if ndim == 2 %}
+PDETJ = PJ[0][0]*PJ[1][1] - PJ[1][0]*PJ[0][1];
+{% endif %}
+{% if ndim == 3 %}
+PDETJ = PJ[0][0]*((PJ[1][1]*PJ[2][2]) - (PJ[2][1]*PJ[1][2])) -PJ[0][1]*(PJ[1][0]*PJ[2][2] - PJ[2][0]*PJ[1][2]) + PJ[0][2]*(PJ[1][0]*PJ[2][1] - PJ[2][0]*PJ[1][1]);
+{% endif %}
 END_QUAD;
 
+{% endmacro %}
 
+{# ********************************************* #}
+
+{%macro compute_JTinv() -%}
+
+LOOP_QUAD; LOOP_NDIM2;
+PJTINV[n1][n2] = PJ[n1][n2]; //WRONG FIX IT
+END_NDIM2; END_QUAD;
+
+{% endmacro %}
+
+
+{# ********************************************* #}
+
+{%macro l2_eval(field,coords) -%}
+{{ CLEAR_FIELD(field,0) }}
+{{ EXTRACT_FIELD(field,0) }}
+{{ compute_J(coords) }}
+{{ compute_detJ() }}
+LOOP_QUAD;
+for (s=0;s<{{ field.ndofs }};s++){
+PVALS = C0_{{  field.name }}_0[s][qx][qy][qz]/ PDETJ;
+}
+END_QUAD;
 {% endmacro %}
 
 
 {# ********************************************* #}
 {%macro h1_eval(field) -%}
-CLEAR_C0; {{ CLEAR_FIELD(field,0) }}
+{{ CLEAR_FIELD(field,0) }}
 {{ EXTRACT_FIELD(field,0) }}
 LOOP_QUAD;
-for (d=0;d<{{ field.ndofs }};d++){
-PVALS = c0_{{ field.name }}_0;
+for (s=0;s<{{ field.ndofs }};s++){
+PVALS = C0_{{  field.name }}_0[s][qx][qy][qz];
 }
 END_QUAD;
 {% endmacro %}
 
 {# ********************************************* #}
 
-{%macro hdiv_eval(field) -%}
-//THIS IS BROKEN AND NEEDS FIXING
-//ADD COMPUTE DETJ AND COMPUTE J
+{%macro hdiv_eval(field,coords) -%}
 {% if ndim == 3 %}
-{{ CLEAR_FIELD(0,0) }}
-{{ CLEAR_FIELD(0,1) }}
-{{ CLEAR_FIELD(0,2) }}
-{{ EXTRACT_FIELD(0,0,'c0_0_0') }}
-{{ EXTRACT_FIELD(0,1,'c0_0_1') }}
-{{ EXTRACT_FIELD(0,2,'c0_0_2') }}
+{{ CLEAR_FIELD(field,0) }}
+{{ CLEAR_FIELD(field,1) }}
+{{ CLEAR_FIELD(field,2) }}
+{{ EXTRACT_FIELD(field,0) }}
+{{ EXTRACT_FIELD(field,1) }}
+{{ EXTRACT_FIELD(field,2) }}
+{{ compute_J(coords) }}
+{{ compute_detJ() }}
 LOOP_QUAD
-PVALS[0] = (c0_0_0 * J[0][0] + c0_0_1 * J[0][1] + c0_0_2 * J[0][2]) / DETJ;
-PVALS[1] = (c0_0_0 * J[1][0] + c0_0_1 * J[1][1] + c0_0_2 * J[1][2]) / DETJ;
-PVALS[2] = (c0_0_0 * J[2][0] + c0_0_1 * J[2][1] + c0_0_2 * J[2][2]) / DETJ;
+for (s=0;s<3;s++){
+PVALS = (C0_{{  field.name }}_0[0][qx][qy][qz]* PJ[s][0] + C0_{{  field.name }}_1[0][qx][qy][qz] * PJ[s][1] + C0_{{  field.name }}_2[0][qx][qy][qz] * PJ[s][2]) / PDETJ;
+}
 END_QUAD;
 {% endif %}
 {% if ndim == 2 %}
-{{ CLEAR_FIELD(0,0) }}
-{{ CLEAR_FIELD(0,1) }}
-{{ EXTRACT_FIELD(0,0,'c0_0_0') }}
-{{ EXTRACT_FIELD(0,1,'c0_0_1') }}
+{{ CLEAR_FIELD(field,0) }}
+{{ CLEAR_FIELD(field,1) }}
+{{ EXTRACT_FIELD(field,0) }}
+{{ EXTRACT_FIELD(field,1) }}
+{{ compute_J(coords) }}
+{{ compute_detJ() }}
 LOOP_QUAD
-PVALS[0] = (c0_0_0 * J[0][0] + c0_0_1 * J[0][1]) / DETJ;
-PVALS[1] = (c0_0_0 * J[1][0] + c0_0_1 * J[1][1]) / DETJ;
+for (s=0;s<2;s++){
+PVALS = (C0_{{  field.name }}_0[0][qx][qy][qz]* PJ[s][0] + C0_{{  field.name }}_1[0][qx][qy][qz] * PJ[s][1]) / PDETJ;
+}
 END_QUAD;
 {% endif %}
 {% if ndim == 1 %}
-{{ CLEAR_FIELD(0,0) }}
-{{ EXTRACT_FIELD(0,0,'c0_0_0') }}
+{{ CLEAR_FIELD(field,0) }}
+{{ EXTRACT_FIELD(field,0) }}
+{{ compute_J(coords) }}
+{{ compute_detJ() }}
 LOOP_QUAD
-PVALS[0] = c0_0_0 * J[0][0] / DETJ;
+for (s=0;s<1;s++){
+PVALS = (C0_{{  field.name }}_0[0][qx][qy][qz]* PJ[s][0]) / PDETJ;
+}
 END_QUAD;
 {% endif %}
 {% endmacro %}
@@ -122,36 +230,43 @@ END_QUAD;
 {# ********************************************* #}
 
 {%macro hcurl_eval(field) -%}
-//THIS IS BROKEN AND NEEDS FIXING
 {% if ndim == 3 %}
-//ADD COMPUTE JTINV
-{{ CLEAR_FIELD(0,0) }}
-{{ CLEAR_FIELD(0,1) }}
-{{ CLEAR_FIELD(0,2) }}
-{{ EXTRACT_FIELD(0,0,'c0_0_0') }}
-{{ EXTRACT_FIELD(0,1,'c0_0_1') }}
-{{ EXTRACT_FIELD(0,2,'c0_0_2') }}
+{{ CLEAR_FIELD(field,0) }}
+{{ CLEAR_FIELD(field,1) }}
+{{ CLEAR_FIELD(field,2) }}
+{{ EXTRACT_FIELD(field,0) }}
+{{ EXTRACT_FIELD(field,1) }}
+{{ EXTRACT_FIELD(field,2) }}
+{{ compute_J(coords) }}
+{{ compute_JTinv() }}
 LOOP_QUAD
-PVALS[0] = (c0_0_0 * JTINV[0][0] + c0_0_1 * JTINV[0][1] + c0_0_2 * JTINV[0][2]);
-PVALS[1] = (c0_0_0 * JTINV[1][0] + c0_0_1 * JTINV[1][1] + c0_0_2 * JTINV[1][2]);
-PVALS[2] = (c0_0_0 * JTINV[2][0] + c0_0_1 * JTINV[2][1] + c0_0_2 * JTINV[2][2]);
+for (s=0;s<3;s++){
+PVALS = (C0_{{  field.name }}_0[0][qx][qy][qz]* PJTINV[s][0] + C0_{{  field.name }}_1[0][qx][qy][qz] * PJTINV[s][1] + C0_{{  field.name }}_2[0][qx][qy][qz] * PJTINV[s][2]);
+}
 END_QUAD;
 {% endif %}
 {% if ndim == 2 %}
-{{ CLEAR_FIELD(0,0) }}
-{{ CLEAR_FIELD(0,1) }}
-{{ EXTRACT_FIELD(0,0,'c0_0_0') }}
-{{ EXTRACT_FIELD(0,1,'c0_0_1') }}
+{{ CLEAR_FIELD(field,0) }}
+{{ CLEAR_FIELD(field,1) }}
+{{ EXTRACT_FIELD(field,0) }}
+{{ EXTRACT_FIELD(field,1) }}
+{{ compute_J(coords) }}
+{{ compute_JTinv() }}
 LOOP_QUAD
-PVALS[0] = (c0_0_0 * JTINV[0][0] + c0_0_1 * JTINV[0][1]);
-PVALS[1] = (c0_0_0 * JTINV[1][0] + c0_0_1 * JTINV[1][1]);
+for (s=0;s<2;s++){
+PVALS = (C0_{{  field.name }}_0[0][qx][qy][qz]* PJTINV[s][0] + C0_{{  field.name }}_1[0][qx][qy][qz] * PJTINV[s][1]);
+}
 END_QUAD;
 {% endif %}
 {% if ndim == 1 %}
-{{ CLEAR_FIELD(0,0) }}
-{{ EXTRACT_FIELD(0,0,'c0_0_0') }}
+{{ CLEAR_FIELD(field,0) }}
+{{ EXTRACT_FIELD(field,0) }}
+{{ compute_J(coords) }}
+{{ compute_JTinv() }}
 LOOP_QUAD
-PVALS[0] = c0_0_0 * JTINV[0][0];
+for (s=0;s<1;s++){
+PVALS = (C0_{{  field.name }}_0[0][qx][qy][qz]* PJTINV[s][0]);
+}
 END_QUAD;
 {% endif %}
 {% endmacro %}
@@ -178,24 +293,28 @@ PetscScalar assemble(DM da {{ valsargs }} {{ fieldargs }} )
   PetscInt i,j,k; //element loop indices
    PetscInt qx,qy,qz; //quad indices
    PetscInt lx,ly,lz; //basis indices
-   PetscInt d,d1,d2; //dof indices
+   PetscInt d,d1,d2; //field dof indices
+   PetscInt n1,n2; //dimension indices
+   PetscInt s,s1,s2; //eval coeff dof indices
   PetscInt xs,xm,ys,ym,zs,zm;
 
-#define DETJ detJ[qx][qy][qz]
-#define DETJINV detJinv[qx][qy][qz]
-#define J J[qx][qy][qz]
-#define JTINV JTinv[qx][qy][qz]
+//J[a][b] is a-th component, b-th derivative ie J[0][0] is dx/dxhat, J[1][2] is dy/dzhat, etc.
+PetscScalar J[{{ npts_x }}][{{ npts_y }}][{{ npts_z }}][{{ ndim }}][{{ ndim }}];
+PetscScalar detJ[{{ npts_x }}][{{ npts_y }}][{{ npts_z }}];
+PetscScalar JTinv[{{ npts_x }}][{{ npts_y }}][{{ npts_z }}][{{ ndim }}][{{ ndim }}];
 
-PetscScalar C0[{{ npts_x }}][{{ npts_y }}][{{ npts_z }}] = { { { 0.,},},};
-#define CLEAR_C0 ierr = PetscMemzero(C0,sizeof(PetscScalar[{{ npts_x }}][{{ npts_y }}][{{ npts_z }}]));CHKERRQ(ierr);
-#define c0 C0[qx][qy][qz]
+#define PDETJ detJ[qx][qy][qz]
+#define PJ J[qx][qy][qz]
+#define PJTINV JTinv[qx][qy][qz]
 
 #define LOOP_QUAD   for (qx=0;qx<{{ npts_x }};qx++) { \
                     for (qy=0;qy<{{ npts_y }};qy++) { \
                     for (qz=0;qz<{{ npts_z }};qz++) { 
 #define END_QUAD }}}
-#define LOOP_DOFS 
-#define END_DOFS }
+				
+#define LOOP_NDIM2   for (n1=0;n1<{{ ndim }};n1++) { \
+                    for (n2=0;n2<{{ ndim }};n2++) {
+#define END_NDIM2 }}
 						
  {% for field in fieldlist %}
  {% for k in range(field.ncomp) %}
@@ -215,7 +334,9 @@ const   PetscScalar {{field.name}}_{{k}}_derivs_z[{{ npts_z }}][{{ field.nbasis_
 PetscScalar C01_{{ field.name }}_{{k}}[{{ field.ndofs }}][{{ npts_z }}][{{field.nbasis_x[k] }}][{{ field.nbasis_y[k] }}] = { { { {  0.,},},},};
 PetscScalar C02_{{ field.name }}_{{k}}[{{ field.ndofs }}][{{ npts_y }}][{{ npts_z }}][{{ field.nbasis_x[k] }}] = { { { {  0.,},},},};
 PetscScalar C0_{{  field.name }}_{{k}}[{{ field.ndofs }}][{{ npts_x }}][{{ npts_y }}][{{ npts_z }}] = { { { {  0.,},},},};
-#define c0_{{ field.name }}_{{k}} C0_{{  field.name }}_{{k}}[d][qx][qy][qz]
+PetscScalar D01_{{ field.name }}_{{k}}[3][{{ field.ndofs }}][{{ npts_z }}][{{field.nbasis_x[k] }}][{{ field.nbasis_y[k] }}] = { { { { {  0.,},},},},};
+PetscScalar D02_{{ field.name }}_{{k}}[3][{{ field.ndofs }}][{{ npts_y }}][{{ npts_z }}][{{ field.nbasis_x[k] }}] = { { { { {  0.,},},},},};
+PetscScalar D0_{{  field.name }}_{{k}}[3][{{ field.ndofs }}][{{ npts_x }}][{{ npts_y }}][{{ npts_z }}] = { { { { {  0.,},},},},};
  {% if ndim == 1 %}
   PetscScalar **data_{{field.name}}_{{k}};
       {% endif %}
@@ -239,25 +360,25 @@ PetscScalar C0_{{  field.name }}_{{k}}[{{ field.ndofs }}][{{ npts_x }}][{{ npts_
 
 //create vals pointer for evaluate
 #define quadss [qz + {{ npts_z }} * (qy + {{ npts_y }} * qx)]
-#define quadsv(d1) [d1 + {{ ndim }} * (qz + {{ npts_z }} * (qy + {{ npts_y }} * qx))]
-#define quadst(d1,d2) [d2 + {{ ndim }} * (d1 + {{ ndim }} * (qz + {{ npts_z }} * (qy + {{ npts_y }} * qx)))]
+#define quadsv(s1) [s1 + {{ ndim }} * (qz + {{ npts_z }} * (qy + {{ npts_y }} * qx))]
+#define quadst(s1,s2) [s2 + {{ ndim }} * (s1 + {{ ndim }} * (qz + {{ npts_z }} * (qy + {{ npts_y }} * qx)))]
 
  {% if ndim == 1 %}
  #define SCALARINDICES [i] quadss
- #define VECTORINDICES(d1) [i] quadsv(d1)
- #define TENSORINDICES(d1,d2) [i] quadst(d2,d1)
+ #define VECTORINDICES(s1) [i] quadsv(s1)
+ #define TENSORINDICES(s1,s2) [i] quadst(s2,s1)
   PetscScalar **data_vals;
        {% endif %}
  {% if ndim == 2 %}
  #define SCALARINDICES [j][i] quadss
- #define VECTORINDICES(d1) [j][i] quadsv(d1)
- #define TENSORINDICES(d1,d2) [j][i] quadst(d2,d1)
+ #define VECTORINDICES(s1) [j][i] quadsv(s1)
+ #define TENSORINDICES(s1,s2) [j][i] quadst(s2,s1)
    PetscScalar ***data_vals;
        {% endif %}
  {% if ndim == 3 %}
  #define SCALARINDICES [k][j][i] quadss
- #define VECTORINDICES(d1) [k][j][i] quadsv(d1)
- #define TENSORINDICES(d1,d2) [k][j][i] quadst(d2,d1)
+ #define VECTORINDICES(s1) [k][j][i] quadsv(s1)
+ #define TENSORINDICES(s1,s2) [k][j][i] quadst(s2,s1)
    PetscScalar ****data_vals;
        {% endif %}
        
@@ -265,9 +386,9 @@ ierr = DMDAVecGetArrayDOF(da_vals , evals , &data_vals );CHKERRQ(ierr);
 {% if valstype == 'scalar' %}
  #define PVALS data_vals SCALARINDICES
 {% elif valstype == 'vector' %}
- #define PVALS data_vals VECTORINDICES(d)
+ #define PVALS data_vals VECTORINDICES(s)
 {% elif valstype == 'tensor' %}
- #define PVALS data_vals TENSORINDICES(d1,d2)
+ #define PVALS data_vals TENSORINDICES(s1,s2)
 {% endif %}
 
 for (k=zs; k<zs+zm; k++) {
@@ -278,11 +399,11 @@ for (k=zs; k<zs+zm; k++) {
 {% if evaltype == 'h1' %}
 {{ h1_eval(evalfield) }}
 {% elif evaltype == 'l2' %}
-{{ l2_eval(evalfield) }}
+{{ l2_eval(evalfield,fieldlist[0]) }}
 {% elif evaltype == 'hdiv' %}
-{{ hdiv_eval(evalfield) }}
+{{ hdiv_eval(evalfield,fieldlist[0]) }}
 {% elif evaltype == 'hcurl' %}
-{{ hcurl_eval(evalfield) }}
+{{ hcurl_eval(evalfield,fieldlist[0]) }}
 {% endif %}
 
        }}}

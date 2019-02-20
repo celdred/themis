@@ -43,9 +43,8 @@ class Checkpoint():
         group = self._get_data_group()
         self._write_timestep_attr(group)
         self.viewer.pushGroup(group)
-        for bi in range(quadcoeff.npatches):
-            quadcoeff.vecs[bi].setName(name + str(bi))
-            self.viewer.view(obj=quadcoeff.vecs[bi])
+        quadcoeff.vec.setName(name)
+        self.viewer.view(obj=quadcoeff.vec)
         self.viewer.popGroup()
 
     def load_quad(self, quadcoeff, name=None):
@@ -55,15 +54,14 @@ class Checkpoint():
         group = self._get_data_group()
         self.viewer.pushGroup(group)
         name = name or quadcoeff.name()
-        for bi in range(quadcoeff.npatches):
-            quadcoeff.vecs[bi].setName(name + str(bi))
-            quadcoeff.vecs[bi].load(self.viewer)
+        quadcoeff.vec.setName(name)
+        quadcoeff.vec.load(self.viewer)
         self.viewer.popGroup()
 
     def store(self, field, name=None):
         if self.mode is FILE_READ:
             raise IOError("Cannot store to checkpoint opened with mode 'FILE_READ'")
-        if not isinstance(field, Function):
+        if not (isinstance(field, Function) or isinstance(field, SplitFunction)):
             raise ValueError("Can only store functions")
 
         name = name or field.name()
@@ -72,43 +70,49 @@ class Checkpoint():
 
         self.viewer.pushGroup(group)
         
-        #arr = field._vector.getArray()
-        #print(name,np.max(arr),np.min(arr))
-        with field.space.get_composite_da().getAccess(field._vector) as splitglobalvec:
-            silist = range(field.space.nspaces)
-            if isinstance(field, SplitFunction):
-                silist = [field._si, ]
+        if isinstance(field, SplitFunction):
+            fspace = field._parentspace
+            silist = [field._si, ]
+        if isinstance(field, Function):
+            fspace = field.space
+            silist = range(fspace.nspaces)
+
+        with fspace.get_composite_da().getAccess(field._vector) as splitglobalvec:
             for si in silist:
-                soff = field.space.get_space_offset(si)
-                for ci in range(field.space.get_space(si).ncomp):
-                    coff = field.space.get_space(si).get_component_offset(ci)
-                    for bi in range(field.space.get_space(si).npatches):
-                        splitglobalvec[bi+soff+coff].setName(name + '_' + str(si) + '_' + str(ci) + '_' + str(bi))
-                        self.viewer.view(obj=splitglobalvec[bi+soff+coff])
-        arr = field._vector.getArray()
-        #print(name,np.max(arr),np.min(arr))
-        #print(group)
-        #print(dir(self.h5file))                   
+                soff = fspace.get_space_offset(si)
+                for ci in range(fspace.get_space(si).ncomp):
+                    coff = fspace.get_space(si).get_component_offset(ci)
+                    #PETSc.Sys.Print(name,si,soff,ci,coff)
+                    if isinstance(field, SplitFunction): sii = 0
+                    if isinstance(field, Function): sii = si
+                    splitglobalvec[soff+coff].setName(name + '_' + str(sii) + '_' + str(ci))
+                    self.viewer.view(obj=splitglobalvec[soff+coff])                  
         self.viewer.popGroup()
 
     def load(self, field, name=None):
-        if not isinstance(field, Function):
+        if not (isinstance(field, Function) or isinstance(field, SplitFunction)):
             raise ValueError("Can only load functions")
 
         name = name or field.name()
         group = self._get_data_group()
         self.viewer.pushGroup(group)
-        with field.space.get_composite_da().getAccess(field._vector) as splitglobalvec:
-            silist = range(field.space.nspaces)
-            if isinstance(field, SplitFunction):
-                silist = [field._si, ]
+
+        if isinstance(field, SplitFunction):
+            fspace = field._parentspace
+            silist = [field._si, ]
+        if isinstance(field, Function):
+            fspace = field.space
+            silist = range(fspace.nspaces)
+            
+        with fspace.get_composite_da().getAccess(field._vector) as splitglobalvec:
             for si in silist:
-                soff = field.space.get_space_offset(si)
-                for ci in range(field.space.get_space(si).ncomp):
-                    coff = field.space.get_space(si).get_component_offset(ci)
-                    for bi in range(field.space.get_space(si).npatches):
-                        splitglobalvec[bi+soff+coff].setName(name + '_' + str(si) + '_' + str(ci) + '_' + str(bi))
-                        splitglobalvec[bi+soff+coff].load(self.viewer)
+                soff = fspace.get_space_offset(si)
+                for ci in range(fspace.get_space(si).ncomp):
+                    coff = fspace.get_space(si).get_component_offset(ci)
+                    if isinstance(field, SplitFunction): sii = 0
+                    if isinstance(field, Function): sii = si
+                    splitglobalvec[soff+coff].setName(name + '_' + str(sii) + '_' + str(ci))
+                    splitglobalvec[soff+coff].load(self.viewer)
         self.viewer.popGroup()
 
     def destroy(self):
@@ -147,7 +151,7 @@ class Checkpoint():
             self._tidx = idx
         else:
             self._tidx += 1
-            self._time = t
+        self._time = t
         if self.mode == FILE_READ:
             return
         indices = self.read_attribute("/", "stored_time_indices", [])

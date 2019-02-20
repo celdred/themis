@@ -1,49 +1,46 @@
 from petscshim import PETSc
 from assembly import extract_fields,compile_functional
 import numpy as np
+from function import Function,SplitFunction
 
 class QuadCoefficient():
     def __init__(self, mesh, ctype, etype, evalfield, quad, name='xquad'):
         self.ctype = ctype
         self.etype = etype
-        self.npatches = mesh.npatches
         self.mesh = mesh
         self.evalfield = evalfield
 # NEED A GOOD DEFAULT NAME HERE!!!
         self._name = name
 
-        self.vecs = []
-        self.dms = []
-        self.shapes = []
-        for bi in range(self.npatches):
-            dm = mesh.get_cell_da(bi)
-            nquadlist = quad.get_nquad()
-            nquad = np.prod(nquadlist)
-            localnxs = mesh.get_local_nxny(bi)
-            shape = list(localnxs)
-            shape.append(nquadlist[0])
-            shape.append(nquadlist[1])
-            shape.append(nquadlist[2])
 
-            if ctype == 'scalar':
-                newdm = dm.duplicate(dof=nquad)
-            if ctype == 'vector':
-                newdm = dm.duplicate(dof=nquad*mesh.ndim)
-                shape.append(mesh.ndim)
-            if ctype == 'tensor':
-                newdm = dm.duplicate(dof=nquad*mesh.ndims*mesh.ndim)
-                shape.append(mesh.ndim)
-                shape.append(mesh.ndim)
+        dm = mesh.get_cell_da()
+        nquadlist = quad.get_nquad()
+        nquad = np.prod(nquadlist)
+        localnxs = mesh.get_local_nxny()
+        shape = list(localnxs)
+        shape.append(nquadlist[0])
+        shape.append(nquadlist[1])
+        shape.append(nquadlist[2])
 
-            self.dms.append(newdm)
-            self.shapes.append(shape)
-            self.vecs.append(self.dms[bi].createGlobalVector())
+        if ctype == 'scalar':
+            newdm = dm.duplicate(dof=nquad)
+        if ctype == 'vector':
+            newdm = dm.duplicate(dof=nquad*mesh.ndim)
+            shape.append(mesh.ndim)
+        if ctype == 'tensor':
+            newdm = dm.duplicate(dof=nquad*mesh.ndims*mesh.ndim)
+            shape.append(mesh.ndim)
+            shape.append(mesh.ndim)
 
+        self.dm  = newdm
+        self.shape = shape
+        self.vec = newdm.createGlobalVector()
+		
         self.evalkernel = EvalKernel(mesh,evalfield,quad,ctype,etype,name)
         
-    def getarray(self, bi):
-        arr = self.dms[bi].getVecArray(self.vecs[bi])[:]
-        arr = np.reshape(arr, self.shapes[bi])
+    def getarray(self):
+        arr = self.dm.getVecArray(self.vec)[:]
+        arr = np.reshape(arr, self.shape)
         return arr
 
     def name(self):
@@ -67,7 +64,11 @@ class EvalKernel():
         self.etype = etype
         self.name = name
         self.mesh = mesh
-        self.coefficients = [field,]  
+        if isinstance(field,Function):
+            self.coefficients = [field,]
+        if isinstance(field,SplitFunction):
+            self.coefficients = [field._parentfunction,]
+        self.field = field
         self.quad = quad
         
 def EvaluateCoefficient(coefficient, evalkernel):
@@ -85,7 +86,6 @@ def EvaluateCoefficient(coefficient, evalkernel):
         # evaluate
         with PETSc.Log.Event('evaluate'):
             for da, assemblefunc in zip(evalkernel.dalist, evalkernel.assemblyfunc_list):
-                # BROKEN FOR MULTIPATCH- COEFFICIENT DMS/VEC AND FIELD ARGS LIST NEEDS A BI INDEX
-                assemblefunc([da, ] +  [coefficient.dms[0],coefficient.vecs[0]] + evalkernel.fieldargs_list, evalkernel.constantargs_list)
+                assemblefunc([da, ] +  [coefficient.dm,coefficient.vec] + evalkernel.fieldargs_list, evalkernel.constantargs_list)
 
 

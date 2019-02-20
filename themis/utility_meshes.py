@@ -1,9 +1,11 @@
-from mesh import SingleBlockMesh
+from mesh import SingleBlockMesh,SingleBlockExtrudedMesh
 
 # from ufl import FiniteElement, TensorProductElement, interval, VectorElement
 # from functionspace import FunctionSpace
 # from function import Function
 import numpy as np
+from ufl import SpatialCoordinate
+from constant import Constant
 
 
 def create_box_mesh(nxs, lxs, pxs, bcs):
@@ -14,24 +16,35 @@ def create_box_mesh(nxs, lxs, pxs, bcs):
     pxs = np.array(pxs, dtype=np.float32)
     lxs = np.array(lxs, dtype=np.float32)
     nxs = np.array(nxs, dtype=np.int32)
-    dxs = lxs/nxs
+    # dxs = lxs/nxs
 
     mesh = SingleBlockMesh(nxs, bcs)
+    mesh.scale_coordinates(lxs,pxs - lxs / 2.)
 
-    coordsdm = mesh.coordinates.space.get_da(0, 0)
-    coordsarr = coordsdm.getVecArray(mesh.coordinates._vector)[:]
+    #coordsdm = mesh.coordinates.space.get_da(0)
+    #coordsarr = coordsdm.getVecArray(mesh.coordinates._vector)[:]
 
-    if len(dxs) == 1:
-        coordsarr = np.expand_dims(coordsarr, axis=1)
-    for i in range(len(dxs)):
-        coordsarr[..., i] = coordsarr[..., i] * dxs[i] + pxs[i] - nxs[i] * dxs[i] / 2.
+    #if len(dxs) == 1:
+    #    coordsarr = np.expand_dims(coordsarr, axis=1)
+    #for i in range(len(dxs)):
+    #    coordsarr[..., i] = coordsarr[..., i] * dxs[i] + pxs[i] - nxs[i] * dxs[i] / 2.
         # coordsarr[...,i] = coordsarr[...,i] * dxs[i]/2. + pxs[i]
-
-    mesh.coordinates.scatter()
+    
+    #mesh.coordinates.scatter()
 
     return mesh
 
 
+def ExtrudedMesh(basemesh, layers, layer_height=None, extrusion_type ='uniform'):
+    if not (extrusion_type == 'uniform'):
+        raise ValueError('cannot handle non-uniform extrusion yet')
+    if layer_height == None:
+        layer_height = 1.0/layers
+    
+    emesh = SingleBlockExtrudedMesh(basemesh, layers, layer_height)
+
+    return emesh
+    
 def PeriodicIntervalMesh(ncells, length_or_left, right=None):
     """
     Generate a uniform mesh of an interval.
@@ -95,7 +108,20 @@ def PeriodicRectangleMesh(nx, ny, Lx, Ly, direction="both", quadrilateral=True):
         bcs = ['nonperiodic', 'periodic']
     return create_box_mesh(nxs, lxs, pxs, bcs)
 
+def PeriodicSquareMesh(nx, ny, L, direction="both", quadrilateral=True):
+    """Generate a periodic square mesh
 
+    :arg nx: The number of cells in the x direction
+    :arg ny: The number of cells in the y direction
+    :arg L: The extent in the x and y directions
+    :arg direction: The direction of the periodicity, one of
+            ``"both"``, ``"x"`` or ``"y"``.
+
+    Creates a domain with extent [0,L] x [0,L]
+
+    """
+    return PeriodicRectangleMesh(nx, ny, L, L, direction=direction, quadrilateral=quadrilateral)
+    
 def IntervalMesh(ncells, length_or_left, right=None):
     """
     Generate a uniform mesh of an interval.
@@ -127,7 +153,60 @@ def IntervalMesh(ncells, length_or_left, right=None):
     bcs = ['nonperiodic', ]
     return create_box_mesh(nxs, lxs, pxs, bcs)
 
+def SquareMesh(nx, ny, L, quadrilateral=True):
+    """Generate a square mesh
 
+    :arg nx: The number of cells in the x direction
+    :arg ny: The number of cells in the y direction
+    :arg L: The extent in the x and y directions
+
+    Creates a domain with extent [0,L] x [0,L]
+    """
+    return RectangleMesh(nx, ny, L, L, quadrilateral=quadrilateral)
+
+def CubeMesh(nx, ny, nz, L, xbc, ybc, zbc):
+    """Generate a cube mesh
+
+    :arg nx: The number of cells in the x direction
+    :arg ny: The number of cells in the y direction
+    :arg nz: The number of cells in the z direction
+    :arg L: The extent in the x, y and z directions
+    :arg xbc: The periodicity in the x direction, either periodic or nonperiodic
+    :arg ybc: The periodicity in the y direction, either periodic or nonperiodic
+    :arg zbc: The periodicity in the z direction, either periodic or nonperiodic
+
+    Creates a domain with extent [0,L] x [0,L] x [0,L]
+    """
+    return BoxMesh(nx, ny, nz, L, L, L, xbc, ybc, zbc)
+
+def BoxMesh(nx, ny, nz, Lx, Ly, Lz, xbc, ybc, zbc):
+    """Generate a box mesh
+
+    :arg nx: The number of cells in the x direction
+    :arg ny: The number of cells in the y direction
+    :arg nz: The number of cells in the z direction
+    :arg Lx: The extent in the x direction
+    :arg Ly: The extent in the y direction
+    :arg Lz: The extent in the z direction
+    :arg xbc: The periodicity in the x direction, either periodic or nonperiodic
+    :arg ybc: The periodicity in the y direction, either periodic or nonperiodic
+    :arg zbc: The periodicity in the z direction, either periodic or nonperiodic
+
+    Creates a domain with extent [0,Lx] x [0,Ly] x [0,Lz]
+    """
+
+
+    for n in (nx, ny, nz):
+        if n <= 0 or n % 1:
+            raise ValueError("Number of cells must be a postive integer")
+
+    nxs = [nx, ny, nz]
+    lxs = [Lx, Ly, Lz]
+    pxs = [Lx/2.0, Ly/2.0, Lz/2.0]
+    bcs = [xbc,ybc,zbc]
+    return create_box_mesh(nxs, lxs, pxs, bcs)
+    
+    
 def RectangleMesh(nx, ny, Lx, Ly, quadrilateral=True):
     """Generate a rectangular mesh
 
