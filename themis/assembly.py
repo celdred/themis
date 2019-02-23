@@ -391,23 +391,23 @@ def compute_bi(i,xmax,M,NB):
     if (i>=xmax-M): bi = NB - (xmax - i)
     return bi
     
-def compute_1d_bounds(ci1, ci2, i, elem1, elem2, ncell, ndofs, interior_facet, bc, ranges1, ranges2):
+def compute_1d_bounds(ci1, ci2, direc, elem1, elem2, ncell, ndofs, interior_facet, bc, ranges1, ranges2):
     dnnz = np.zeros((ndofs), dtype=np.int32)
     nnz = np.zeros((ndofs), dtype=np.int32)
 
     # clip values to a range
     py_clip = lambda x, l, u: l if x < l else u if x > u else x
 
-    icells = elem1.get_icells(ci1, i, ncell, bc, interior_facet)
-    leftmost_offsets, leftmost_offsetmult = elem2.get_offsets(ci2, i)
-    rightmost_offsets, rightmost_offsetmult = elem2.get_offsets(ci2, i)
+    icells = elem1.get_icells(ci1, direc, ncell, bc, interior_facet)
+    leftmost_offsets, leftmost_offsetmult = elem2.get_offsets(ci2, direc)
+    rightmost_offsets, rightmost_offsetmult = elem2.get_offsets(ci2, direc)
     
     leftmostcells = icells[:, 0]
     rightmostcells = icells[:, 1]
 
-    NB = elem2.get_nblocks(ci2,i)
+    NB = elem2.get_nblocks(ci2,direc)
     M = (NB-1)//2
-    #print(icells,NB,M)
+    #print(icells,direc,NB,M)
     #if bc == 'periodic' or NB == 1:
     bileft = 0
     biright = 0
@@ -421,6 +421,7 @@ def compute_1d_bounds(ci1, ci2, i, elem1, elem2, ncell, ndofs, interior_facet, b
         rightbound = rightmost_offsets[biright][-1] + rightmostcell * rightmost_offsetmult[biright][-1]
         nnz[i-ranges1[0]] = rightbound - leftbound + 1  # this is the total size
         dnnz[i-ranges1[0]] = py_clip(rightbound, ranges2[0], ranges2[1]-1) - py_clip(leftbound, ranges2[0], ranges2[1]-1) + 1
+    #print('nnz',bc,ncell,ndofs,nnz,dnnz)
     return dnnz, nnz
 
 

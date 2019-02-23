@@ -397,7 +397,7 @@ class TwoForm():
         self.activefield._activevector = self.activefield._vector
 
         # print(self.J)
-        self.mat.view()
+        # self.mat.view()
         PETSc.Sys.Print(self.mat.getInfo(info=3))
 
         # WHAT SHOULD I REALLY BE RETURNING HERE?

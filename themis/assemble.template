@@ -228,7 +228,7 @@ for (k=zs; k<zs+zm; k++) {
 	      {{ SET_NONPERIODIC_X_OTHER() }}
 	      {{ SET_NONPERIODIC_X_FIELDS() }}
 	    
-		printf("start %i %i %i: %i %i %i\n",i,j,k,xs,xm,xmax);
+		//printf("start %i %i %i: %i %i %i\n",i,j,k,xs,xm,xmax);
 	      
 		 {% if formdim == 2 %}
        {% for ci1 in range(nci1) %}
@@ -239,7 +239,7 @@ for (k=zs; k<zs+zm; k++) {
 			jcoord = j * offset_mult1_y_{{ ci1 }}[bi_1_y_{{ci1}}][ly] + offsets1_y_{{ ci1 }}[bi_1_y_{{ci1}}][ly] - y1s_{{ ci1 }};
 			kcoord = k * offset_mult1_z_{{ ci1 }}[bi_1_z_{{ci1}}][lz] + offsets1_z_{{ ci1 }}[bi_1_z_{{ci1}}][lz] - z1s_{{ ci1 }};
 			rows_{{ ci1 }} s1_{{ci1}}_indices =  icoord + x1m_{{ ci1 }}*(jcoord + y1m_{{ ci1 }}*kcoord);
-			printf("ci1: %i %i %i : %i %i\n",i,j,k,lx,icoord);
+			//printf("ci1: %i %i %i : %i %i\n",i,j,k,lx,icoord);
 		}}}
       {% endfor %}
 
@@ -252,12 +252,12 @@ for (k=zs; k<zs+zm; k++) {
 			jcoord = j * offset_mult2_y_{{ ci2 }}[bi_2_y_{{ci2}}][ly] + offsets2_y_{{ ci2 }}[bi_2_y_{{ci2}}][ly] - y2s_{{ ci2 }};
 			kcoord = k * offset_mult2_z_{{ ci2 }}[bi_2_z_{{ci2}}][lz] + offsets2_z_{{ ci2 }}[bi_2_z_{{ci2}}][lz] - z2s_{{ ci2 }};
 			cols_{{ ci2 }} s2_{{ci2}}_indices =  icoord + x2m_{{ ci2 }}*(jcoord + y2m_{{ ci2 }}*kcoord);
-			printf("ci2: %i %i %i : %i %i\n",i,j,k,lx,icoord);
+			//printf("ci2: %i %i %i : %i %i\n",i,j,k,lx,icoord);
 		}}}
 	 {% endfor %}
 		{% endif %}
 		
-		printf("rows/cols\n");
+		//printf("rows/cols\n");
 
 		//extract element dofs from local dofs
 		 {% for field in fieldlist %}
@@ -281,7 +281,7 @@ for (k=zs; k<zs+zm; k++) {
 		{% if ndim == 3 %}
 		{{field.name}}_vals {{field.name}}_{{k}}_indices = data_{{field.name}}_{{k}} [kk][jj][ii][d];
 		{% endif %}
-		printf("{{field.name}} {{k}} : %i %i %i : %i %i\n",i,j,k,lx,ii);
+		//printf("{{field.name}} {{k}} : %i %i %i : %i %i\n",i,j,k,lx,ii);
 		}}}}
 		#undef ii
 		#undef jj
@@ -290,7 +290,7 @@ for (k=zs; k<zs+zm; k++) {
 		{% endfor %}
 		{% endfor %}
 		
-				printf("fields\n");
+				//printf("fields\n");
 
 		//compute the element tensor
 		
@@ -358,7 +358,7 @@ for (k=zs; k<zs+zm; k++) {
 				{% endif %}
 
 		
-						printf("computed tensor\n");
+						//printf("computed tensor\n");
 
 		//Put the element tensor into the local tensor
 		{% if formdim == 2 %}
@@ -382,9 +382,9 @@ for (k=zs; k<zs+zm; k++) {
 		formsum[0] = formsum[0] + vals[0];
 		{% endif %}
 		
-								printf("tensor set\n");
+								//printf("tensor set\n");
 
-				printf("end %i %i %i: %i %i\n",i,j,k,xs,xm);
+				//printf("end %i %i %i: %i %i\n",i,j,k,xs,xm);
 				
        }}}
 

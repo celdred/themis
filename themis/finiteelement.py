@@ -699,6 +699,9 @@ def _GD_interaction_cells(ncell, bc, interior_facet, order):
             rightmost = rightmost + 1
         interaction_offsets = np.array([leftmost, rightmost], dtype=np.int32)
         interaction_cells[:, :] = np.expand_dims(ilist, axis=1) + np.expand_dims(interaction_offsets, axis=0)
+        if order == 1 and bc == 'nonperiodic':
+            interaction_cells[0,0] = 0
+            interaction_cells[-1,-1] = ncell-1
     return interaction_cells
 
 # CORRECT FACET INTEGRAL STUFF??
