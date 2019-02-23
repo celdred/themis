@@ -29,9 +29,9 @@ def create_matrix(mat_type, target, source, blocklist, kernellist):
                     bindex = blocklist.index((si1, si2))
                     fill_mono(matrices[si1][si2], target.get_space(si1), source.get_space(si2), [(0, 0), ], [kernellist[bindex], ], zeroassembly=True)
                     # this catches bugs in pre-allocation and the initial assembly by locking the non-zero structure
-                    matrices[si1][si2].setOption(PETSc.Mat.Option.NEW_NONZERO_LOCATION_ERR, False)
-                    matrices[si1][si2].setOption(PETSc.Mat.Option.UNUSED_NONZERO_LOCATION_ERR, False)
-                    matrices[si1][si2].setOption(PETSc.Mat.Option.NEW_NONZERO_ALLOCATION_ERR, False)
+                    matrices[si1][si2].setOption(PETSc.Mat.Option.NEW_NONZERO_LOCATION_ERR, True)
+                    matrices[si1][si2].setOption(PETSc.Mat.Option.UNUSED_NONZERO_LOCATION_ERR, True)
+                    matrices[si1][si2].setOption(PETSc.Mat.Option.NEW_NONZERO_ALLOCATION_ERR, True)
 
                     # These are for zeroRows- the first keeps the non-zero structure when zeroing rows, the 2nd tells PETSc that the process only zeros owned rows
                     matrices[si1][si2].setOption(PETSc.Mat.Option.KEEP_NONZERO_PATTERN, True)
@@ -51,9 +51,9 @@ def create_matrix(mat_type, target, source, blocklist, kernellist):
     mat.assemble()
 
     # this catches bugs in pre-allocation and the initial assembly by locking the non-zero structure
-    mat.setOption(PETSc.Mat.Option.NEW_NONZERO_LOCATION_ERR, False)
-    mat.setOption(PETSc.Mat.Option.UNUSED_NONZERO_LOCATION_ERR, False)
-    mat.setOption(PETSc.Mat.Option.NEW_NONZERO_ALLOCATION_ERR, False)
+    mat.setOption(PETSc.Mat.Option.NEW_NONZERO_LOCATION_ERR, True)
+    mat.setOption(PETSc.Mat.Option.UNUSED_NONZERO_LOCATION_ERR, True)
+    mat.setOption(PETSc.Mat.Option.NEW_NONZERO_ALLOCATION_ERR, True)
     # These are for zeroRows- the first keeps the non-zero structure when zeroing rows, the 2nd tells PETSc that the process only zeros owned rows
     mat.setOption(PETSc.Mat.Option.KEEP_NONZERO_PATTERN, True)
     mat.setOption(PETSc.Mat.Option.NO_OFF_PROC_ZERO_ROWS, False)
@@ -142,7 +142,7 @@ def create_mono(target, source, blocklist, kernellist):
             i = i + 1  # increment row block
     mat.setPreallocationNNZ((dnnzarr, onnzarr))
     mat.setOption(PETSc.Mat.Option.IGNORE_ZERO_ENTRIES, False)
-    mat.setOption(PETSc.Mat.Option.NEW_NONZERO_ALLOCATION_ERR, False)
+    mat.setOption(PETSc.Mat.Option.NEW_NONZERO_ALLOCATION_ERR, True)
     mat.setUp()
     mat.zeroEntries()
 
@@ -397,7 +397,8 @@ class TwoForm():
         self.activefield._activevector = self.activefield._vector
 
         # print(self.J)
-        # self.mat.view()
+        self.mat.view()
+        PETSc.Sys.Print(self.mat.getInfo(info=3))
 
         # WHAT SHOULD I REALLY BE RETURNING HERE?
         return PETSc.Mat.Structure.SAME_NONZERO_PATTERN

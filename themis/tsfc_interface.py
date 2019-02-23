@@ -52,7 +52,7 @@ def compile_form(form):
                 tabobj['name'] = tabname
 
                 # this matches the string generated in runtime_tabulated.py in FInAT
-                # ie variant_order_derivorder_{d,c}_psid_eid_restriction
+                # ie variant_order_derivorder_shiftaxis_{d,c}_restrict
                 tabobj['variant'] = splittab[1]
                 tabobj['order'] = int(splittab[2])
                 tabobj['derivorder'] = int(splittab[3])
@@ -61,12 +61,7 @@ def compile_form(form):
                     tabobj['discont'] = True
                 if splittab[5] == 'c':
                     tabobj['discont'] = False
-                # splittab[6] is the psid, which is not needed
-                #tabobj['restrict'] = splittab[7]
                 tabobj['restrict'] = splittab[6]
-                
-                #broken now
-                #tabobj['pts'] = pts
                 tabobj['shape'] = shape
 
                 

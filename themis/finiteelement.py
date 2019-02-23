@@ -13,7 +13,7 @@ variant_to_elemname['mseH1'] = 'CMSE'
 variant_to_elemname['mseL2'] = 'DMSE'
 variant_to_elemname['qbH1'] = 'CQB'
 variant_to_elemname['qbL2'] = 'DQB'
-variant_to_elemname['mgdH1'] = 'CGD'
+variant_to_elemname['mgdH1'] = 'GD'
 variant_to_elemname['mgdL2'] = 'DGD'
 
 
@@ -156,7 +156,7 @@ class ThemisElement():
         # THESE SPTS SHOULD REALLY BE DIFFERENT VARIANTS I THINK...
         # THIS IS USEFUL MOSTLY FOR DISPERSION STUFF
         # BUT I THINK REALLY IMPLEMENTING A BUNCH OF VARIANTS IS THE BEST APPROACH
-    def __init__(self, elem,sptsH1=None,sptsL2=None):
+    def __init__(self, elem,sptsh1=None,sptsl2=None):
 
         
 # ADD SUPPORT FOR TENSOR ELEMENTS
@@ -166,8 +166,6 @@ class ThemisElement():
         else:
             self._ndofs = 1
             
-
-
         if isinstance(elem, EnrichedElement):
             elem1,elem2 =  elem._elements
             if (isinstance(elem1,HDivElement) and isinstance(elem2,HDivElement)) or (isinstance(elem1,HCurlElement) and isinstance(elem2,HCurlElement)):
@@ -190,12 +188,6 @@ class ThemisElement():
         else:
             raise ValueError('Themis supports only FiniteElemet, EnrichedElement and TensorProductElement')
         
-        # PETSc.Sys.Print(elem,ncomp)
-        # PETSc.Sys.Print(variantlist)
-        # PETSc.Sys.Print(degreelist)
-        # PETSc.Sys.Print(elemnamelist)
-        # PETSc.Sys.Print(contlist)
-        
         self._cont = elem.sobolev_space()
         
         self._ncomp = ncomp
@@ -205,6 +197,7 @@ class ThemisElement():
         self._variantlist = variantlist
 
         self._nbasis = []
+        self._nblocks = []
         self._ndofs_per_element = []
         self._offsets = []
         self._offset_mult = []
@@ -212,9 +205,11 @@ class ThemisElement():
         self._derivs = []
         self._derivs2 = []
         self._spts = []
+                        
         for ci in range(self._ncomp):
 
             self._nbasis.append([])
+            self._nblocks.append([])
             self._ndofs_per_element.append([])
             self._offsets.append([])
             self._offset_mult.append([])
@@ -223,51 +218,45 @@ class ThemisElement():
             self._derivs2.append([])
             self._spts.append([])
             for elemname, degree, variant in zip(self._elemnamelist[ci], self._degreelist[ci],self._variantlist[ci]):
-
-                # this works because degree has already been adjusted when setting up degreelist
-                if variant == 'feec': # REALLY HERE VARIANT SHOULD BE DONE MORE CLEVERLY IE VARIOUS OPTIONS OF SPTS...
-                    if elemname in ['DG','DMSE']:
-                        if (sptsL2 is None): spts = ThemisQuadratureNumerical('gll', [degree+1]).get_pts()[0]
-                        else: spts = sptsL2
-                    if elemname in ['CG','DMSE']:
-                        if (sptsH1 is None): spts = ThemisQuadratureNumerical('gll', [degree+1]).get_pts()[0]
-                        else: spts = sptsH1
-                        
-                #PETSc.Sys.Print(ci,elemname,variant,degree)
-                #PETSc.Sys.Print(spts)
                 
+                sptsL2 = sptsl2 or ThemisQuadratureNumerical('gll', [degree+1]).get_pts()[0] #this works because degree has already been adjusted!
+                sptsH1 = sptsh1 or ThemisQuadratureNumerical('gll', [degree+1]).get_pts()[0]
                 # compute number of shape functions in each direction (=nbasis); and number of degrees of freedom per element
                 self._nbasis[ci].append(degree + 1)
                 if elemname in ['CG','CQB','CMSE']:
                     self._ndofs_per_element[ci].append(degree)
                 if elemname in ['DG','DQB','DMSE']:
                     self._ndofs_per_element[ci].append(degree + 1)
-                if elemname == 'CGD':
+                if elemname in ['GD','DGD']:
                     self._ndofs_per_element[ci].append(1)
+
+                #set the number of blocks
+                if elemname in ['CG','CQB','CMSE','DG','DQB','DMSE']:
+                    self._nblocks[ci].append(1)                
+                if elemname == 'GD':
+                    self._nblocks[ci].append(degree) 
                 if elemname == 'DGD':
-                    self._ndofs_per_element[ci].append(1)
-
-
+                    self._nblocks[ci].append(degree+1)
+                                        
                 # compute offsets and offset mults
-                if elemname in ['CG','CQB','CMSE']:  # MIGHT BE WRONG FOR CQB?
+                if elemname in ['CG','CQB','CMSE']:
                     of, om = _CG_offset_info(degree)
-                if elemname in ['DG','DQB','DMSE']: # MIGHT BE WRONG FOR DQB?
+                if elemname in ['DG','DQB','DMSE']:
                     of, om = _DG_offset_info(degree)
-                if elemname == 'CGD':
-                    of, om = _CGD_offset_info(degree)
+                if elemname == 'GD':
+                    of, om = _GD_offset_info(degree)
                 if elemname == 'DGD':
                     of, om = _DGD_offset_info(degree)
-    
                 self._offsets[ci].append(of)
                 self._offset_mult[ci].append(om)
 
                 # compute basis and deriv functions
                 if elemname == 'CG':
-                    b, d, d2, s = _CG_basis(degree, spts)
+                    b, d, d2, s = _CG_basis(degree, sptsH1)
                 if elemname == 'DG':
-                    b, d, d2, s = _DG_basis(degree, spts)
-                if elemname == 'CGD':
-                    b, d, d2, s = _CGD_basis(degree)
+                    b, d, d2, s = _DG_basis(degree, sptsL2)
+                if elemname == 'GD':
+                    b, d, d2, s = _GD_basis(degree)
                 if elemname == 'DGD':
                     b, d, d2, s = _DGD_basis(degree)
                 if elemname == 'CQB':
@@ -275,9 +264,9 @@ class ThemisElement():
                 if elemname == 'DQB':
                     b, d, d2, s = _DQB_basis(degree)
                 if elemname == 'CMSE':
-                    b, d, d2, s = _CMSE_basis(degree, spts)
+                    b, d, d2, s = _CMSE_basis(degree, sptsH1)
                 if elemname == 'DMSE':
-                    b, d, d2, s = _DMSE_basis(degree, spts)
+                    b, d, d2, s = _DMSE_basis(degree, sptsH1) # Note use of sptsH1 here, since DMSE basis is built from CMSE basis!
                 self._basis[ci].append(b)
                 self._derivs[ci].append(d)
                 self._derivs2[ci].append(d2)
@@ -293,7 +282,8 @@ class ThemisElement():
                 self._derivs[ci].append(d)
                 self._derivs2[ci].append(d2)
                 self._spts[ci].append(s)
-
+                self._nblocks[ci].append(1)
+                
     def get_continuity(self, ci, direc):
         return self._contlist[ci][direc]
 
@@ -301,13 +291,13 @@ class ThemisElement():
         fam = self._elemnamelist[ci][direc]
         if fam in ['CG','CQB','CMSE']:
             nx = self._degreelist[ci][direc] * ncell
-            if (not bc == 'periodic'):
+            if (bc == 'nonperiodic'):
                 nx = nx + 1
         if fam in ['DG','DQB','DMSE']:
             nx = (self._degreelist[ci][direc]+1) * ncell
-        if fam == 'CGD':
+        if fam == 'GD':
             nx = ncell
-            if (not bc == 'periodic'):
+            if (bc == 'nonperiodic'):
                 nx = nx + 1
         if fam == 'DGD':
             nx = ncell
@@ -326,134 +316,152 @@ class ThemisElement():
         bprod = np.prod(self._nbasis)
         return [bprod, self._ndofs]
 
+# Offsets are returned as nblock-nbasis 
+# Basis/Derivs are returned as nblock-nquad-nbasis (tabulated) or nblock-nbasis (symbolic)
+
     def get_offsets(self, ci, direc):
         return self._offsets[ci][direc], self._offset_mult[ci][direc]
 
     def get_sym_basis(self, ci, direc, newsymb):
         xsymb = sympy.var('x')
         blist = []
-        for basis in self._basis[ci][direc]:
-            adjbasis = basis.subs(xsymb, newsymb)
-            blist.append(adjbasis)
+        for bi in range(self._nblocks[ci][direc]):
+            blist.append([])
+            for basis in self._basis[ci][direc][bi]:
+                adjbasis = basis.subs(xsymb, newsymb)
+                blist[bi].append(adjbasis)
         return blist
 
     def get_sym_derivs(self, ci, direc, newsymb):
         xsymb = sympy.var('x')
         dlist = []
-        for deriv in self._derivs[ci][direc]:
-            adjderiv = deriv.subs(xsymb, newsymb)
-            dlist.append(adjderiv)
+        for bi in range(self._nblocks[ci][direc]):
+            dlist.append([])
+            for deriv in self._derivs[ci][direc][bi]:
+                adjderiv = deriv.subs(xsymb, newsymb)
+                dlist[bi].append(adjderiv)
         return dlist
 
     def get_sym_derivs2(self, ci, direc, newsymb):
         xsymb = sympy.var('x')
         dlist = []
-        for deriv2 in self._derivs2[ci][direc]:
-            adjderiv2 = deriv2.subs(xsymb, newsymb)
-            dlist.append(adjderiv2)
+        for bi in range(self._nblocks[ci][direc]):
+            dlist.append([])
+            for deriv2 in self._derivs2[ci][direc][bi]:
+                adjderiv2 = deriv2.subs(xsymb, newsymb)
+                dlist[bi].append(adjderiv2)
         return dlist
 
-    # NOTE ORDER HERE IS QUADPT, BASIS
     def get_basis_exact(self, ci, direc, x):
-
         xsymb = sympy.var('x')
-        symbas = self._basis[ci][direc]
-        basis_funcs = sympy.zeros(len(x),len(symbas))
-        for i in range(len(symbas)):
-            for j in range(len(x)):
-                if symbas[i] == 1.0:  # check for the constant basis function
-                    basis_funcs[j, i] = sympy.Rational(1, 1)
+        npts = len(x)
+        nbasis = len(self._basis[ci][direc][0])
+        nblocks = self._nblocks[ci][direc]
+        basis_funcs = sympy.zeros(nblocks,npts,nbasis)
+        for bi in range(nblocks):
+            symbas = self._basis[ci][direc][bi]
+            for i in range(nbasis):
+                for j in range(npts):
+                    if symbas[i] == 1.0:  # check for the constant basis function
+                        basis_funcs[bi,j, i] = sympy.Rational(1, 1)
                 else:
-                    basis_funcs[j, i] = symbas[i].subs(xsymb, x[j])
+                    basis_funcs[bi,j, i] = symbas[i].subs(xsymb, x[j])
         return basis_funcs
 
-    # NOTE ORDER HERE IS QUADPT, BASIS
     def get_derivs_exact(self, ci, direc, x):
         xsymb = sympy.var('x')
-        symbas = self._derivs[ci][direc]
-        basis_derivs = sympy.zeros(len(x),len(symbas))
-        for i in range(len(symbas)):
-            for j in range(len(x)):
-                if symbas[i] == 0:  # check for the constant deriv function
-                    basis_derivs[j, i] = 0
+        npts = len(x)
+        nbasis = len(self._basis[ci][direc][0])
+        nblocks = self._nblocks[ci][direc]
+        basis_derivs = sympy.zeros(nblocks,npts,nbasis)
+        for bi in range(nblocks):
+            symbas = self._derivs[ci][direc][bi]
+            for i in range(nbasis):
+                for j in range(npts):
+                    if symbas[i] == 1.0:  # check for the constant basis function
+                        basis_derivs[bi,j, i] = sympy.Rational(1, 1) * 0
                 else:
-                    basis_derivs[j, i] = symbas[i].subs(xsymb, x[j])
+                    basis_derivs[bi,j, i] = symbas[i].subs(xsymb, x[j])
         return basis_derivs
 
-    # NOTE ORDER HERE IS QUADPT, BASIS
     def get_derivs2_exact(self, ci, direc, x):
         xsymb = sympy.var('x')
-        symbas = self._derivs2[ci][direc]
-        basis_derivs2 = sympy.zeros(len(x),len(symbas))
-        for i in range(len(symbas)):
-            for j in range(len(x)):
-                if symbas[i] == 0:  # check for the constant deriv2 function
-                    basis_derivs2[j, i] = 0
+        npts = len(x)
+        nbasis = len(self._basis[ci][direc][0])
+        nblocks = self._nblocks[ci][direc]
+        basis_derivs2 = sympy.zeros(nblocks,npts,nbasis)
+        for bi in range(nblocks):
+            symbas = self._derivs2[ci][direc][bi]
+            for i in range(nbasis):
+                for j in range(npts):
+                    if symbas[i] == 1.0:  # check for the constant basis function
+                        basis_derivs2[bi,j, i] = sympy.Rational(1, 1) * 0
                 else:
-                    basis_derivs2[j, i] = symbas[i].subs(xsymb, x[j])
+                    basis_derivs2[bi,j, i] = symbas[i].subs(xsymb, x[j])
         return basis_derivs2
 
-    # NOTE ORDER HERE IS QUADPT, BASIS
     def get_basis(self, ci, direc, x):
         xsymb = sympy.var('x')
-        symbas = self._basis[ci][direc]
-        basis_funcs = np.zeros((x.shape[0], len(symbas)))
-        for i in range(len(symbas)):
-            if symbas[i] == 1.0:  # check for the constant basis function
-                basis_funcs[:, i] = 1.0
-            else:
-                basis = sympy.lambdify(xsymb, symbas[i], "numpy")
-                basis_funcs[:, i] = np.squeeze(basis(x))
+        npts = x.shape[0]
+        nbasis = len(self._basis[ci][direc][0])
+        nblocks = self._nblocks[ci][direc]
+        basis_funcs = np.zeros((nblocks,npts,nbasis))
+        for bi in range(nblocks):
+            symbas = self._basis[ci][direc][bi] 
+            for i in range(len(symbas)):
+                if symbas[i] == 1.0:  # check for the constant basis function
+                    basis_funcs[bi,:, i] = 1.0
+                else:
+                    basis = sympy.lambdify(xsymb, symbas[i], "numpy")
+                    basis_funcs[bi,:, i] = np.squeeze(basis(x))
         return basis_funcs
 
-    # NOTE ORDER HERE IS QUADPT, BASIS
     def get_derivs(self, ci, direc, x):
         xsymb = sympy.var('x')
-        symbas = self._derivs[ci][direc]
-        basis_derivs = np.zeros((x.shape[0], len(symbas)))
-        for i in range(len(symbas)):
-            if symbas[i] == 0.0:  # check for the constant deriv function
-                basis_derivs[:, i] = 0.0
-            else:
-                deriv = sympy.lambdify(xsymb, symbas[i], "numpy")
-                basis_derivs[:, i] = np.squeeze(deriv(x))
+        npts = x.shape[0]
+        nbasis = len(self._basis[ci][direc][0])
+        nblocks = self._nblocks[ci][direc]
+        basis_derivs = np.zeros((nblocks,npts,nbasis))
+        for bi in range(nblocks):
+            symbas = self._derivs[ci][direc][bi]
+            for i in range(len(symbas)):
+                if symbas[i] == 0.0:  # check for the constant basis function
+                    basis_derivs[bi,:, i] = 0.0
+                else:
+                    deriv = sympy.lambdify(xsymb, symbas[i], "numpy")
+                    basis_derivs[bi,:, i] = np.squeeze(deriv(x))
         return basis_derivs
 
-    # NOTE ORDER HERE IS QUADPT, BASIS
     def get_derivs2(self, ci, direc, x):
         xsymb = sympy.var('x')
-        symbas = self._derivs2[ci][direc]
-        basis_derivs2 = np.zeros((x.shape[0], len(symbas)))
-        for i in range(len(symbas)):
-            if symbas[i] == 0.0:  # check for the constant deriv2 function
-                basis_derivs2[:, i] = 0.0
-            else:
-                deriv2 = sympy.lambdify(xsymb, symbas[i], "numpy")
-                basis_derivs2[:, i] = np.squeeze(deriv2(x))
+        npts = x.shape[0]
+        nbasis = len(self._basis[ci][direc][0])
+        nblocks = self._nblocks[ci][direc]
+        basis_derivs2 = np.zeros((nblocks,npts,nbasis))
+        for bi in range(nblocks):
+            symbas = self._derivs2[ci][direc][bi] 
+            for i in range(len(symbas)):
+                if symbas[i] == 0.0:  # check for the constant basis function
+                    basis_derivs2[bi,:, i] = 0.0
+                else:
+                    deriv2 = sympy.lambdify(xsymb, symbas[i], "numpy")
+                    basis_derivs2[bi,:, i] = np.squeeze(deriv2(x))
         return basis_derivs2
 
     def get_icells(self, ci, direc, ncell, bc, interior_facet):
         elemname = self._elemnamelist[ci][direc]
         degree = self._degreelist[ci][direc]
-        if elemname in ['CG','CQB','CMSE']:  # MIGHT BE WRONG FOR CQB?
+        if elemname in ['CG','CQB','CMSE']:  
             return _CG_interaction_cells(ncell, bc, interior_facet, degree)
-        if elemname in ['DG','DQB','DMSE']:  # MIGHT BE WRONG FOR DQB?
+        if elemname in ['DG','DQB','DMSE']:
             return _DG_interaction_cells(ncell, bc, interior_facet, degree)
-        if elemname == 'CGD':
-            return _CGD_interaction_cells(ncell, bc, interior_facet, degree)
+        if elemname == 'GD':
+            return _GD_interaction_cells(ncell, bc, interior_facet, degree)
         if elemname == 'DGD':
             return _DGD_interaction_cells(ncell, bc, interior_facet, degree)
 
     def swidth(self):
-        #maxdeg = max(max(self._degreelist))
         maxnbasis = max(max(self._nbasis))
-        #maxnodfs = max(max(self._ndofs_per_element))
-        
-        #if self._cont == 'L2':
-        #    maxdeg = maxdeg + 1  # this deals with fact that for pure L2 spaces we have deg +1 ndofs!
-        #PETSc.Sys.Print(self._cont,maxdeg,maxnodfs,maxnbasis)
-        #PETSc.Sys.Print(self._cont,swidth)
-        #PETSc.Sys.Print(self._degreelist)
         return maxnbasis
 
     def get_info(self, ci, direc, x):
@@ -464,16 +472,14 @@ class ThemisElement():
     def get_ncomp(self):
         return self._ncomp
 
-#   LAGRANGE ELEMENTS
+    def get_nblocks(self,ci,direc):
+        return self._nblocks[ci][direc]
 
 
-def _CG_basis(order, spts):
-    xsymb = sympy.var('x')
-    # if spts == None:
-    # spts = gauss_lobatto(order+1)
-# SCALES SPTS TO [0,1]
-    # spts = 0.5 * spts + 0.5
+# Lagrange Elements
 
+def _CG_basis(order, spts, symb = None):
+    xsymb = symb or sympy.var('x')
     symbas = []
     derivs = []
     derivs2 = []
@@ -481,12 +487,11 @@ def _CG_basis(order, spts):
         symbas.append(lagrange_poly_support(i, spts, xsymb))
         derivs.append(sympy.diff(symbas[i]))
         derivs2.append(sympy.diff(sympy.diff(symbas[i])))
+    return [symbas,], [derivs,], [derivs2,], spts
 
-    return symbas, derivs, derivs2, spts
 
-
-def _DG_basis(order, spts):
-    xsymb = sympy.var('x')
+def _DG_basis(order, spts, symb = None):
+    xsymb = symb or sympy.var('x')
     symbas = []
     derivs = []
     derivs2 = []
@@ -500,22 +505,21 @@ def _DG_basis(order, spts):
         symbas.append(sympy.Rational(1, 1))
         derivs.append(sympy.Rational(1, 1) * 0)
         derivs2.append(sympy.Rational(1, 1) * 0)
-
-    return symbas, derivs, derivs2, spts
+    return [symbas,], [derivs,], [derivs2,], spts
 
 
 def _CG_offset_info(order):
     offsets = np.arange(0, order+1, dtype=np.int32)
     offset_multiplier = order * np.ones(offsets.shape, dtype=np.int32)
     # 'p*i','p*i+1'...'p*i+p'
-    return offsets, offset_multiplier
+    return np.expand_dims(offsets,axis=0), np.expand_dims(offset_multiplier,axis=0)
 
 
 def _DG_offset_info(order):
     offsets = np.arange(0, order+1, dtype=np.int32)
     offset_multiplier = (order+1) * np.ones(offsets.shape, dtype=np.int32)
     # 'p*i','p*i+1'...'p*i+p'
-    return offsets, offset_multiplier
+    return np.expand_dims(offsets,axis=0), np.expand_dims(offset_multiplier,axis=0)
 
 
 def _CG_interaction_cells(ncell, bc, interior_facet, order):
@@ -557,9 +561,8 @@ def _DG_interaction_cells(ncell, bc, interior_facet, order):
 
 #  MGD ELEMENTS
 
-
-def _CGD_basis(order):
-    xsymb = sympy.var('x')
+def _GD_basis(order, symb = None):
+    xsymb = symb or sympy.var('x')
     symbas = []
     derivs = []
     derivs2 = []
@@ -573,127 +576,210 @@ def _CGD_basis(order):
         symbas.append(basis)
         derivs.append(sympy.diff(basis))
         derivs2.append(sympy.diff(sympy.diff(basis)))
-
-    return symbas, derivs, derivs2, spts
-
-
-def _DGD_basis(order):
-    xsymb = sympy.var('x')
-    symbas = []
-    derivs = []
-    derivs2 = []
-    cg_symbas = []
-
-    a = 2
-    b = -(order+1)
-    p = a * np.arange(order+2) + b
-    p = sympy.Rational(1,2) * p + sympy.Rational(1,2)
-    spts = [sympy.Rational(1,2), ]
     
-    if order >=1:
-        for i in range(0, order+2):
-            cg_symbas.append(lagrange_poly_support(i, p, xsymb))
-
-        symbas.append(sympy.diff(-cg_symbas[0]))
-        derivs.append(sympy.diff(symbas[0]))
-        derivs2.append(sympy.diff(sympy.diff(symbas[0])))
-        for i in range(1, order+1):
-            dN = sympy.diff(cg_symbas[i])
-            basis = symbas[i-1] - dN
-            symbas.append(basis)
-            derivs.append(sympy.diff(basis))
-            derivs2.append(sympy.diff(sympy.diff(basis)))
-
+    # do a linear combination of basis functions here for blocks near the boundary, based on extrapolation formulas
+    # phihat0 = phi0 + 4 phi-1
+    # phihat1 = phi1 - 6 phi-1
+    # phihat2 = phi2 + 4 phi-1
+    # phihat3 = phi3 - phi-1
+    # phihatN = phiN + 4 phiN+1
+    # phihatN-1 = phiN-1 - 6 phiN+1
+    # phihatN-2 = phiN-2 + 4 phiN+1
+    # phihatN-3 = phiN-3 - phiN+1 
+    if order == 3:
+        symbasleft = []
+        symbasright = []
+        # permutation patterns here take into account offsets
+        symbasleft.append(symbas[1] + 4 * symbas[0])
+        symbasleft.append(symbas[2] - 6 * symbas[0])
+        symbasleft.append(symbas[3] + 4 * symbas[0])
+        symbasleft.append(0         - 1 * symbas[0])
+        symbasright.append(0         - 1 * symbas[3])
+        symbasright.append(symbas[0] + 4 * symbas[3])
+        symbasright.append(symbas[1] - 6 * symbas[3])
+        symbasright.append(symbas[2] + 4 * symbas[3])
+        derivsleft = []
+        derivsright = []
+        derivs2left = []
+        derivs2right = []
+        for i in range(len(symbas)):
+            derivsleft.append(sympy.diff(symbasleft[i]))
+            derivsright.append(sympy.diff(symbasright[i]))
+            derivs2left.append(sympy.diff(sympy.diff(symbasleft[i])))
+            derivs2right.append(sympy.diff(sympy.diff(symbasright[i])))
+        return [symbasleft,symbas,symbasright], [derivsleft,derivs,derivsright], [derivs2left,derivs2,derivs2right], spts
+# ADD SUPPORT HERE FOR MORE GENERAL FORMULAS...
     else:
-        symbas.append(sympy.Rational(1, 1))
-        derivs.append(sympy.Rational(1, 1) * 0)
-        derivs2.append(sympy.Rational(1, 1) * 0)
-        
-    return symbas, derivs, derivs2, spts
+        return [symbas]*order, [derivs]*order, [derivs2]*order, spts
+
+# uses the formulas from Hiemstra et. al 2014 to create a compatible DG basis from a given CG basis
+def create_compatible_basis(cg_symbas):
+        nblocks = len(cg_symbas)
+        ncg_basis = len(cg_symbas[0])
+        symbas = []
+        derivs = []
+        derivs2 = []
+        for bi in range(nblocks):
+            symbas.append([])
+            derivs.append([])
+            derivs2.append([])
+            for i in range(1,ncg_basis):
+                basis = 0
+                for j in range(i):
+                    basis = basis + sympy.diff(-cg_symbas[bi][j])
+                symbas[bi].append(basis)
+                derivs[bi].append(sympy.diff(basis))
+                derivs2[bi].append(sympy.diff(sympy.diff(basis)))
+        return symbas,derivs,derivs2
+
+def _DGD_basis(order, symb = None):
+    xsymb = symb or sympy.var('x')
+    spts = [sympy.Rational(1,2),]
+    if order >=1:
+        cg_symbas,_,_,_ = _GD_basis(order+1,symb=xsymb)
+        symbas,derivs,derivs2 = create_compatible_basis(cg_symbas)
+    else:
+        symbas = [[sympy.Rational(1, 1),],]
+        derivs = [[sympy.Rational(1, 1) * 0,],]
+        derivs2 = [[sympy.Rational(1, 1) * 0,],]
+    return symbas,derivs,derivs2,spts
 
 
-def _CGD_offset_info(order):
+def _GD_offset_info(order):
     offsets = np.arange(-(order-1)//2, (order-1)//2+2, 1, dtype=np.int32)
     offset_multiplier = np.ones(offsets.shape, dtype=np.int32)
-    return offsets, offset_multiplier
-
+    expanded_offset_multiplier = np.reshape(np.tile(offset_multiplier,order),(order,offset_multiplier.shape[0]))
+    M = (order-1)//2 # nblocks = order
+    expanded_offsets = np.zeros((order,offsets.shape[0]),dtype=np.int32)
+    k = 0
+    for i in range(M,-(M+1),-1):
+        expanded_offsets[k,:] = offsets + i
+        k = k + 1
+    #print('GD',expanded_offsets)
+    return expanded_offsets, expanded_offset_multiplier
 
 def _DGD_offset_info(order):
     offsets = np.arange(-(order)//2, (order)/2+1, 1, dtype=np.int32)
     offset_multiplier = np.ones(offsets.shape, dtype=np.int32)
-    return offsets, offset_multiplier
+    expanded_offset_multiplier = np.reshape(np.tile(offset_multiplier,order+1),(order+1,offset_multiplier.shape[0]))
+    M = order//2 # nblocks = order + 1
+    expanded_offsets = np.zeros((order+1,offsets.shape[0]),dtype=np.int32)  
+    k = 0
+    for i in range(M,-(M+1),-1):
+        expanded_offsets[k,:] = offsets + i
+        k = k + 1
+    #print('DGD',expanded_offsets)
+    return expanded_offsets, expanded_offset_multiplier
 
-# ADD FACET INTEGRAL STUFF
-
-
-def _CGD_interaction_cells(ncell, bc, interior_facet, order):
+# CORRECT FACET INTEGRAL STUFF??
+def _GD_interaction_cells(ncell, bc, interior_facet, order):
     if bc == 'periodic':
         off = 0
     else:
         off = 1
-    leftmost = -(order-1)//2-1
-    rightmost = (order-1)//2
-    if interior_facet:
-        leftmost = leftmost - 1
-        rightmost = rightmost + 1
-    interaction_offsets = np.array([leftmost, rightmost], dtype=np.int32)
     interaction_cells = np.zeros((ncell+off, 2), dtype=np.int32)
     ilist = np.arange(0, interaction_cells.shape[0])
-    interaction_cells[:, :] = np.expand_dims(ilist, axis=1) + np.expand_dims(interaction_offsets, axis=0)
-    #print('cgd',interaction_cells)
+    if order == 3 and bc == 'nonperiodic':
+        interaction_cells[0,:] = np.array([0,1],dtype=np.int32)
+        interaction_cells[1,:] = np.array([-1,1],dtype=np.int32)
+        interaction_cells[2,:] = np.array([-2,1],dtype=np.int32)
+        interaction_cells[3,:] = np.array([-3,1],dtype=np.int32)
+        interaction_cells[4:ncell+off-4,:] = np.array([-2,1],dtype=np.int32)
+        interaction_cells[ncell+off-4,:] = np.array([-2,2],dtype=np.int32)
+        interaction_cells[ncell+off-3,:] = np.array([-2,1],dtype=np.int32)
+        interaction_cells[ncell+off-2,:] = np.array([-2,0],dtype=np.int32)
+        interaction_cells[ncell+off-1,:] = np.array([-2,-1],dtype=np.int32)
+        interaction_cells = interaction_cells + np.expand_dims(ilist,axis=1)
+        # FACET INTEGRAL STUFF?        
+    else:
+        leftmost = -(order-1)//2-1
+        rightmost = (order-1)//2
+        if interior_facet: # IS THIS CORRECT?
+            leftmost = leftmost - 1
+            rightmost = rightmost + 1
+        interaction_offsets = np.array([leftmost, rightmost], dtype=np.int32)
+        interaction_cells[:, :] = np.expand_dims(ilist, axis=1) + np.expand_dims(interaction_offsets, axis=0)
     return interaction_cells
 
-# ADD FACET INTEGRAL STUFF
-
-
+# CORRECT FACET INTEGRAL STUFF??
 def _DGD_interaction_cells(ncell, bc, interior_facet, order):
-
-    leftmost = -(order-1)//2
-    rightmost = (order-1)//2+1 #ADDED 1 HERE
-    if interior_facet:
-        leftmost = leftmost - 1
-        rightmost = rightmost + 1
-    interaction_offsets = np.array([leftmost, rightmost], dtype=np.int32)
     interaction_cells = np.zeros((ncell, 2), dtype=np.int32)
     ilist = np.arange(0, interaction_cells.shape[0])
-    interaction_cells[:, :] = np.expand_dims(ilist, axis=1) + np.expand_dims(interaction_offsets, axis=0)
-    #print('dgd',interaction_cells)
+    if order == 2 and bc == 'nonperiodic':
+        interaction_cells[0,:] = np.array([0,1],dtype=np.int32)
+        interaction_cells[1,:] = np.array([-1,1],dtype=np.int32)
+        interaction_cells[2,:] = np.array([-2,1],dtype=np.int32)
+        interaction_cells[3:ncell-3,:] = np.array([-1,1],dtype=np.int32)
+        interaction_cells[ncell-3,:] = np.array([-1,2],dtype=np.int32)
+        interaction_cells[ncell-2,:] = np.array([-1,1],dtype=np.int32)
+        interaction_cells[ncell-1,:] = np.array([-1,0],dtype=np.int32)
+        interaction_cells = interaction_cells + np.expand_dims(ilist,axis=1)
+        # FACET INTEGRAL STUFF?                
+    else:
+        leftmost = -(order-1)//2
+        rightmost = (order-1)//2+1
+        if interior_facet:
+            leftmost = leftmost - 1
+            rightmost = rightmost + 1
+        interaction_offsets = np.array([leftmost, rightmost], dtype=np.int32)
+        interaction_cells[:, :] = np.expand_dims(ilist, axis=1) + np.expand_dims(interaction_offsets, axis=0)
+        #print('dgd',interaction_cells)
     return interaction_cells
 
 
 # QB ELEMENTS
 
 
-def _CQB_basis(order):
-    pass
+def bernstein_polys(n,var):
+	'''Returns the n+1 bernstein basis polynomials of degree n (n>=1) on [-1,1]'''
+	#if n==0:
+	#	return [1/2.,]
+	polys = []
+	#b = 1
+	#a = -1
+	# t = sympy.var('t')
+	for v in range(0,n+1):
+		coeff = sympy.binomial(n,v)
+		basisfunc = coeff * (1 - var)**(n-v) * var**v
+		# basisfunc = basisfunc.subs(t,(var-a)/(b-a))
+		polys.append(basisfunc)
+	return polys
+    
+# HOW SHOULD SPTS BE HANDLED HERE?
+# NOT EVEN REALLY SURE IT MAKES SENSE...
+def _CQB_basis(order, symb= None):
+    xsymb = symb or sympy.var('x')
+    symbas =  bernstein_polys(order,xsymb)
+    derivs = []
+    derivs2 = []
+    for i in range(len(symbas)):
+        derivs.append(sympy.diff(symbas[i]))
+        derivs2.append(sympy.diff(sympy.diff(symbas[i])))
+    return [symbas,],[derivs,],[derivs2,],None
 
-
-def _DQB_basis(order):
-    pass
-
-# I THINK THESE ARE THE SAME AS CG/DG...BUT MAYBE INTERACTION CELLS IS DIFFERENT?
-
-
-def _CQB_offset_info(order):
-    pass
-
-
-def _DQB_offset_info(order):
-    pass
-
-
-def _CQB_interaction_cells(ncell, bc, interior_facet, order):
-    pass
-
-
-def _DQB_interaction_cells(ncell, bc, interior_facet, order):
-    pass
+def _DQB_basis(order, symb= None):
+    xsymb = symb or sympy.var('x')
+    spts = None
+    if order >=1:
+        cg_symbas,_,_,_ = _CQB_basis(order+1,symb=xsymb)
+        symbas,derivs,derivs2 = create_compatible_basis(cg_symbas)
+    else:
+        symbas = [[sympy.Rational(1, 1),],]
+        derivs = [[sympy.Rational(1, 1) * 0,],]
+        derivs2 = [[sympy.Rational(1, 1) * 0,],]
+    return symbas,derivs,derivs2,spts
 
 # MSE ELEMENTS
-
-
 _CMSE_basis = _CG_basis
 
-
-def _DMSE_basis(order, spts=None):
-    pass
+# Careful here, spts argument is actually those used for the CG space!
+def _DMSE_basis(order, spts, symb= None):
+    xsymb = symb or sympy.var('x')
+    if order >=1:
+        cg_symbas,_,_,_ = _CMSE_basis(order+1,spts,symb=xsymb)
+        symbas,derivs,derivs2 = create_compatible_basis(cg_symbas)
+    else:
+        symbas = [[sympy.Rational(1, 1),],]
+        derivs = [[sympy.Rational(1, 1) * 0,],]
+        derivs2 = [[sympy.Rational(1, 1) * 0,],]
+    return symbas,derivs,derivs2,spts

@@ -202,10 +202,10 @@ class SingleBlockMesh(Mesh):
         cell_da.setSizes(nxs)
         cell_da.setBoundaryType(self._blist)
         cell_da.setStencil(PETSc.DMDA.StencilType.BOX, 1)
-        if not procsizes == None:
+        if not (procsizes == None):
             cell_da.setProcSizes(procsizes)
         cell_da.setUp()
-
+        
         # print self.cell_da.getProcSizes()
         edgex_da = PETSc.DMDA().create(dim=self.ndim, dof=1, sizes=edgex_nxs, proc_sizes=cell_da.getProcSizes(), boundary_type=self._blist, stencil_type=PETSc.DMDA.StencilType.BOX, stencil_width=1, setup=False)
         # THIS IS AN UGLY HACK NEEDED BECAUSE OWNERSHIP RANGES ARGUMENT TO petc4py DMDA_CREATE is BROKEN

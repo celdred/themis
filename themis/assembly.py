@@ -212,6 +212,7 @@ def compile_functional(kernel, tspace, sspace, mesh):
             assembly_routine = generate_evaluate_routine(mesh, kernel)
         else:
             assembly_routine = generate_assembly_routine(mesh, tspace, sspace, kernel)
+            #print(assembly_routine)
         assembly_function = CompiledKernel(assembly_routine, "assemble", cppargs=["-O3"], argtypes=argtypeslist, restype=restype)
         kernel.assemblyfunc_list.append(assembly_function)
 
@@ -384,6 +385,12 @@ def AssembleOneForm(veclist, space, kernel):
         #print('assembled-1',time.time()-time1)
 
 
+def compute_bi(i,xmax,M,NB):
+    if (i<M): bi = i
+    if ((i>=M) and (i<xmax-M)): bi = M
+    if (i>=xmax-M): bi = NB - (xmax - i)
+    return bi
+    
 def compute_1d_bounds(ci1, ci2, i, elem1, elem2, ncell, ndofs, interior_facet, bc, ranges1, ranges2):
     dnnz = np.zeros((ndofs), dtype=np.int32)
     nnz = np.zeros((ndofs), dtype=np.int32)
@@ -394,15 +401,24 @@ def compute_1d_bounds(ci1, ci2, i, elem1, elem2, ncell, ndofs, interior_facet, b
     icells = elem1.get_icells(ci1, i, ncell, bc, interior_facet)
     leftmost_offsets, leftmost_offsetmult = elem2.get_offsets(ci2, i)
     rightmost_offsets, rightmost_offsetmult = elem2.get_offsets(ci2, i)
-
+    
     leftmostcells = icells[:, 0]
     rightmostcells = icells[:, 1]
 
+    NB = elem2.get_nblocks(ci2,i)
+    M = (NB-1)//2
+    #print(icells,NB,M)
+    #if bc == 'periodic' or NB == 1:
+    bileft = 0
+    biright = 0
     for i in range(ranges1[0], ranges1[1]):
         leftmostcell = leftmostcells[i]
         rightmostcell = rightmostcells[i]
-        leftbound = leftmost_offsets[0] + leftmostcell * leftmost_offsetmult[0]
-        rightbound = rightmost_offsets[-1] + rightmostcell * rightmost_offsetmult[-1]
+        if bc == 'nonperiodic' and NB > 1:
+            bileft = compute_bi(leftmostcell,ncell,M,NB)
+            biright = compute_bi(rightmostcell,ncell,M,NB)
+        leftbound = leftmost_offsets[bileft][0] + leftmostcell * leftmost_offsetmult[bileft][0]
+        rightbound = rightmost_offsets[biright][-1] + rightmostcell * rightmost_offsetmult[biright][-1]
         nnz[i-ranges1[0]] = rightbound - leftbound + 1  # this is the total size
         dnnz[i-ranges1[0]] = py_clip(rightbound, ranges2[0], ranges2[1]-1) - py_clip(leftbound, ranges2[0], ranges2[1]-1) + 1
     return dnnz, nnz
@@ -479,16 +495,19 @@ def two_form_preallocate_opt(mesh, space1, space2, ci1, ci2, interior_x, interio
 # Mostly intended for applications that want to use Themis/UFL to handle the creation and assembly of a PETSc matrix, and then do something with it
 # Doesn't interact with solver stuff, although this might be subject to change at some point
 
+#EVENTUALLY ALSO ADD 1-FORM ASSEMBLY HERE
+#THIS WILL BE VERY USEFUL FOR MASS-LUMPED VARIANTS IE FULLY EXPLICIT TIME STEPPING WITHOUT LINEAR SOLVES...
+
 def assemble(f, bcs=None, form_compiler_parameters=None, mat_type='aij'):
     import ufl
     from solver import _extract_bcs
     from form import TwoForm
 
     if not isinstance(f, ufl.Form):
-        raise TypeError("Provided 2-Form is a '%s', not a Form" % type(f).__name__)
+        raise TypeError("Provided f is a '%s', not a Form" % type(f).__name__)
 
     if len(f.arguments()) != 2:
-        raise ValueError("Provided 2-Form is not a bilinear form")
+        raise ValueError("Provided f is not a bilinear form")
 
     bcs = _extract_bcs(bcs)
 

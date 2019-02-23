@@ -41,15 +41,15 @@
 {%macro SETVALS(ci,cell) -%}
 
 {% if cell == 1 %}
- #define kk	(k1cell * offset_mult1_z_{{ ci }}[lz] + offsets1_z_{{ ci }}[lz])
- #define jj (j1cell * offset_mult1_y_{{ ci }}[ly] + offsets1_y_{{ ci }}[ly])
- #define ii (i1cell * offset_mult1_x_{{ ci }}[lx] + offsets1_x_{{ ci }}[lx])
+ #define kk	(k1cell * offset_mult1_z_{{ ci }}[bi1_1_z_{{ci}}][lz] + offsets1_z_{{ ci }}[bi1_1_z_{{ci}}][lz])
+ #define jj (j1cell * offset_mult1_y_{{ ci }}[bi1_1_y_{{ci}}][ly] + offsets1_y_{{ ci }}[bi1_1_y_{{ci}}][ly])
+ #define ii (i1cell * offset_mult1_x_{{ ci }}[bi1_1_x_{{ci}}][lx] + offsets1_x_{{ ci }}[bi1_1_x_{{ci}}][lx])
  #define vals vals1_{{ ci }}
  {% endif %}
  {% if cell == 2 %}
- #define kk	(k2cell * offset_mult1_z_{{ ci }}[lz] + offsets1_z_{{ ci }}[lz])
- #define jj (j2cell * offset_mult1_y_{{ ci }}[ly] + offsets1_y_{{ ci }}[ly])
- #define ii (i2cell * offset_mult1_x_{{ ci }}[lx] + offsets1_x_{{ ci }}[lx])
+ #define kk	(k2cell * offset_mult1_z_{{ ci }}[bi2_1_z_{{ci}}][lz] + offsets1_z_{{ ci }}[bi2_1_z_{{ci}}][lz])
+ #define jj (j2cell * offset_mult1_y_{{ ci }}[bi2_1_y_{{ci}}][ly] + offsets1_y_{{ ci }}[bi2_1_y_{{ci}}][ly])
+ #define ii (i2cell * offset_mult1_x_{{ ci }}[bi2_1_x_{{ci}}][lx] + offsets1_x_{{ ci }}[bi2_1_x_{{ci}}][lx])
   #define vals vals2_{{ ci }}
  {% endif %}
 for (lx=0;lx<{{ nbasis1_x[ci] }};lx++) {
@@ -169,35 +169,52 @@ PetscScalar assemble(DM da {{ fieldargs }} {{ constantargs }})
 
  {% if formdim == 2 %}
   {% for ci2 in range(nci2) %}
-const   PetscInt offsets2_x_{{ ci2 }}[{{ nbasis2_x[ci2] }}] = {{ offsets2_x[ci2] }};
-const   PetscInt offsets2_y_{{ ci2 }}[{{ nbasis2_y[ci2] }}] = {{ offsets2_y[ci2] }};
-const   PetscInt offsets2_z_{{ ci2 }}[{{ nbasis2_z[ci2] }}] = {{ offsets2_z[ci2] }};
-const   PetscInt offset_mult2_x_{{ ci2 }}[{{ nbasis2_x[ci2] }}] = {{ offset_mult2_x[ci2] }};
-const   PetscInt offset_mult2_y_{{ ci2 }}[{{ nbasis2_y[ci2] }}] = {{ offset_mult2_y[ci2] }};
-const   PetscInt offset_mult2_z_{{ ci2 }}[{{ nbasis2_z[ci2] }}] = {{ offset_mult2_z[ci2] }};
+const   PetscInt offsets2_x_{{ ci2 }}[{{ nblocks2_x[ci2] }}][{{ nbasis2_x[ci2] }}] = {{ offsets2_x[ci2] }};
+const   PetscInt offsets2_y_{{ ci2 }}[{{ nblocks2_y[ci2] }}][{{ nbasis2_y[ci2] }}] = {{ offsets2_y[ci2] }};
+const   PetscInt offsets2_z_{{ ci2 }}[{{ nblocks2_z[ci2] }}][{{ nbasis2_z[ci2] }}] = {{ offsets2_z[ci2] }};
+const   PetscInt offset_mult2_x_{{ ci2 }}[{{ nblocks2_x[ci2] }}][{{ nbasis2_x[ci2] }}] = {{ offset_mult2_x[ci2] }};
+const   PetscInt offset_mult2_y_{{ ci2 }}[{{ nblocks2_y[ci2] }}][{{ nbasis2_y[ci2] }}] = {{ offset_mult2_y[ci2] }};
+const   PetscInt offset_mult2_z_{{ ci2 }}[{{ nblocks2_z[ci2] }}][{{ nbasis2_z[ci2] }}] = {{ offset_mult2_z[ci2] }};
+   PetscInt bi1_2_x_{{ ci2 }} = -1000;
+   PetscInt bi1_2_y_{{ ci2 }} = -1000;
+   PetscInt bi1_2_z_{{ ci2 }} = -1000;
+   PetscInt bi2_2_x_{{ ci2 }} = -1000;
+   PetscInt bi2_2_y_{{ ci2 }} = -1000;
+   PetscInt bi2_2_z_{{ ci2 }} = -1000;
   {% endfor %}
   {% endif %}
  {% if formdim >= 1 %}
  {% for ci1 in range(nci1) %}
-const   PetscInt offsets1_x_{{ ci1 }}[{{ nbasis1_x[ci1] }}] = {{ offsets1_x[ci1] }};
-const   PetscInt offsets1_y_{{ ci1 }}[{{ nbasis1_y[ci1] }}] = {{ offsets1_y[ci1] }};
-const   PetscInt offsets1_z_{{ ci1 }}[{{ nbasis1_z[ci1] }}] = {{ offsets1_z[ci1] }};
-const   PetscInt offset_mult1_x_{{ ci1 }}[{{ nbasis1_x[ci1] }}] = {{ offset_mult1_x[ci1] }};
-const   PetscInt offset_mult1_y_{{ ci1 }}[{{ nbasis1_y[ci1] }}] = {{ offset_mult1_y[ci1] }};
-const   PetscInt offset_mult1_z_{{ ci1 }}[{{ nbasis1_z[ci1] }}] = {{ offset_mult1_z[ci1] }};
+const   PetscInt offsets1_x_{{ ci1 }}[{{ nblocks1_x[ci1] }}][{{ nbasis1_x[ci1] }}] = {{ offsets1_x[ci1] }};
+const   PetscInt offsets1_y_{{ ci1 }}[{{ nblocks1_y[ci1] }}][{{ nbasis1_y[ci1] }}] = {{ offsets1_y[ci1] }};
+const   PetscInt offsets1_z_{{ ci1 }}[{{ nblocks1_z[ci1] }}][{{ nbasis1_z[ci1] }}] = {{ offsets1_z[ci1] }};
+const   PetscInt offset_mult1_x_{{ ci1 }}[{{ nblocks1_x[ci1] }}][{{ nbasis1_x[ci1] }}] = {{ offset_mult1_x[ci1] }};
+const   PetscInt offset_mult1_y_{{ ci1 }}[{{ nblocks1_y[ci1] }}][{{ nbasis1_y[ci1] }}] = {{ offset_mult1_y[ci1] }};
+const   PetscInt offset_mult1_z_{{ ci1 }}[{{ nblocks1_z[ci1] }}][{{ nbasis1_z[ci1] }}] = {{ offset_mult1_z[ci1] }};
+   PetscInt bi1_1_x_{{ ci1 }} = -1000;
+   PetscInt bi1_1_y_{{ ci1 }} = -1000;
+   PetscInt bi1_1_z_{{ ci1 }} = -1000;
+   PetscInt bi2_1_x_{{ ci1 }} = -1000;
+   PetscInt bi2_1_y_{{ ci1 }} = -1000;
+   PetscInt bi2_1_z_{{ ci1 }} = -1000;
   {% endfor %}
   {% endif %}
 
  {% for field in fieldlist %}
  PetscScalar	{{field.name}}_vals[{{ field.nbasis_total }} * 2][{{ field.ndofs }}] = { { 0.,},};
  {% for k in range(field.ncomp) %}
-const   PetscInt {{field.name}}_{{k}}_offsets_x[{{ field.nbasis_x[k] }}] = {{ field.offsets_x[k] }};
-const   PetscInt {{field.name}}_{{k}}_offsets_y[{{ field.nbasis_y[k] }}] = {{ field.offsets_y[k] }};
-const   PetscInt {{field.name}}_{{k}}_offsets_z[{{ field.nbasis_z[k] }}] = {{ field.offsets_z[k] }};
-const   PetscInt {{field.name}}_{{k}}_offset_mult_x[{{ field.nbasis_x[k] }}] = {{ field.offset_mult_x[k] }};
-const   PetscInt {{field.name}}_{{k}}_offset_mult_y[{{ field.nbasis_y[k] }}] = {{ field.offset_mult_y[k] }};
-const   PetscInt {{field.name}}_{{k}}_offset_mult_z[{{ field.nbasis_z[k] }}] = {{ field.offset_mult_z[k] }};
-
+const   PetscInt {{field.name}}_{{k}}_offsets_x[{{ field.nblocks_x[k] }}][{{ field.nbasis_x[k] }}] = {{ field.offsets_x[k] }};
+const   PetscInt {{field.name}}_{{k}}_offsets_y[{{ field.nblocks_y[k] }}][{{ field.nbasis_y[k] }}] = {{ field.offsets_y[k] }};
+const   PetscInt {{field.name}}_{{k}}_offsets_z[{{ field.nblocks_z[k] }}][{{ field.nbasis_z[k] }}] = {{ field.offsets_z[k] }};
+const   PetscInt {{field.name}}_{{k}}_offset_mult_x[{{ field.nblocks_x[k] }}][{{ field.nbasis_x[k] }}] = {{ field.offset_mult_x[k] }};
+const   PetscInt {{field.name}}_{{k}}_offset_mult_y[{{ field.nblocks_y[k] }}][{{ field.nbasis_y[k] }}] = {{ field.offset_mult_y[k] }};
+const   PetscInt {{field.name}}_{{k}}_offset_mult_z[{{ field.nblocks_z[k] }}][{{ field.nbasis_z[k] }}] = {{ field.offset_mult_z[k] }};
+   PetscInt bi1_{{field.name}}_x_{{k}} = -1000;
+   PetscInt bi1_{{field.name}}_y_{{k}} = -1000;
+   PetscInt bi1_{{field.name}}_z_{{k}} = -1000;
+   PetscInt bi2_{{field.name}}_x_{{k}} = -1000;
+   PetscInt bi2_{{field.name}}_y_{{k}} = -1000;
+   PetscInt bi2_{{field.name}}_z_{{k}} = -1000;
 #define {{field.name}}_{{k}}_indices [fieldoffset + lz + {{  field.nbasis_z[k]  }} * (ly + {{ field.nbasis_y[k]  }} * lx)][d]
 
  {% if ndim == 1 %}
@@ -213,7 +230,17 @@ const   PetscInt {{field.name}}_{{k}}_offset_mult_z[{{ field.nbasis_z[k] }}] = {
   {% endfor %}
 
  {% for tabulation in tabulations %}
- const   PetscScalar {{ tabulation.name }}[{{ tabulation.npts }}][{{ tabulation.nbasis }}] = {{ tabulation.values }};
+ const   PetscScalar {{ tabulation.name }}[{{ tabulation.nblocks }}][{{ tabulation.npts }}][{{ tabulation.nbasis }}] = {{ tabulation.values }};
+//FIX THIS- TAKE INTO ACCOUNT RESTRICTIONS AS WELL?
+  {% if tabulation.shiftaxis == 0 %}
+ PetscInt bi_{{ tabulation.name }}_x_0 = -1000;
+     {% endif %}
+ {% if tabulation.shiftaxis == 1 %}
+ PetscInt bi_{{ tabulation.name }}_y_0 = -1000;
+     {% endif %}
+      {% if tabulation.shiftaxis == 2 %}
+ PetscInt bi_{{ tabulation.name }}_z_0 = -1000;
+     {% endif %}
  {% endfor %}
  
 	//*************************************//	
@@ -385,20 +412,29 @@ if (upper_boundary == 1) zs = zs+zm-1; zm = 1;
 	{% endif %}
 {% endif %}
 
-//printf(" {{ facet_type }} %i\n",{{ facet_direc }});
-//printf(" {{ bcs[0] }} {{ bcs[1] }} {{ facet_exterior_boundary }} \n");
-//printf("%i %i %i %i : %i %i\n",xs,xm,ys,ym,lower_boundary,upper_boundary);
-//printf("{{ kernelstr == '' }} \n");
-
-
+ {% from 'setblocks.template' import SET_PERIODIC_OTHER with context %}
+ {% from 'setblocks.template' import SET_NONPERIODIC_X_OTHER with context %}
+ {% from 'setblocks.template' import SET_NONPERIODIC_Y_OTHER with context %}
+ {% from 'setblocks.template' import SET_NONPERIODIC_Z_OTHER with context %}
+ {% from 'setblocks.template' import SET_PERIODIC_FIELDS with context %}
+ {% from 'setblocks.template' import SET_NONPERIODIC_X_FIELDS with context %}
+ {% from 'setblocks.template' import SET_NONPERIODIC_Y_FIELDS with context %}
+ {% from 'setblocks.template' import SET_NONPERIODIC_Z_FIELDS with context %}
+ 
+ // THESE ARE WRONG- NEED TO FIGURE OUT WHICH CELL WE ARE USING!
+ {{ SET_PERIODIC_OTHER() }}
+{{ SET_PERIODIC_FIELDS() }}
 //loop over edges
 for (k=zs; k<zs+zm; k++) {
+	{{ SET_NONPERIODIC_Z_OTHER() }}
+	{{ SET_NONPERIODIC_Z_FIELDS() }}
    for (j=ys; j<ys+ym; j++) {
+	   {{ SET_NONPERIODIC_Y_OTHER() }}
+	   {{ SET_NONPERIODIC_Y_FIELDS() }}
       for (i=xs; i<xs+xm; i++) {
-		
-			//*************************************//		
-		//printf("%i %i %i\n",i,j,k);
-		//compute rows and cols
+		{{ SET_NONPERIODIC_X_OTHER() }}
+		{{ SET_NONPERIODIC_X_FIELDS() }}
+
 
 		 {% if formdim == 2 %}
 	{% if facet_type == 'interior' or facet_exterior_boundary == 'upper' %}
@@ -407,9 +443,9 @@ for (k=zs; k<zs+zm; k++) {
 		for (lx=0;lx<{{ nbasis1_x[ci1] }};lx++) {
 		for (ly=0;ly<{{ nbasis1_y[ci1] }};ly++) {
 		for (lz=0;lz<{{ nbasis1_z[ci1] }};lz++) {
-			icoord = i1cell * offset_mult1_x_{{ ci1 }}[lx] + offsets1_x_{{ ci1 }}[lx] - x1s_{{ ci1 }};
-			jcoord = j1cell * offset_mult1_y_{{ ci1 }}[ly] + offsets1_y_{{ ci1 }}[ly] - y1s_{{ ci1 }};
-			kcoord = k1cell * offset_mult1_z_{{ ci1 }}[lz] + offsets1_z_{{ ci1 }}[lz] - z1s_{{ ci1 }};
+			icoord = i1cell * offset_mult1_x_{{ ci1 }}[bi1_1_x_{{ ci1 }}][lx] + offsets1_x_{{ ci1 }}[bi1_1_x_{{ ci1 }}][lx] - x1s_{{ ci1 }};
+			jcoord = j1cell * offset_mult1_y_{{ ci1 }}[bi1_1_y_{{ ci1 }}][ly] + offsets1_y_{{ ci1 }}[bi1_1_y_{{ ci1 }}][ly] - y1s_{{ ci1 }};
+			kcoord = k1cell * offset_mult1_z_{{ ci1 }}[bi1_1_z_{{ ci1 }}][lz] + offsets1_z_{{ ci1 }}[bi1_1_z_{{ ci1 }}][lz] - z1s_{{ ci1 }};
 			rows1_{{ ci1 }} s1_{{ci1}}_indices =  icoord + x1m_{{ ci1 }}*(jcoord + y1m_{{ ci1 }}*kcoord);
 		}}}
       {% endfor %}
@@ -418,9 +454,9 @@ for (k=zs; k<zs+zm; k++) {
 		for (lx=0;lx<{{ nbasis2_x[ci2] }};lx++) {
 		for (ly=0;ly<{{ nbasis2_y[ci2] }};ly++) {
 		for (lz=0;lz<{{ nbasis2_z[ci2] }};lz++) {
-			icoord = i1cell * offset_mult2_x_{{ ci2 }}[lx] + offsets2_x_{{ ci2 }}[lx] - x2s_{{ ci2 }};
-			jcoord = j1cell * offset_mult2_y_{{ ci2 }}[ly] + offsets2_y_{{ ci2 }}[ly] - y2s_{{ ci2 }};
-			kcoord = k1cell * offset_mult2_z_{{ ci2 }}[lz] + offsets2_z_{{ ci2 }}[lz] - z2s_{{ ci2 }};
+			icoord = i1cell * offset_mult2_x_{{ ci2 }}[bi1_2_x_{{ ci2 }}][lx] + offsets2_x_{{ ci2 }}[bi1_2_x_{{ ci2 }}][lx] - x2s_{{ ci2 }};
+			jcoord = j1cell * offset_mult2_y_{{ ci2 }}[bi1_2_y_{{ ci2 }}][ly] + offsets2_y_{{ ci2 }}[bi1_2_y_{{ ci2 }}][ly] - y2s_{{ ci2 }};
+			kcoord = k1cell * offset_mult2_z_{{ ci2 }}[bi1_2_z_{{ ci2 }}][lz] + offsets2_z_{{ ci2 }}[bi1_2_z_{{ ci2 }}][lz] - z2s_{{ ci2 }};
 			cols1_{{ ci2 }} s2_{{ci2}}_indices =  icoord + x2m_{{ ci2 }}*(jcoord + y2m_{{ ci2 }}*kcoord);
 		}}}
 	 {% endfor %}
@@ -432,9 +468,9 @@ for (k=zs; k<zs+zm; k++) {
 		for (lx=0;lx<{{ nbasis1_x[ci1] }};lx++) {
 		for (ly=0;ly<{{ nbasis1_y[ci1] }};ly++) {
 		for (lz=0;lz<{{ nbasis1_z[ci1] }};lz++) {
-			icoord = i2cell * offset_mult1_x_{{ ci1 }}[lx] + offsets1_x_{{ ci1 }}[lx] - x1s_{{ ci1 }};
-			jcoord = j2cell * offset_mult1_y_{{ ci1 }}[ly] + offsets1_y_{{ ci1 }}[ly] - y1s_{{ ci1 }};
-			kcoord = k2cell * offset_mult1_z_{{ ci1 }}[lz] + offsets1_z_{{ ci1 }}[lz] - z1s_{{ ci1 }};
+			icoord = i2cell * offset_mult1_x_{{ ci1 }}[bi2_1_x_{{ ci1 }}][lx] + offsets1_x_{{ ci1 }}[bi2_1_x_{{ ci1 }}][lx] - x1s_{{ ci1 }};
+			jcoord = j2cell * offset_mult1_y_{{ ci1 }}[bi2_1_y_{{ ci1 }}][ly] + offsets1_y_{{ ci1 }}[bi2_1_y_{{ ci1 }}][ly] - y1s_{{ ci1 }};
+			kcoord = k2cell * offset_mult1_z_{{ ci1 }}[bi2_1_z_{{ ci1 }}][lz] + offsets1_z_{{ ci1 }}[bi2_1_z_{{ ci1 }}][lz] - z1s_{{ ci1 }};
 			rows2_{{ ci1 }} s1_{{ci1}}_indices =  icoord + x1m_{{ ci1 }}*(jcoord + y1m_{{ ci1 }}*kcoord);
 		}}}
       {% endfor %}
@@ -443,9 +479,9 @@ for (k=zs; k<zs+zm; k++) {
 		for (lx=0;lx<{{ nbasis2_x[ci2] }};lx++) {
 		for (ly=0;ly<{{ nbasis2_y[ci2] }};ly++) {
 		for (lz=0;lz<{{ nbasis2_z[ci2] }};lz++) {
-			icoord = i2cell * offset_mult2_x_{{ ci2 }}[lx] + offsets2_x_{{ ci2 }}[lx] - x2s_{{ ci2 }};
-			jcoord = j2cell * offset_mult2_y_{{ ci2 }}[ly] + offsets2_y_{{ ci2 }}[ly] - y2s_{{ ci2 }};
-			kcoord = k2cell * offset_mult2_z_{{ ci2 }}[lz] + offsets2_z_{{ ci2 }}[lz] - z2s_{{ ci2 }};
+			icoord = i2cell * offset_mult2_x_{{ ci2 }}[bi2_2_x_{{ ci2 }}][lx] + offsets2_x_{{ ci2 }}[bi2_2_x_{{ ci2 }}][lx] - x2s_{{ ci2 }};
+			jcoord = j2cell * offset_mult2_y_{{ ci2 }}[bi2_2_y_{{ ci2 }}][ly] + offsets2_y_{{ ci2 }}[bi2_2_y_{{ ci2 }}][ly] - y2s_{{ ci2 }};
+			kcoord = k2cell * offset_mult2_z_{{ ci2 }}[bi2_2_z_{{ ci2 }}][lz] + offsets2_z_{{ ci2 }}[bi2_2_z_{{ ci2 }}][lz] - z2s_{{ ci2 }};
 			cols2_{{ ci2 }} s2_{{ci2}}_indices =  icoord + x2m_{{ ci2 }}*(jcoord + y2m_{{ ci2 }}*kcoord);
 		}}}
 	 {% endfor %}
@@ -458,37 +494,33 @@ for (k=zs; k<zs+zm; k++) {
 			//*************************************//		
 
 		//extract element dofs from local dofs
-				
+
 		 {% for field in fieldlist %}
 
 		 		fieldoffset = 0;
 		 //For interior facet this is organized as + (2) followed by - (1)
 		 {% if facet_type == 'interior' %}
-		 {% set ijklist = [('i2cell','j2cell','k2cell'),('i1cell','j1cell','k1cell'),]%}
+		 {% set ijklist = [('i2cell','j2cell','k2cell','2'),('i1cell','j1cell','k1cell','1'),]%}
 		 {% endif %}
 		 {% if facet_type == 'exterior' and facet_exterior_boundary == 'upper' %}
-		 {% set ijklist = [('i1cell','j1cell','k1cell'),]%}
+		 {% set ijklist = [('i1cell','j1cell','1'),]%}
 		 {% endif %}
 		 {% if facet_type == 'exterior' and facet_exterior_boundary == 'lower' %}
-		 {% set ijklist = [('i2cell','j2cell','k2cell'),]%}
+		 {% set ijklist = [('i2cell','j2cell','2'),]%}
 		 {% endif %}
-		 
-		 //printf("starting field {{ field.name }} extraction\n");
-		
-		 {% for i,j,k in ijklist %}
+		 		
+		 {% for i,j,k,cell in ijklist %}
 		 #define ic {{ i }}
 		 #define jc {{ j }}
 		 #define kc {{ k }}
-
-		//printf("%i %i %i\n", ic,jc,kc);
-		//asdf
+		 		
 		{% for k in range(field.ncomp) %}
 		{%set offset_mult = field.name~'_'~k ~'_offset_mult' %}
 		{%set offset = field.name~'_'~k ~'_offsets' %}
-		#define ii (ic*{{ offset_mult }}_x[lx] + {{ offset }}_x[lx]) 
-		#define jj (jc*{{ offset_mult }}_y[ly] + {{ offset }}_y[ly]) 
-		#define kk (kc*{{ offset_mult }}_z[lz] + {{ offset }}_z[lz]) 
-		for (lx=0;lx<{{ field.nbasis_x[k] }};lx++){
+		#define ii (ic*{{ offset_mult }}_x[bi{{cell}_{{field.name}}_x_{{k}}][lx] + {{ offset }}_x[bi{{cell}_{{field.name}}_x_{{k}}][lx]) 
+		#define jj (jc*{{ offset_mult }}_y[bi{{cell}_{{field.name}}_y_{{k}}][ly] + {{ offset }}_y[bi{{cell}_{{field.name}}_y_{{k}}][ly]) 
+		#define kk (kc*{{ offset_mult }}_z[bi{{cell}_{{field.name}}_z_{{k}}][lz] + {{ offset }}_z[bi{{cell}_{{field.name}}_z_{{k}}][lz]) 
+		for (lx=0;lx<{{ field.nbasis_x[k] }};bi1_{{field.name}}_x_{{k}}++){
 		for (ly=0;ly<{{ field.nbasis_y[k] }};ly++){
 		for (lz=0;lz<{{ field.nbasis_z[k] }};lz++){
 		for (d=0;d<{{ field.ndofs }};d++){
@@ -513,8 +545,6 @@ for (k=zs; k<zs+zm; k++) {
 		#undef jc
 		#undef kc	
 		{% endfor %}
-
-		//printf("field {{ field.name }} extracted\n");
 
 		{% endfor %}
 		
@@ -551,7 +581,7 @@ for (k=zs; k<zs+zm; k++) {
 				 ,{{field}}
 				 				{% endfor %}
 				 {% for tabulation in tabulations %}
-				 ,{{tabulation.name}}
+				 ,{{tabulation.name}}[bi1x]
 				{% endfor %}
 			);
     {% endif %}
@@ -564,7 +594,8 @@ for (k=zs; k<zs+zm; k++) {
 				 				{% endfor %}
 				 ,facet_number
 				 {% for tabulation in tabulations %}
-				 ,{{tabulation.name}}
+				 // FIX THIS- TAKE INTO ACCOUNT SHIFT AXIS AND ALSO RESTRICTON...
+				 ,{{tabulation.name}}[bi_{{ tabulation.name }}_x_0]
 				{% endfor %}
 			);
     {% endif %}

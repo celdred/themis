@@ -1,6 +1,5 @@
 
 
-//THIS CAN MAYBE CHANGE/BE ELIMINATED NOW
  {% if formdim >= 1 %}
  {% for ci in range(nci1) %}
 #define s1_{{ci}}_indices [lz + {{  nbasis1_z[ci]  }} * (ly + {{ nbasis1_y[ci]  }} * lx)]
@@ -16,14 +15,11 @@
  {% endfor %}
 {% endif %}
 
-//THIS CAN MAYBE CHANGE NOW?
 
 {%macro SETVALS(ci) -%}
-//THIS ORDERING OF ROWS IS THEMIS SPECIFIC...
-//ALSO MAKE THIS ACCESS MACRO SPECIFIC- ie we should be able to swap between C and Fortran ordering!
- #define kk	(k * offset_mult1_z_{{ ci }}[lz] + offsets1_z_{{ ci }}[lz])
- #define jj (j * offset_mult1_y_{{ ci }}[ly] + offsets1_y_{{ ci }}[ly])
- #define ii (i * offset_mult1_x_{{ ci }}[lx] + offsets1_x_{{ ci }}[lx])
+ #define kk (k * offset_mult1_z_{{ ci }}[bi_1_z_{{ci}}][lz] + offsets1_z_{{ ci }}[bi_1_z_{{ci}}][lz])
+ #define jj (j * offset_mult1_y_{{ ci }}[bi_1_y_{{ci}}][ly] + offsets1_y_{{ ci }}[bi_1_y_{{ci}}][ly])
+ #define ii (i * offset_mult1_x_{{ ci }}[bi_1_x_{{ci}}][lx] + offsets1_x_{{ ci }}[bi_1_x_{{ci}}][lx])
 for (lx=0;lx<{{ nbasis1_x[ci] }};lx++) {
 for (ly=0;ly<{{ nbasis1_y[ci] }};ly++) {
 for (lz=0;lz<{{ nbasis1_z[ci] }};lz++) {
@@ -104,7 +100,7 @@ PetscScalar assemble(DM da {{ fieldargs }} {{ constantargs }})
    PetscInt nx,ny,nz;
    PetscInt mx,my,mz;
    PetscInt d; //dof index
-  PetscInt xs,xm,ys,ym,zs,zm;
+  PetscInt xs,xm,ys,ym,zs,zm,xmax,ymax,zmax;
   PetscInt icoord,jcoord,kcoord;
    {% if formdim >= 1 %}
   {% for ci1 in range(nci1) %}
@@ -119,36 +115,43 @@ PetscScalar assemble(DM da {{ fieldargs }} {{ constantargs }})
 
  {% if formdim == 2 %}
   {% for ci2 in range(nci2) %}
-const   PetscInt offsets2_x_{{ ci2 }}[{{ nbasis2_x[ci2] }}] = {{ offsets2_x[ci2] }};
-const   PetscInt offsets2_y_{{ ci2 }}[{{ nbasis2_y[ci2] }}] = {{ offsets2_y[ci2] }};
-const   PetscInt offsets2_z_{{ ci2 }}[{{ nbasis2_z[ci2] }}] = {{ offsets2_z[ci2] }};
-const   PetscInt offset_mult2_x_{{ ci2 }}[{{ nbasis2_x[ci2] }}] = {{ offset_mult2_x[ci2] }};
-const   PetscInt offset_mult2_y_{{ ci2 }}[{{ nbasis2_y[ci2] }}] = {{ offset_mult2_y[ci2] }};
-const   PetscInt offset_mult2_z_{{ ci2 }}[{{ nbasis2_z[ci2] }}] = {{ offset_mult2_z[ci2] }};
-
+const   PetscInt offsets2_x_{{ ci2 }}[{{ nblocks2_x[ci2] }}][{{ nbasis2_x[ci2] }}] = {{ offsets2_x[ci2] }};
+const   PetscInt offsets2_y_{{ ci2 }}[{{ nblocks2_y[ci2] }}][{{ nbasis2_y[ci2] }}] = {{ offsets2_y[ci2] }};
+const   PetscInt offsets2_z_{{ ci2 }}[{{ nblocks2_z[ci2] }}][{{ nbasis2_z[ci2] }}] = {{ offsets2_z[ci2] }};
+const   PetscInt offset_mult2_x_{{ ci2 }}[{{ nblocks2_x[ci2] }}][{{ nbasis2_x[ci2] }}] = {{ offset_mult2_x[ci2] }};
+const   PetscInt offset_mult2_y_{{ ci2 }}[{{ nblocks2_y[ci2] }}][{{ nbasis2_y[ci2] }}] = {{ offset_mult2_y[ci2] }};
+const   PetscInt offset_mult2_z_{{ ci2 }}[{{ nblocks2_z[ci2] }}][{{ nbasis2_z[ci2] }}] = {{ offset_mult2_z[ci2] }};
+   PetscInt bi_2_x_{{ ci2 }} = -1000;
+   PetscInt bi_2_y_{{ ci2 }} = -1000;
+   PetscInt bi_2_z_{{ ci2 }} = -1000;
   {% endfor %}
   {% endif %}
  {% if formdim >= 1 %}
  {% for ci1 in range(nci1) %}
-const   PetscInt offsets1_x_{{ ci1 }}[{{ nbasis1_x[ci1] }}] = {{ offsets1_x[ci1] }};
-const   PetscInt offsets1_y_{{ ci1 }}[{{ nbasis1_y[ci1] }}] = {{ offsets1_y[ci1] }};
-const   PetscInt offsets1_z_{{ ci1 }}[{{ nbasis1_z[ci1] }}] = {{ offsets1_z[ci1] }};
-const   PetscInt offset_mult1_x_{{ ci1 }}[{{ nbasis1_x[ci1] }}] = {{ offset_mult1_x[ci1] }};
-const   PetscInt offset_mult1_y_{{ ci1 }}[{{ nbasis1_y[ci1] }}] = {{ offset_mult1_y[ci1] }};
-const   PetscInt offset_mult1_z_{{ ci1 }}[{{ nbasis1_z[ci1] }}] = {{ offset_mult1_z[ci1] }};
-
+const   PetscInt offsets1_x_{{ ci1 }}[{{ nblocks1_x[ci1] }}][{{ nbasis1_x[ci1] }}] = {{ offsets1_x[ci1] }};
+const   PetscInt offsets1_y_{{ ci1 }}[{{ nblocks1_y[ci1] }}][{{ nbasis1_y[ci1] }}] = {{ offsets1_y[ci1] }};
+const   PetscInt offsets1_z_{{ ci1 }}[{{ nblocks1_z[ci1] }}][{{ nbasis1_z[ci1] }}] = {{ offsets1_z[ci1] }};
+const   PetscInt offset_mult1_x_{{ ci1 }}[{{ nblocks1_x[ci1] }}][{{ nbasis1_x[ci1] }}] = {{ offset_mult1_x[ci1] }};
+const   PetscInt offset_mult1_y_{{ ci1 }}[{{ nblocks1_y[ci1] }}][{{ nbasis1_y[ci1] }}] = {{ offset_mult1_y[ci1] }};
+const   PetscInt offset_mult1_z_{{ ci1 }}[{{ nblocks1_z[ci1] }}][{{ nbasis1_z[ci1] }}] = {{ offset_mult1_z[ci1] }};
+   PetscInt bi_1_x_{{ ci1 }} = -1000;
+   PetscInt bi_1_y_{{ ci1 }} = -1000;
+   PetscInt bi_1_z_{{ ci1 }} = -1000;
   {% endfor %}
   {% endif %}
 
  {% for field in fieldlist %}
  PetscScalar	{{field.name}}_vals[{{ field.nbasis_total }}][{{ field.ndofs }}] = { { 0.,},};
  {% for k in range(field.ncomp) %}
-const   PetscInt {{field.name}}_{{k}}_offsets_x[{{ field.nbasis_x[k] }}] = {{ field.offsets_x[k] }};
-const   PetscInt {{field.name}}_{{k}}_offsets_y[{{ field.nbasis_y[k] }}] = {{ field.offsets_y[k] }};
-const   PetscInt {{field.name}}_{{k}}_offsets_z[{{ field.nbasis_z[k] }}] = {{ field.offsets_z[k] }};
-const   PetscInt {{field.name}}_{{k}}_offset_mult_x[{{ field.nbasis_x[k] }}] = {{ field.offset_mult_x[k] }};
-const   PetscInt {{field.name}}_{{k}}_offset_mult_y[{{ field.nbasis_y[k] }}] = {{ field.offset_mult_y[k] }};
-const   PetscInt {{field.name}}_{{k}}_offset_mult_z[{{ field.nbasis_z[k] }}] = {{ field.offset_mult_z[k] }};
+const   PetscInt {{field.name}}_{{k}}_offsets_x[{{ field.nblocks_x[k] }}][{{ field.nbasis_x[k] }}] = {{ field.offsets_x[k] }};
+const   PetscInt {{field.name}}_{{k}}_offsets_y[{{ field.nblocks_y[k] }}][{{ field.nbasis_y[k] }}] = {{ field.offsets_y[k] }};
+const   PetscInt {{field.name}}_{{k}}_offsets_z[{{ field.nblocks_z[k] }}][{{ field.nbasis_z[k] }}] = {{ field.offsets_z[k] }};
+const   PetscInt {{field.name}}_{{k}}_offset_mult_x[{{ field.nblocks_x[k] }}][{{ field.nbasis_x[k] }}] = {{ field.offset_mult_x[k] }};
+const   PetscInt {{field.name}}_{{k}}_offset_mult_y[{{ field.nblocks_y[k] }}][{{ field.nbasis_y[k] }}] = {{ field.offset_mult_y[k] }};
+const   PetscInt {{field.name}}_{{k}}_offset_mult_z[{{ field.nblocks_z[k] }}][{{ field.nbasis_z[k] }}] = {{ field.offset_mult_z[k] }};
+   PetscInt bi_{{field.name}}_x_{{k}} = -1000;
+   PetscInt bi_{{field.name}}_y_{{k}} = -1000;
+   PetscInt bi_{{field.name}}_z_{{k}} = -1000;
 
 #define {{field.name}}_{{k}}_indices [fieldoffset + lz + {{  field.nbasis_z[k]  }} * (ly + {{ field.nbasis_y[k]  }} * lx)][d]
 
@@ -165,7 +168,16 @@ const   PetscInt {{field.name}}_{{k}}_offset_mult_z[{{ field.nbasis_z[k] }}] = {
   {% endfor %}
  
  {% for tabulation in tabulations %}
- const   PetscScalar {{ tabulation.name }}[{{ tabulation.npts }}][{{ tabulation.nbasis }}] = {{ tabulation.values }};
+ const   PetscScalar {{ tabulation.name }}[{{ tabulation.nblocks }}][{{ tabulation.npts }}][{{ tabulation.nbasis }}] = {{ tabulation.values }};
+ {% if tabulation.shiftaxis == 0 %}
+ PetscInt bi_{{ tabulation.name }}_x_0 = -1000;
+     {% endif %}
+ {% if tabulation.shiftaxis == 1 %}
+ PetscInt bi_{{ tabulation.name }}_y_0 = -1000;
+     {% endif %}
+      {% if tabulation.shiftaxis == 2 %}
+ PetscInt bi_{{ tabulation.name }}_z_0 = -1000;
+     {% endif %}
  {% endfor %}
 
  {% for field in fieldlist %}
@@ -193,53 +205,69 @@ const   PetscInt {{field.name}}_{{k}}_offset_mult_z[{{ field.nbasis_z[k] }}] = {
        {% endfor %}
       {% endif %}
   ierr = DMDAGetCorners(da,&xs,&ys,&zs,&xm,&ym,&zm);CHKERRQ(ierr);
- 
+   ierr = DMDAGetInfo(da,0,&xmax,&ymax,&zmax,0,0,0,0,0,0,0,0,0);CHKERRQ(ierr);
+
+ {% from 'setblocks.template' import SET_PERIODIC_OTHER with context %}
+ {% from 'setblocks.template' import SET_NONPERIODIC_X_OTHER with context %}
+ {% from 'setblocks.template' import SET_NONPERIODIC_Y_OTHER with context %}
+ {% from 'setblocks.template' import SET_NONPERIODIC_Z_OTHER with context %}
+ {% from 'setblocks.template' import SET_PERIODIC_FIELDS with context %}
+ {% from 'setblocks.template' import SET_NONPERIODIC_X_FIELDS with context %}
+ {% from 'setblocks.template' import SET_NONPERIODIC_Y_FIELDS with context %}
+ {% from 'setblocks.template' import SET_NONPERIODIC_Z_FIELDS with context %}
+
+{{ SET_PERIODIC_OTHER() }}
+{{ SET_PERIODIC_FIELDS() }}
 for (k=zs; k<zs+zm; k++) {
+{{ SET_NONPERIODIC_Z_OTHER() }}
+{{ SET_NONPERIODIC_Z_FIELDS() }}
    for (j=ys; j<ys+ym; j++) {
+     {{ SET_NONPERIODIC_Y_OTHER() }}
+     {{ SET_NONPERIODIC_Y_FIELDS() }}
       for (i=xs; i<xs+xm; i++) {
-		
-		//THESE ROWS/COLS ARE THEMIS SPECIFIC RIGHT NOW
-		//THIS CAN BE SWITCHED TO FiNaT TENSOR PRODUCT SPECIFIC ORDER
-		
-		//THIS SHOULD BE SWAPPABLE BETWEEN C AND FORTRAN STYLE ORDERINGS...
-		
-		//THIS IS REALLY THE DIFFERENCE BETWEEN STRUCTURED AND UNSTRUCTURED
-		
+	      {{ SET_NONPERIODIC_X_OTHER() }}
+	      {{ SET_NONPERIODIC_X_FIELDS() }}
+	    
+		printf("start %i %i %i: %i %i %i\n",i,j,k,xs,xm,xmax);
+	      
 		 {% if formdim == 2 %}
        {% for ci1 in range(nci1) %}
 		for (lx=0;lx<{{ nbasis1_x[ci1] }};lx++) {
 		for (ly=0;ly<{{ nbasis1_y[ci1] }};ly++) {
 		for (lz=0;lz<{{ nbasis1_z[ci1] }};lz++) {
-			icoord = i * offset_mult1_x_{{ ci1 }}[lx] + offsets1_x_{{ ci1 }}[lx] - x1s_{{ ci1 }};
-			jcoord = j * offset_mult1_y_{{ ci1 }}[ly] + offsets1_y_{{ ci1 }}[ly] - y1s_{{ ci1 }};
-			kcoord = k * offset_mult1_z_{{ ci1 }}[lz] + offsets1_z_{{ ci1 }}[lz] - z1s_{{ ci1 }};
-
+			icoord = i * offset_mult1_x_{{ ci1 }}[bi_1_x_{{ci1}}][lx] + offsets1_x_{{ ci1 }}[bi_1_x_{{ci1}}][lx] - x1s_{{ ci1 }};
+			jcoord = j * offset_mult1_y_{{ ci1 }}[bi_1_y_{{ci1}}][ly] + offsets1_y_{{ ci1 }}[bi_1_y_{{ci1}}][ly] - y1s_{{ ci1 }};
+			kcoord = k * offset_mult1_z_{{ ci1 }}[bi_1_z_{{ci1}}][lz] + offsets1_z_{{ ci1 }}[bi_1_z_{{ci1}}][lz] - z1s_{{ ci1 }};
 			rows_{{ ci1 }} s1_{{ci1}}_indices =  icoord + x1m_{{ ci1 }}*(jcoord + y1m_{{ ci1 }}*kcoord);
+			printf("ci1: %i %i %i : %i %i\n",i,j,k,lx,icoord);
 		}}}
       {% endfor %}
+
 
        {% for ci2 in range(nci2) %}
 		for (lx=0;lx<{{ nbasis2_x[ci2] }};lx++) {
 		for (ly=0;ly<{{ nbasis2_y[ci2] }};ly++) {
 		for (lz=0;lz<{{ nbasis2_z[ci2] }};lz++) {
-			icoord = i * offset_mult2_x_{{ ci2 }}[lx] + offsets2_x_{{ ci2 }}[lx] - x2s_{{ ci2 }};
-			jcoord = j * offset_mult2_y_{{ ci2 }}[ly] + offsets2_y_{{ ci2 }}[ly] - y2s_{{ ci2 }};
-			kcoord = k * offset_mult2_z_{{ ci2 }}[lz] + offsets2_z_{{ ci2 }}[lz] - z2s_{{ ci2 }};
+			icoord = i * offset_mult2_x_{{ ci2 }}[bi_2_x_{{ci2}}][lx] + offsets2_x_{{ ci2 }}[bi_2_x_{{ci2}}][lx] - x2s_{{ ci2 }};
+			jcoord = j * offset_mult2_y_{{ ci2 }}[bi_2_y_{{ci2}}][ly] + offsets2_y_{{ ci2 }}[bi_2_y_{{ci2}}][ly] - y2s_{{ ci2 }};
+			kcoord = k * offset_mult2_z_{{ ci2 }}[bi_2_z_{{ci2}}][lz] + offsets2_z_{{ ci2 }}[bi_2_z_{{ci2}}][lz] - z2s_{{ ci2 }};
 			cols_{{ ci2 }} s2_{{ci2}}_indices =  icoord + x2m_{{ ci2 }}*(jcoord + y2m_{{ ci2 }}*kcoord);
+			printf("ci2: %i %i %i : %i %i\n",i,j,k,lx,icoord);
 		}}}
 	 {% endfor %}
 		{% endif %}
+		
+		printf("rows/cols\n");
 
 		//extract element dofs from local dofs
-
 		 {% for field in fieldlist %}
 		 		fieldoffset = 0;
 		{% for k in range(field.ncomp) %}
 		{%set offset_mult = field.name~'_'~k ~'_offset_mult' %}
 		{%set offset = field.name~'_'~k ~'_offsets' %}
-		#define ii (i*{{ offset_mult }}_x[lx] + {{ offset }}_x[lx]) 
-		#define jj (j*{{ offset_mult }}_y[ly] + {{ offset }}_y[ly]) 
-		#define kk (k*{{ offset_mult }}_z[lz] + {{ offset }}_z[lz]) 
+		#define ii (i*{{ offset_mult }}_x[bi_{{field.name}}_x_{{k}}][lx] + {{ offset }}_x[bi_{{field.name}}_x_{{k}}][lx]) 
+		#define jj (j*{{ offset_mult }}_y[bi_{{field.name}}_y_{{k}}][ly] + {{ offset }}_y[bi_{{field.name}}_y_{{k}}][ly]) 
+		#define kk (k*{{ offset_mult }}_z[bi_{{field.name}}_z_{{k}}][lz] + {{ offset }}_z[bi_{{field.name}}_z_{{k}}][lz]) 
 		for (lx=0;lx<{{ field.nbasis_x[k] }};lx++){
 		for (ly=0;ly<{{ field.nbasis_y[k] }};ly++){
 		for (lz=0;lz<{{ field.nbasis_z[k] }};lz++){
@@ -253,6 +281,7 @@ for (k=zs; k<zs+zm; k++) {
 		{% if ndim == 3 %}
 		{{field.name}}_vals {{field.name}}_{{k}}_indices = data_{{field.name}}_{{k}} [kk][jj][ii][d];
 		{% endif %}
+		printf("{{field.name}} {{k}} : %i %i %i : %i %i\n",i,j,k,lx,ii);
 		}}}}
 		#undef ii
 		#undef jj
@@ -261,8 +290,9 @@ for (k=zs; k<zs+zm; k++) {
 		{% endfor %}
 		{% endfor %}
 		
+				printf("fields\n");
+
 		//compute the element tensor
-		{% if not kernelstr == '' %}
 		
 		    {% if formdim == 2 %}
 	ierr = PetscMemzero(vals,sizeof(PetscScalar[{{ nbasis1_total }}][{{ nbasis2_total }}])); CHKERRQ(ierr);
@@ -273,14 +303,25 @@ for (k=zs; k<zs+zm; k++) {
 		    {% if formdim == 0 %}
 		    vals[0] = 0.0;
 				{% endif %}
+				
+				{% if not kernelstr == '' %}
 		{{kernelname}}(vals
 				 {% for field in fieldplusconstantslist %}
 				 ,{{field}}
 				{% endfor %}
 				 {% for tabulation in tabulations %}
-				 ,{{tabulation.name}}
+				  {% if tabulation.shiftaxis == 0 %}
+				 ,{{tabulation.name}}[bi_{{ tabulation.name }}_x_0]
+			      	{% endif %}
+				  {% if tabulation.shiftaxis == 1 %}
+				 ,{{tabulation.name}}[bi_{{ tabulation.name }}_y_0]
+			      	{% endif %}
+				  {% if tabulation.shiftaxis == 2 %}
+				 ,{{tabulation.name}}[bi_{{ tabulation.name }}_z_0]
+			      	{% endif %}
 				{% endfor %}
 			);
+			  				{% endif %}
 
 			//unsplat vals
 		
@@ -295,15 +336,15 @@ for (k=zs; k<zs+zm; k++) {
 		for (mx=0;mx<{{ nbasis2_x[ci2] }};mx++) {
 		for (my=0;my<{{ nbasis2_y[ci2] }};my++) {
 		for (mz=0;mz<{{ nbasis2_z[ci2] }};mz++) {
-			
        vals_{{ ci1 }}_{{ ci2 }} s1_{{ci1}}_indices_n s2_{{ci2}}_indices_m = vals s1_{{ci1}}_indices_noff s2_{{ci2}}_indices_moff;
-       
+       		//printf("%i %i: %i %i %i : %12.12f\n", nx,mx,rows_{{ci1}} [nx], cols_{{ci2}} [mx], {{ nbasis1_x[ci1] }} * {{ nbasis1_y[ci1] }} * {{ nbasis1_z[ci1] }}, vals_{{ ci1 }}_{{ ci2 }} s1_{{ci1}}_indices_n s2_{{ci2}}_indices_m );
    }}}}}}
    ci2off = ci2off + {{ nbasis2_x[ci2] }} * {{ nbasis2_y[ci2] }} * {{ nbasis2_z[ci2] }};
 				{% endfor %}
 			ci1off = ci1off + {{ nbasis1_x[ci1] }} * {{ nbasis1_y[ci1] }} * {{ nbasis1_z[ci1] }};
 				{% endfor %}
 				{% endif %}
+				
 					    {% if formdim == 1 %}
 					    ci1off = 0;
 		       {% for ci1 in range(nci1) %}
@@ -315,13 +356,18 @@ for (k=zs; k<zs+zm; k++) {
 						ci1off = ci1off + {{ nbasis1_x[ci1] }} * {{ nbasis1_y[ci1] }} * {{ nbasis1_z[ci1] }};
 				{% endfor %}
 				{% endif %}
-		{% endif %}
+
 		
+						printf("computed tensor\n");
+
 		//Put the element tensor into the local tensor
 		{% if formdim == 2 %}
 		       {% for ci1 in range(nci1) %}
        {% for ci2 in range(nci2) %}
+								
         ierr = MatSetValuesLocal(formmat_{{ ci1 }}_{{ ci2 }},{{ nbasis1_x[ci1] }} * {{ nbasis1_y[ci1] }} * {{ nbasis1_z[ci1] }},rows_{{ ci1 }},{{ nbasis2_x[ci2] }} * {{ nbasis2_y[ci2] }} * {{ nbasis2_z[ci2] }},cols_{{ ci2 }},*vals_{{ ci1 }}_{{ ci2 }},ADD_VALUES);CHKERRQ(ierr);
+			 								
+
 			 {% endfor %}
 	 {% endfor %}
 		{% endif %}
@@ -336,6 +382,10 @@ for (k=zs; k<zs+zm; k++) {
 		formsum[0] = formsum[0] + vals[0];
 		{% endif %}
 		
+								printf("tensor set\n");
+
+				printf("end %i %i %i: %i %i\n",i,j,k,xs,xm);
+				
        }}}
 
 //restore fields arrays and data
