@@ -5,8 +5,8 @@ import numpy as np
 from functionspace import FunctionSpace
 from function import Function
 from bcs import DirichletBC
-from solver import NonlinearVariationalProblem,NonlinearVariationalSolver
-from ufl import inner,dx
+from solver import NonlinearVariationalProblem, NonlinearVariationalSolver
+from ufl import inner, dx
 from ufl_expr import TestFunction
 from finiteelement import ThemisElement
 from ufl import Mesh, FiniteElement, interval, VectorElement, quadrilateral, TensorProductElement, hexahedron
@@ -63,7 +63,7 @@ from assembly import CompiledKernel
 import ctypes
 
 decompfunction = CompiledKernel(decompfunction_code, "decompfunction", cppargs=["-O3"], argtypes=[ctypes.c_voidp, ctypes.c_voidp,
-                                ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ], restype=ctypes.c_int)
+                                                                                                  ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ], restype=ctypes.c_int)
 
 
 class SingleBlockMesh(Mesh):
@@ -134,14 +134,13 @@ class SingleBlockMesh(Mesh):
         if self.ndim >= 3:
             self._edgez_da.destroy()
 
-
-    def get_boundary_direcs(self,subdomain):
+    def get_boundary_direcs(self, subdomain):
         if subdomain == 'on_boundary':
             return self.bdirecs
         else:
-            #ADD ERROR CHECKING HERE
+            # ADD ERROR CHECKING HERE
             return self.bdirecs[subdomain]
-		
+
     def __init__(self, nxs, bcs, name='singleblockmesh', coordelem=None, procsizes=None):
         assert(len(nxs) == len(bcs))
 
@@ -153,38 +152,22 @@ class SingleBlockMesh(Mesh):
         self._blist = []
         self.bdirecs = []
         self.extruded = False
-		
-        for i,bc in enumerate(bcs):
+
+        for i, bc in enumerate(bcs):
             if bc == 'periodic':
                 self._blist.append(PETSc.DM.BoundaryType.PERIODIC)
             else:
-                self._blist.append(PETSc.DM.BoundaryType.NONE) #GHOSTED
+                self._blist.append(PETSc.DM.BoundaryType.NONE)  # GHOSTED
                 # THIS WORKS FOR ALL THE UTILITY MESHES SO FAR
                 # MIGHT NEED SOMETHING MORE GENERAL IN THE FUTURE?
-                if i == 0: direc = 'x'
-                if i == 1: direc = 'y'
-                if i == 2: direc = 'z'
+                if i == 0:
+                    direc = 'x'
+                if i == 1:
+                    direc = 'y'
+                if i == 2:
+                    direc = 'z'
                 self.bdirecs.append(direc+'-')
                 self.bdirecs.append(direc+'+')
-
-        bdx = 0
-        bdy = 0
-        bdz = 0
-        edgex_nxs = list(nxs)
-        if (bcs[0] == 'nonperiodic'):
-            edgex_nxs[0] = edgex_nxs[0] + 1
-            bdx = 1
-        if self.ndim >= 2:
-            edgey_nxs = list(nxs)
-            if (bcs[1] == 'nonperiodic'):
-                edgey_nxs[1] = edgey_nxs[1] + 1
-                bdy = 1
-
-        if self.ndim >= 3:
-            edgez_nxs = list(nxs)
-            if (bcs[2] == 'nonperiodic'):
-                edgez_nxs[2] = edgez_nxs[2] + 1
-                bdz = 1
 
         # generate mesh
         cell_da = PETSc.DMDA().create()
@@ -202,57 +185,37 @@ class SingleBlockMesh(Mesh):
         cell_da.setSizes(nxs)
         cell_da.setBoundaryType(self._blist)
         cell_da.setStencil(PETSc.DMDA.StencilType.BOX, 1)
-        if not (procsizes == None):
+        if not (procsizes is None):
             cell_da.setProcSizes(procsizes)
         cell_da.setUp()
-        
-        # print self.cell_da.getProcSizes()
-        #edgex_da = PETSc.DMDA().create(dim=self.ndim, dof=1, sizes=edgex_nxs, proc_sizes=cell_da.getProcSizes(), boundary_type=self._blist, stencil_type=PETSc.DMDA.StencilType.BOX, stencil_width=1, setup=False)
-        # THIS IS AN UGLY HACK NEEDED BECAUSE OWNERSHIP RANGES ARGUMENT TO petc4py DMDA_CREATE is BROKEN
-        #decompfunction([cell_da, edgex_da], [self.ndim, 1, 1, 1, bdx, 0, 0])
-        #edgex_da.setUp()
-
-        #if self.ndim >= 2:
-        #    edgey_da = PETSc.DMDA().create(dim=self.ndim, dof=1, sizes=edgey_nxs, proc_sizes=cell_da.getProcSizes(), boundary_type=self._blist, stencil_type=PETSc.DMDA.StencilType.BOX, stencil_width=1, setup=False)
-            # THIS IS AN UGLY HACK NEEDED BECAUSE OWNERSHIP RANGES ARGUMENT TO petc4py DMDA_CREATE is BROKEN
-        #    decompfunction([cell_da, edgey_da], [self.ndim, 1, 1, 1, 0, bdy, 0])
-        #    edgey_da.setUp()
-        #if self.ndim >= 3:
-        #    edgez_da = PETSc.DMDA().create(dim=self.ndim, dof=1, sizes=edgez_nxs, proc_sizes=cell_da.getProcSizes(), boundary_type=self._blist, stencil_type=PETSc.DMDA.StencilType.BOX, stencil_width=1, setup=False)
-            # THIS IS AN UGLY HACK NEEDED BECAUSE OWNERSHIP RANGES ARGUMENT TO petc4py DMDA_CREATE is BROKEN
-        #    decompfunction([cell_da, edgez_da], [self.ndim, 1, 1, 1, 0, 0, bdz])
-        #    edgez_da.setUp()
-
         self._cell_da = cell_da
-        #self._edgex_da = edgex_da
-        #self._edgex_nxs = edgex_nxs
-        #if self.ndim >= 2:
-        #    self._edgey_da = edgey_da
-        #    self._edgey_nxs = edgey_nxs
-        #if self.ndim >= 3:
-        #    self._edgez_da = edgez_da
-        #    self._edgez_nxs = edgez_nxs
 
         if (coordelem is None):
             if len(nxs) == 1:
-                if bcs[0] == 'nonperiodic': celem = FiniteElement("CG", interval, 1, variant='feec')
-                else: celem = FiniteElement("DG", interval, 1, variant='feec')
+                if bcs[0] == 'nonperiodic':
+                    celem = FiniteElement("CG", interval, 1, variant='feec')
+                else:
+                    celem = FiniteElement("DG", interval, 1, variant='feec')
             if len(nxs) == 2:
-                if bcs[0] == 'nonperiodic' and bcs[1] == 'nonperiodic' : celem = FiniteElement("Q", quadrilateral, 1, variant='feec')
-                else: celem = FiniteElement("DQ", quadrilateral, 1, variant='feec')
+                if bcs[0] == 'nonperiodic' and bcs[1] == 'nonperiodic':
+                    celem = FiniteElement("Q", quadrilateral, 1, variant='feec')
+                else:
+                    celem = FiniteElement("DQ", quadrilateral, 1, variant='feec')
             if len(nxs) == 3:
-                if bcs[0] == 'nonperiodic' and bcs[1] == 'nonperiodic' and bcs[2] == 'nonperiodic': celem = FiniteElement("Q", hexahedron, 1, variant='feec')
-                else: celem = FiniteElement("DQ", hexahedron, 1, variant='feec')
+                if bcs[0] == 'nonperiodic' and bcs[1] == 'nonperiodic' and bcs[2] == 'nonperiodic':
+                    celem = FiniteElement("Q", hexahedron, 1, variant='feec')
+                else:
+                    celem = FiniteElement("DQ", hexahedron, 1, variant='feec')
         else:
             # ADD SANITY CHECKS ON COORDINATE ELEMENT HERE
             celem = coordelem
-            
+
         vcelem = VectorElement(celem, dim=self.ndim)
         self._celem = celem
         self._vcelem = vcelem
         Mesh.__init__(self, vcelem)
-        #print(celem,vcelem,coordelem,bcs)
-        
+        # print(celem,vcelem,coordelem,bcs)
+
         # construct and set coordsvec
         coordsspace = FunctionSpace(self, vcelem)
         self.coordinates = Function(coordsspace, name='coords')
@@ -265,75 +228,76 @@ class SingleBlockMesh(Mesh):
             coordsarr[:] = newcoords[:]
         self.coordinates.scatter()
 
-
-
-
 # THESE ARE HACKY AND UGLY
 # TO BE REPLACED WHEN THEMIS HAS SUPPORT FOR INTERPOLATION AND AUGMENTED ASSIGNMENT, ETC.
 
-    #computes xhat = a * x + b
-    def scale_coordinates(self,avals,bvals):
+    def scale_coordinates(self, avals, bvals):  # computes xhat = a * x + b
+
         coordsdm = self.coordinates.space.get_da(0)
         coordsarr = coordsdm.getVecArray(self.coordinates._vector)[:]
         for i in range(self.ndim):
-            if self.ndim == 1: coordsarr[:] = avals[i] * coordsarr[:] + bvals[i]
-            else: coordsarr[...,i] = avals[i] * coordsarr[...,i] + + bvals[i]
+            if self.ndim == 1:
+                coordsarr[:] = avals[i] * coordsarr[:] + bvals[i]
+            else:
+                coordsarr[..., i] = avals[i] * coordsarr[..., i] + + bvals[i]
         self.coordinates.scatter()
 
+    def set_coordinates(self, coordvals, coordbcs, additive=False):
 
-    def set_coordinates(self,coordvals,coordbcs,additive=False):
-	
         coordsdm = self.coordinates.space.get_da(0)
         coordsarr = coordsdm.getVecArray(self.coordinates._vector)[:]
-         
+
         # SHOULD REALLY BE ABLE TO DO THIS AS A VECTOR FUNCTION SPACE I THINK
         # REPLACE WHEN THEMIS HAS SUPPORT FOR VECTOR FUNCTION SPACES
-        
-        cspace = FunctionSpace(self,self._celem)
+
+        cspace = FunctionSpace(self, self._celem)
         ctest = TestFunction(cspace)
         cf = Function(cspace)
-        
+
         for i in range(self.ndim):
             if not coordvals[i] == 0.0:
-                clhs = inner(ctest,cf) * dx
-                crhs = inner(ctest,coordvals[i]) * dx
+                clhs = inner(ctest, cf) * dx
+                crhs = inner(ctest, coordvals[i]) * dx
                 cbcs = []
-                for val,location in coordbcs[i]:					
-                    cbcs.append(DirichletBC(cspace,val,location))
-                cproblem = NonlinearVariationalProblem(clhs-crhs,cf,bcs=cbcs)
+                for val, location in coordbcs[i]:
+                    cbcs.append(DirichletBC(cspace, val, location))
+                cproblem = NonlinearVariationalProblem(clhs-crhs, cf, bcs=cbcs)
                 cproblem._constant_jacobian = True
-                csolver = NonlinearVariationalSolver(cproblem,options_prefix = 'projsys_',solver_parameters={'snes_type': 'ksponly'})			
+                csolver = NonlinearVariationalSolver(cproblem, options_prefix='projsys_', solver_parameters={'snes_type': 'ksponly'})
                 csolver.solve()
 
                 cdm = cspace.get_da(0)
                 carr = cdm.getVecArray(cf._vector)[:]
 
                 if additive:
-                    if self.ndim == 1: coordsarr[:] = coordsarr[:] + carr
-                    else: coordsarr[...,i] = coordsarr[...,i] + carr
+                    if self.ndim == 1:
+                        coordsarr[:] = coordsarr[:] + carr
+                    else:
+                        coordsarr[..., i] = coordsarr[..., i] + carr
                 else:
-                    if self.ndim == 1: coordsarr[:] = carr
-                    else: coordsarr[...,i] = carr
+                    if self.ndim == 1:
+                        coordsarr[:] = carr
+                    else:
+                        coordsarr[..., i] = carr
         self.coordinates.scatter()
-        
+
+
 class SingleBlockExtrudedMesh(SingleBlockMesh):
 
-    def __init__(self, basemesh, layers, layer_height, name='singleblockextrudedmesh',vcoordelem=None):
+    def __init__(self, basemesh, layers, layer_height, name='singleblockextrudedmesh', vcoordelem=None):
 
-        
         self.basemesh = basemesh
         basenxs = basemesh.nxs
         basebcs = basemesh.bcs
-        
 
-        basecoordelem = basemesh._celem 
+        basecoordelem = basemesh._celem
         if not (vcoordelem is None):
             # ADD SANITY CHECKS HERE
             velem = vcoordelem
         else:
             velem = FiniteElement("CG", interval, 1, variant='feec')
-        
-        celem = TensorProductElement(basecoordelem,velem)
+
+        celem = TensorProductElement(basecoordelem, velem)
 #################
 
         nxs = list(basenxs)
@@ -343,16 +307,18 @@ class SingleBlockExtrudedMesh(SingleBlockMesh):
 
         proc_sizes = list(basemesh._cell_da.getProcSizes())
         proc_sizes.append(1)
-        SingleBlockMesh.__init__(self,nxs, bcs, name=name, coordelem=celem,procsizes=proc_sizes)
+        SingleBlockMesh.__init__(self, nxs, bcs, name=name, coordelem=celem, procsizes=proc_sizes)
 
         # bdirecs shouldn't include the extruded directions...
         self.bdirecs = []
-        for i,bc in enumerate(basebcs):
+        for i, bc in enumerate(basebcs):
             if bc == 'nonperiodic':
                 # THIS WORKS FOR ALL THE UTILITY MESHES SO FAR
                 # MIGHT NEED SOMETHING MORE GENERAL IN THE FUTURE?
-                if i == 0: direc = 'x'
-                if i == 1: direc = 'y'
+                if i == 0:
+                    direc = 'x'
+                if i == 1:
+                    direc = 'y'
                 self.bdirecs.append(direc+'-')
                 self.bdirecs.append(direc+'+')
 
@@ -362,38 +328,41 @@ class SingleBlockExtrudedMesh(SingleBlockMesh):
         # This is just uniform extrusion...
         basecoordsdm = basemesh.coordinates.space.get_da(0)
         basecoordsarr = basecoordsdm.getVecArray(basemesh.coordinates._vector)[:]
-        
+
         coordsdm = self.coordinates.space.get_da(0)
         coordsarr = coordsdm.getVecArray(self.coordinates._vector)[:]
-        
-        if len(basecoordsarr.shape) == 1:
-            basecoordsarr = np.expand_dims(basecoordsarr,axis=1)
 
-        basecoordsarr = np.expand_dims(basecoordsarr,axis=-2)
-        
+        if len(basecoordsarr.shape) == 1:
+            basecoordsarr = np.expand_dims(basecoordsarr, axis=1)
+
+        basecoordsarr = np.expand_dims(basecoordsarr, axis=-2)
+
         for i in range(len(basenxs)):
             coordsarr[..., i] = basecoordsarr[..., i]
 
         Lx = layer_height * layers
         coordsarr[..., -1] = coordsarr[..., -1] * Lx
-        
+
         self.coordinates.scatter()
-        
-    def get_boundary_direcs(self,subdomain):
+
+    def get_boundary_direcs(self, subdomain):
         if subdomain == 'on_boundary':
             return self.bdirecs
         if subdomain == 'bottom':
-            if self.extrusion_dim == 1: return ['y-',]
-            if self.extrusion_dim == 2: return ['z-',]
+            if self.extrusion_dim == 1:
+                return ['y-', ]
+            if self.extrusion_dim == 2:
+                return ['z-', ]
         if subdomain == 'top':
-            if self.extrusion_dim == 1: return ['y+',]
-            if self.extrusion_dim == 2: return ['z+',]
+            if self.extrusion_dim == 1:
+                return ['y+', ]
+            if self.extrusion_dim == 2:
+                return ['z+', ]
         else:
-            #ADD ERROR CHECKING HERE
+            # ADD ERROR CHECKING HERE
             return self.bdirecs[subdomain]
 
 
-    
 # creates the reference domain [0,1]^d coordinate field
 def create_reference_domain_coordinates(cell_da, celem):
 
@@ -402,44 +371,43 @@ def create_reference_domain_coordinates(cell_da, celem):
     sizes = cell_da.getSizes()
     ndims = len(ranges)
     coordslist = []
-    #print(celem)
+    # print(celem)
     for i in range(ndims):
         nx = sizes[i]
         localnx = ranges[i][1]-ranges[i][0]
         dx = 1./nx
-        ndofs = themis_celem.get_ndofs_per_element(0,i)
-        #print(i,nx,localnx)
-        spts = themis_celem._spts[0][i][:ndofs] #this makes CG skip the last dof, which is correct
+        ndofs = themis_celem.get_ndofs_per_element(0, i)
+        # print(i,nx,localnx)
+        spts = themis_celem._spts[0][i][:ndofs]  # this makes CG skip the last dof, which is correct
         elementwisecoords = np.array(spts) * dx
         elementwisecoords = np.tile(elementwisecoords, localnx)
-        #print(elementwisecoords)
-        elementcoords = np.linspace(ranges[i][0],ranges[i][1]-1,localnx) * dx #this is left edge of each element
-        #print(elementcoords)
-        elementcoords = np.repeat(elementcoords,ndofs)
+        # print(elementwisecoords)
+        elementcoords = np.linspace(ranges[i][0], ranges[i][1]-1, localnx) * dx  # this is left edge of each element
+        # print(elementcoords)
+        elementcoords = np.repeat(elementcoords, ndofs)
         # NEED ACTUALLY ADD LAST BIT HERE FOR CG ie 1...
-        #print(elementcoords)
-        
+        # print(elementcoords)
+
         coords1D = elementcoords + elementwisecoords
-        if themis_celem.get_continuity(0,i) == 'H1' and ranges[i][1] == sizes[i]: #if this process owns the boundary
-            coords1D = np.append(coords1D,1.0)
+        if themis_celem.get_continuity(0, i) == 'H1' and ranges[i][1] == sizes[i]:  # if this process owns the boundary
+            coords1D = np.append(coords1D, 1.0)
 
         coordslist.append(coords1D)
     coordsND = np.meshgrid(*coordslist, indexing='ij')
-    coordsND = np.stack(coordsND,axis=-1)
-
+    coordsND = np.stack(coordsND, axis=-1)
 
     # coordslist = []
     # expandedcoords = np.array(coordsarr)
     # # always treat coords as DG1
     # for i in range(len(nxs)):
-        # coords1D = np.tile([-0.5, 0.5], localnxs[i])  # This is DG1 ie 2 dofs per element
-        # expandedcoords = np.repeat(expandedcoords, 2, axis=i)
-        # coordslist.append(coords1D)
+    # coords1D = np.tile([-0.5, 0.5], localnxs[i])  # This is DG1 ie 2 dofs per element
+    # expandedcoords = np.repeat(expandedcoords, 2, axis=i)
+    # coordslist.append(coords1D)
     # coordsND = np.array(np.meshgrid(*coordslist, indexing='ij'))
     # if len(nxs) == 1:
-        # expandedcoords = np.expand_dims(expandedcoords, axis=1)
+    # expandedcoords = np.expand_dims(expandedcoords, axis=1)
     # revisedcoordsND = np.zeros(expandedcoords.shape)
     # for i in range(len(nxs)):
-        # revisedcoordsND[..., i] = coordsND[i, ...] + expandedcoords[..., i]
+    # revisedcoordsND[..., i] = coordsND[i, ...] + expandedcoords[..., i]
 
     return coordsND

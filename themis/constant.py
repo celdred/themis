@@ -84,11 +84,7 @@ class Constant(ufl.Coefficient):
     def assign(self, value):
         """Set the value of this constant.
         :arg value: A value of the appropriate shape"""
-        try:
-            self.dat = value
-            return self
-        except:
-            raise ValueError('Issue setting value of constant')
+        self.dat, _, _ = _globalify(value)
 
     def __iadd__(self, o):
         raise NotImplementedError("Augmented assignment to Constant not implemented")

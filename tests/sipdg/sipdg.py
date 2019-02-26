@@ -1,125 +1,125 @@
-
-
-from common import PETSc,errornorm,dx,DumbCheckpoint,sin,sinh,inner,grad,FILE_CREATE,div,avg,jump,as_vector,Dx,ds,dS,FacetNormal,action
-from common import FiniteElement,FunctionSpace,SpatialCoordinate,Function,Projector,NonlinearVariationalProblem,NonlinearVariationalSolver
-from common import IntervalMesh,SquareMesh,PeriodicIntervalMesh,PeriodicSquareMesh,interval,quadrilateral,triangle,ExtrudedMesh,TensorProductElement
-from common import TestFunction,DirichletBC,pi,TestFunctions,TrialFunctions,TrialFunction
-from common import QuadCoefficient,ThemisQuadratureNumerical,ds_v,ds_t,ds_b,dS_h,dS_v
-from common import create_mesh,create_elems
+from common import PETSc, errornorm, dx, DumbCheckpoint, sin, inner, grad, avg, jump, ds, dS, FacetNormal, action
+from common import FunctionSpace, SpatialCoordinate, Function, Projector, NonlinearVariationalProblem, NonlinearVariationalSolver
+from common import TestFunction, pi, TrialFunction
+from common import QuadCoefficient, ThemisQuadratureNumerical, ds_v, ds_t, ds_b, dS_h, dS_v
+from common import create_mesh, create_elems
 
 OptDB = PETSc.Options()
 order = OptDB.getInt('order', 1)
 simname = OptDB.getString('simname', 'test')
 variant = OptDB.getString('variant', 'feec')
-xbc = OptDB.getString('xbc', 'nonperiodic') #periodic nonperiodic 
-ybc = OptDB.getString('ybc', 'nonperiodic') #periodic nonperiodic
-zbc = OptDB.getString('zbc', 'nonperiodic') #periodic nonperiodic
-nx = OptDB.getInt('nx', 16) 
+xbc = OptDB.getString('xbc', 'nonperiodic')  # periodic nonperiodic
+ybc = OptDB.getString('ybc', 'nonperiodic')  # periodic nonperiodic
+zbc = OptDB.getString('zbc', 'nonperiodic')  # periodic nonperiodic
+nx = OptDB.getInt('nx', 16)
 ny = OptDB.getInt('ny', 16)
 nz = OptDB.getInt('nz', 16)
 ndims = OptDB.getInt('ndims', 2)
 cell = OptDB.getString('cell', 'quad')
-plot = OptDB.getBool('plot', True) #periodic nonperiodic
+plot = OptDB.getBool('plot', True)  # periodic nonperiodic
 
-PETSc.Sys.Print(variant,order,cell,ndims,xbc,ybc,zbc,nx,ny,nz)
+PETSc.Sys.Print(variant, order, cell, ndims, xbc, ybc, zbc, nx, ny, nz)
 
 nquadplot_default = order
 if variant == 'mgd' and order > 1:
     nquadplot_default = 2
 nquadplot = OptDB.getInt('nquadplot', nquadplot_default)
-xbcs = [xbc,ybc,zbc]	
+xbcs = [xbc, ybc, zbc]
 
 
-#create mesh and spaces
-mesh = create_mesh(nx,ny,nz,ndims,cell,xbcs)
-h1elem,l2elem,hdivelem,hcurlelem = create_elems(ndims,cell,variant,order+1) # must use order + 1 here since this returns FEEC complex compatible L2
+# create mesh and spaces
+mesh = create_mesh(nx, ny, nz, ndims, cell, xbcs)
+h1elem, l2elem, hdivelem, hcurlelem = create_elems(ndims, cell, variant, order+1)  # must use order + 1 here since this returns FEEC complex compatible L2
 
-l2 = FunctionSpace(mesh,l2elem)
+l2 = FunctionSpace(mesh, l2elem)
 
-#set rhs/soln
+# set rhs/soln
 xs = SpatialCoordinate(mesh)
 
 a = 1. / pi
 if ndims == 1:
-	x = xs[0]
-	rhsexpr = (64. /  a  / a) * sin(4. * x / a)
-	solnexpr = 4. * sin(4. * x / a)
+    x = xs[0]
+    rhsexpr = (64. / a / a) * sin(4. * x / a)
+    solnexpr = 4. * sin(4. * x / a)
 if ndims == 2:
-	x = xs[0]
-	y = xs[1]	
-	rhsexpr = (80. /  a  / a) * sin(2. * x / a) * sin(4. * y / a )
-	solnexpr = 4. * sin(2. * x / a) * sin(4. * y / a )
+    x = xs[0]
+    y = xs[1]
+    rhsexpr = (80. / a / a) * sin(2. * x / a) * sin(4. * y / a)
+    solnexpr = 4. * sin(2. * x / a) * sin(4. * y / a)
 if ndims == 3:
-	x = xs[0]
-	y = xs[1]	
-	z = xs[2]	
-	rhsexpr = (224. /  a  / a) * sin(2. * x / a) * sin(4. * y / a ) * sin(6. * z / a )
-	solnexpr = 4. * sin(2. * x / a) * sin(4. * y / a ) * sin(6. * z / a )
+    x = xs[0]
+    y = xs[1]
+    z = xs[2]
+    rhsexpr = (224. / a / a) * sin(2. * x / a) * sin(4. * y / a) * sin(6. * z / a)
+    solnexpr = 4. * sin(2. * x / a) * sin(4. * y / a) * sin(6. * z / a)
 
-soln = Function(l2,name='soln')
-rhs = Function(l2,name='rhs')
-solnproj = Projector(solnexpr,soln,bcs=[]) #,options_prefix= 'masssys_'
-rhsproj = Projector(rhsexpr,rhs,bcs=[]) #,options_prefix= 'masssys_'
+soln = Function(l2, name='soln')
+rhs = Function(l2, name='rhs')
+solnproj = Projector(solnexpr, soln, bcs=[])  # ,options_prefix= 'masssys_'
+rhsproj = Projector(rhsexpr, rhs, bcs=[])  # ,options_prefix= 'masssys_'
 solnproj.project()
 rhsproj.project()
 
-#Create forms and problem
+# Create forms and problem
 u = TestFunction(l2)
-v  = TrialFunction(l2)
-x = Function(l2,name='x')
+v = TrialFunction(l2)
+x = Function(l2, name='x')
 
 n = FacetNormal(mesh)
-#THIS ASSUMES A UNIFORM GRID, SHOULD BE MORE CLEVER...
+# THIS ASSUMES A UNIFORM GRID, SHOULD BE MORE CLEVER...
 ddx = 1. / nx
 if variant == 'mgd':
-    penalty = 1. * (1. +1.) / ddx
+    penalty = 1. * (1. + 1.) / ddx
 else:
-    penalty = order * (order +1.) / ddx
+    penalty = order * (order + 1.) / ddx
 
-if cell in ['tpquad','tphex','tptri']:
-    dS = dS_v + dS_h
-    ds = ds_v + ds_t + ds_b
+if cell in ['tpquad', 'tphex', 'tptri']:
+    dIF = dS_v + dS_h
+    dEF = ds_v + ds_t + ds_b
+else:
+    dIF = dS
+    dEF = ds
 
-aV = inner(grad(u),grad(v)) * dx #volume term
-aIF = (inner(jump(u,n),jump(v,n)) * penalty - inner(avg(grad(u)),jump(v,n)) - inner(avg(grad(v)),jump(u,n))) * dS #interior facet term
-aEF = (u*v * penalty - inner(grad(u),v*n) - inner(grad(v),u*n)) * ds #exterior facet term
+aV = inner(grad(u), grad(v)) * dx  # volume term
+aIF = (inner(jump(u, n), jump(v, n)) * penalty - inner(avg(grad(u)), jump(v, n)) - inner(avg(grad(v)), jump(u, n))) * dIF  # interior facet term
+aEF = (u*v * penalty - inner(grad(u), v*n) - inner(grad(v), u*n)) * dEF  # exterior facet term
 a = aV + aEF + aIF
 
-Rlhs = action(a,x)
-Rrhs =  u * rhs * dx
+Rlhs = action(a, x)
+Rrhs = u * rhs * dx
 
-#create solvers
-problem = NonlinearVariationalProblem(Rlhs- Rrhs,x,bcs=[])
+# create solvers
+problem = NonlinearVariationalProblem(Rlhs - Rrhs, x, bcs=[])
 problem._constant_jacobian = True
-solver = NonlinearVariationalSolver(problem,options_prefix = 'linsys_',solver_parameters={'snes_type': 'ksponly'})
+solver = NonlinearVariationalSolver(problem, options_prefix='linsys_', solver_parameters={'snes_type': 'ksponly'})
 
-#solve system
+# solve system
 solver.solve()
 
-#compute norms
-l2err = errornorm(x,soln,norm_type='L2')
+# compute norms
+l2err = errornorm(x, soln, norm_type='L2')
 PETSc.Sys.Print(l2err)
 
-#output
+# output
 checkpoint = DumbCheckpoint(simname)
 checkpoint.store(x)
 checkpoint.store(soln)
 checkpoint.store(mesh.coordinates)
-diff = Function(l2,name='diff')
-diffproj = Projector(x-soln,diff) #options_prefix= 'masssys_'
+diff = Function(l2, name='diff')
+diffproj = Projector(x-soln, diff)  # options_prefix= 'masssys_'
 diffproj.project()
 checkpoint.store(diff)
 
-checkpoint.write_attribute('fields/','l2err',l2err)
+checkpoint.write_attribute('fields/', 'l2err', l2err)
 
 
-#evaluate
-evalquad = ThemisQuadratureNumerical('pascal',[nquadplot,])
-#SWAP TO L2 ONCE TSFC/UFL SUPPORT IT...
-xquad = QuadCoefficient(mesh,'scalar','h1',x,evalquad,name='x_quad')
-solnquad = QuadCoefficient(mesh,'scalar','h1',soln,evalquad,name='soln_quad')
-diffquad = QuadCoefficient(mesh,'scalar','h1',diff,evalquad,name='diff_quad')
-coordsquad = QuadCoefficient(mesh,'vector','h1',mesh.coordinates,evalquad,name='coords_quad')
+# evaluate
+evalquad = ThemisQuadratureNumerical('pascal', [nquadplot, ])
+# SWAP TO L2 ONCE TSFC/UFL SUPPORT IT...
+xquad = QuadCoefficient(mesh, 'scalar', 'h1', x, evalquad, name='x_quad')
+solnquad = QuadCoefficient(mesh, 'scalar', 'h1', soln, evalquad, name='soln_quad')
+diffquad = QuadCoefficient(mesh, 'scalar', 'h1', diff, evalquad, name='diff_quad')
+coordsquad = QuadCoefficient(mesh, 'vector', 'h1', mesh.coordinates, evalquad, name='coords_quad')
 xquad.evaluate()
 solnquad.evaluate()
 diffquad.evaluate()
@@ -131,10 +131,9 @@ checkpoint.store_quad(coordsquad)
 
 checkpoint.close()
 
-#plot
+# plot
 if plot:
     from common import plot_function
-    plot_function(x,xquad,coordsquad,'x')
-    plot_function(soln,solnquad,coordsquad,'soln')
-    plot_function(diff,diffquad,coordsquad,'diff')
-    
+    plot_function(x, xquad, coordsquad, 'x')
+    plot_function(soln, solnquad, coordsquad, 'soln')
+    plot_function(diff, diffquad, coordsquad, 'diff')

@@ -69,7 +69,7 @@ class Checkpoint():
         self._write_timestep_attr(group)
 
         self.viewer.pushGroup(group)
-        
+
         if isinstance(field, SplitFunction):
             fspace = field._parentspace
             silist = [field._si, ]
@@ -82,11 +82,13 @@ class Checkpoint():
                 soff = fspace.get_space_offset(si)
                 for ci in range(fspace.get_space(si).ncomp):
                     coff = fspace.get_space(si).get_component_offset(ci)
-                    #PETSc.Sys.Print(name,si,soff,ci,coff)
-                    if isinstance(field, SplitFunction): sii = 0
-                    if isinstance(field, Function): sii = si
+                    # PETSc.Sys.Print(name,si,soff,ci,coff)
+                    if isinstance(field, SplitFunction):
+                        sii = 0
+                    if isinstance(field, Function):
+                        sii = si
                     splitglobalvec[soff+coff].setName(name + '_' + str(sii) + '_' + str(ci))
-                    self.viewer.view(obj=splitglobalvec[soff+coff])                  
+                    self.viewer.view(obj=splitglobalvec[soff+coff])
         self.viewer.popGroup()
 
     def load(self, field, name=None):
@@ -103,14 +105,16 @@ class Checkpoint():
         if isinstance(field, Function):
             fspace = field.space
             silist = range(fspace.nspaces)
-            
+
         with fspace.get_composite_da().getAccess(field._vector) as splitglobalvec:
             for si in silist:
                 soff = fspace.get_space_offset(si)
                 for ci in range(fspace.get_space(si).ncomp):
                     coff = fspace.get_space(si).get_component_offset(ci)
-                    if isinstance(field, SplitFunction): sii = 0
-                    if isinstance(field, Function): sii = si
+                    if isinstance(field, SplitFunction):
+                        sii = 0
+                    if isinstance(field, Function):
+                        sii = si
                     splitglobalvec[soff+coff].setName(name + '_' + str(sii) + '_' + str(ci))
                     splitglobalvec[soff+coff].load(self.viewer)
         self.viewer.popGroup()

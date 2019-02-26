@@ -3,6 +3,7 @@ from ufl import MixedFunctionSpace as UFLMixedFunctionSpace
 from petscshim import PETSc
 from finiteelement import ThemisElement
 import numpy as np
+import ufl
 
 
 class FunctionSpace(UFLFunctionSpace):
@@ -209,19 +210,19 @@ class FunctionSpace(UFLFunctionSpace):
 
         self._themiselement = ThemisElement(element)
         self._uflelement = element
-		
+
         self.ncomp = self._themiselement.get_ncomp()
         self._mesh = mesh
         self._name = name
         self._spaces = [self, ]
         self.nspaces = 1
-		
+
         self._si = si
-        if parent == None:
+        if parent is None:
             self._parent = self
         else:
             self._parent = parent
-		
+
         UFLFunctionSpace.__init__(self, mesh, element)
 
         # create das and lgmaps
@@ -241,34 +242,34 @@ class FunctionSpace(UFLFunctionSpace):
         self._component_lgmaps = self._composite_da.getLGMaps()
         self._overall_lgmap = self._composite_da.getLGMap()
         self._cb_lis = self._composite_da.getLocalISs()
-        
-        #PETSc.Sys.Print(element,self._da[0][0].getGhostRanges(),self._da[0][0].getRanges())
-        
+
+        # PETSc.Sys.Print(element,self._da[0][0].getGhostRanges(),self._da[0][0].getRanges())
+
+
 class MixedFunctionSpace(UFLMixedFunctionSpace):
 
     def mesh(self):
         return self.ufl_domain()
 
     def __len__(self):
-        """Return the number of :class:`FunctionSpace`\s of which this
+        """Return the number of :class:`FunctionSpace` of which this
         :class:`MixedFunctionSpace` is composed."""
         return self.nspaces
 
-    def sub(self,i):
+    def sub(self, i):
         return self._spaces[i]
-		
+
     def split(self):
         return self._spaces
 
-    def __init__(self, spacelist,name='mixedspace'):
-        #self._spaces = spacelist
+    def __init__(self, spacelist, name='mixedspace'):
+        # self._spaces = spacelist
         self.nspaces = len(spacelist)
 
         # ADD CHECK THAT ALL SPACES ARE DEFINED ON THE SAME MESH
         self._spaces = []
-        for i,space in enumerate(spacelist):
-            self._spaces.append(FunctionSpace(spacelist[i]._mesh,spacelist[i]._uflelement,name=name+str(i),si=i,parent=self))
-
+        for i, space in enumerate(spacelist):
+            self._spaces.append(FunctionSpace(spacelist[i]._mesh, spacelist[i]._uflelement, name=name+str(i), si=i, parent=self))
 
         UFLMixedFunctionSpace.__init__(self, *spacelist)
 
@@ -386,14 +387,17 @@ def make_scalar_element(mesh, family, degree, vfamily, vdegree):
         return ufl.TensorProductElement(la, lb)
     else:
         return ufl.FiniteElement(family, cell=cell, degree=degree)
-        
-def VectorFunctionSpace(mesh, element, dim = None, name='fspace', si=0, parent=None):
+
+
+def VectorFunctionSpace(mesh, element, dim=None, name='fspace', si=0, parent=None):
 
     sub_element = make_scalar_element(element)
     dim = dim or mesh.ufl_cell().geometric_dimension()
     element = ufl.VectorElement(sub_element, dim=dim)
     return FunctionSpace(mesh, element, name=name)
 
-#IMPLEMENT THIS!
+# IMPLEMENT THIS!
+
+
 def TensorFunctionSpace():
     pass

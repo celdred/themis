@@ -3,9 +3,10 @@ import numpy as np
 
 from ufl import FiniteElement, interval
 from finiteelement import ThemisElement
-from finat.point_set import TensorPointSet,PointSet
-from function import Function,SplitFunction
+from finat.point_set import TensorPointSet
+from function import Function, SplitFunction
 from constant import Constant
+
 
 def a_to_cinit_string(x):
     np.set_printoptions(threshold=np.prod(x.shape))
@@ -17,10 +18,12 @@ def a_to_cinit_string(x):
 
 # Needed for code generation, just holds field specific stuff like offsets, etc.
 
+
 class FieldObject():
     def __init__(self):
         pass
-        
+
+
 class TabObject():
     def __init__(self):
         pass
@@ -29,9 +32,10 @@ class TabObject():
 exterior_facet_types = ['exterior_facet', 'exterior_facet_vert', 'exterior_facet_bottom', 'exterior_facet_top']
 interior_facet_types = ['interior_facet', 'interior_facet_vert', 'interior_facet_horiz']
 
+
 def generate_assembly_routine(mesh, space1, space2, kernel):
     # load templates
-    templateLoader = jinja2.FileSystemLoader(searchpath=["../../gitrepo/themis","../gitrepo/themis" ])
+    templateLoader = jinja2.FileSystemLoader(searchpath=["../../gitrepo/themis", "../gitrepo/themis"])
 
     # create environment
     templateEnv = jinja2.Environment(loader=templateLoader, trim_blocks=True)
@@ -57,10 +61,10 @@ def generate_assembly_routine(mesh, space1, space2, kernel):
     templateVars['bcs'] = mesh.bcs
 
     # Load element specific information- offsets/offset mult
- 
-	#THIS LOGIC CAN MAYBE MOVE TO FE?
-	#IE AN ELEMENT INFO-TYPE THING?
-	
+
+    # THIS LOGIC CAN MAYBE MOVE TO FE?
+    # IE AN ELEMENT INFO-TYPE THING?
+
     if not (space1 is None):
         space1size = space1.ncomp
         offsets1_x = []
@@ -80,33 +84,33 @@ def generate_assembly_routine(mesh, space1, space2, kernel):
         elem1 = space1.themis_element()
         for ci1 in range(space1size):
             s1dalist = s1dalist + ',' + 'DM s1da_' + str(ci1)
-            
-            nb = elem1.get_nblocks(ci1,0)
-            of, ofm = elem1.get_offsets(ci1,0)
+
+            nb = elem1.get_nblocks(ci1, 0)
+            of, ofm = elem1.get_offsets(ci1, 0)
             offsets1_x.append(a_to_cinit_string(of))
             offset_mult1_x.append(a_to_cinit_string(ofm))
-            #offsets1_x.append(a_to_cinit_string(of[(nb-1)//2,:]))
-            #offset_mult1_x.append(a_to_cinit_string(ofm[(nb-1)//2,:]))
+            # offsets1_x.append(a_to_cinit_string(of[(nb-1)//2,:]))
+            # offset_mult1_x.append(a_to_cinit_string(ofm[(nb-1)//2,:]))
             nblocks1_x.append(nb)
-            nbasis1_x.append(of.shape[1]) #assumption that each block has the same number of basis functions, which is fundamental
+            nbasis1_x.append(of.shape[1])  # assumption that each block has the same number of basis functions, which is fundamental
 
-            nb = elem1.get_nblocks(ci1,1)
-            of, ofm = elem1.get_offsets(ci1,1)
+            nb = elem1.get_nblocks(ci1, 1)
+            of, ofm = elem1.get_offsets(ci1, 1)
             offsets1_y.append(a_to_cinit_string(of))
             offset_mult1_y.append(a_to_cinit_string(ofm))
-            #offsets1_y.append(a_to_cinit_string(of[(nb-1)//2,:]))
-            #offset_mult1_y.append(a_to_cinit_string(ofm[(nb-1)//2,:]))
+            # offsets1_y.append(a_to_cinit_string(of[(nb-1)//2,:]))
+            # offset_mult1_y.append(a_to_cinit_string(ofm[(nb-1)//2,:]))
             nblocks1_y.append(nb)
-            nbasis1_y.append(of.shape[1]) #assumption that each block has the same number of basis functions, which is fundamental
-			
-            nb = elem1.get_nblocks(ci1,2)
-            of, ofm = elem1.get_offsets(ci1,2)
+            nbasis1_y.append(of.shape[1])  # assumption that each block has the same number of basis functions, which is fundamental
+
+            nb = elem1.get_nblocks(ci1, 2)
+            of, ofm = elem1.get_offsets(ci1, 2)
             offsets1_z.append(a_to_cinit_string(of))
             offset_mult1_z.append(a_to_cinit_string(ofm))
-            #offsets1_z.append(a_to_cinit_string(of[(nb-1)//2,:]))
-            #offset_mult1_z.append(a_to_cinit_string(ofm[(nb-1)//2,:]))
+            # offsets1_z.append(a_to_cinit_string(of[(nb-1)//2,:]))
+            # offset_mult1_z.append(a_to_cinit_string(ofm[(nb-1)//2,:]))
             nblocks1_z.append(nb)
-            nbasis1_z.append(of.shape[1]) #assumption that each block has the same number of basis functions, which is fundamental
+            nbasis1_z.append(of.shape[1])  # assumption that each block has the same number of basis functions, which is fundamental
 
         nbasis1_total = np.sum(np.array(nbasis1_x, dtype=np.int32) * np.array(nbasis1_y, dtype=np.int32) * np.array(nbasis1_z, dtype=np.int32))
 
@@ -130,34 +134,33 @@ def generate_assembly_routine(mesh, space1, space2, kernel):
         for ci2 in range(space2size):
             s2dalist = s2dalist + ',' + 'DM s2da_' + str(ci2)
 
-            nb = elem2.get_nblocks(ci2,0)
-            of, ofm = elem2.get_offsets(ci2,0)
+            nb = elem2.get_nblocks(ci2, 0)
+            of, ofm = elem2.get_offsets(ci2, 0)
             offsets2_x.append(a_to_cinit_string(of))
             offset_mult2_x.append(a_to_cinit_string(ofm))
-            #offsets2_x.append(a_to_cinit_string(of[(nb-1)//2,:]))
-            #offset_mult2_x.append(a_to_cinit_string(ofm[(nb-1)//2,:]))
+            # offsets2_x.append(a_to_cinit_string(of[(nb-1)//2,:]))
+            # offset_mult2_x.append(a_to_cinit_string(ofm[(nb-1)//2,:]))
             nblocks2_x.append(nb)
-            nbasis2_x.append(of.shape[1]) #assumption that each block has the same number of basis functions, which is fundamental
+            nbasis2_x.append(of.shape[1])  # assumption that each block has the same number of basis functions, which is fundamental
 
-
-            nb = elem2.get_nblocks(ci2,1)
-            of, ofm = elem2.get_offsets(ci2,1)
+            nb = elem2.get_nblocks(ci2, 1)
+            of, ofm = elem2.get_offsets(ci2, 1)
             offsets2_y.append(a_to_cinit_string(of))
             offset_mult2_y.append(a_to_cinit_string(ofm))
-            #offsets2_y.append(a_to_cinit_string(of[(nb-1)//2,:]))
-            #offset_mult2_y.append(a_to_cinit_string(ofm[(nb-1)//2,:]))
+            # offsets2_y.append(a_to_cinit_string(of[(nb-1)//2,:]))
+            # offset_mult2_y.append(a_to_cinit_string(ofm[(nb-1)//2,:]))
             nblocks2_y.append(nb)
-            nbasis2_y.append(of.shape[1]) #assumption that each block has the same number of basis functions, which is fundamental
+            nbasis2_y.append(of.shape[1])  # assumption that each block has the same number of basis functions, which is fundamental
 
-            nb = elem2.get_nblocks(ci2,2)
-            of, ofm = elem2.get_offsets(ci2,2)
+            nb = elem2.get_nblocks(ci2, 2)
+            of, ofm = elem2.get_offsets(ci2, 2)
             offsets2_z.append(a_to_cinit_string(of))
             offset_mult2_z.append(a_to_cinit_string(ofm))
-            #offsets2_z.append(a_to_cinit_string(of[(nb-1)//2,:]))
-            #offset_mult2_z.append(a_to_cinit_string(ofm[(nb-1)//2,:]))
+            # offsets2_z.append(a_to_cinit_string(of[(nb-1)//2,:]))
+            # offset_mult2_z.append(a_to_cinit_string(ofm[(nb-1)//2,:]))
             nblocks2_z.append(nb)
-            nbasis2_z.append(of.shape[1]) #assumption that each block has the same number of basis functions, which is fundamental
-			
+            nbasis2_z.append(of.shape[1])  # assumption that each block has the same number of basis functions, which is fundamental
+
         nbasis2_total = np.sum(np.array(nbasis2_x, dtype=np.int32) * np.array(nbasis2_y, dtype=np.int32) * np.array(nbasis2_z, dtype=np.int32))
 
     # load fields info, including coordinates
@@ -207,32 +210,32 @@ def generate_assembly_routine(mesh, space1, space2, kernel):
         for ci in range(fspace.get_space(si).ncomp):
             elem = fspace.get_space(si).themis_element()
 
-            nb = elem.get_nblocks(ci,0)
-            of, ofm = elem.get_offsets(ci,0)
+            nb = elem.get_nblocks(ci, 0)
+            of, ofm = elem.get_offsets(ci, 0)
             fieldobj.offsets_x.append(a_to_cinit_string(of))
             fieldobj.offset_mult_x.append(a_to_cinit_string(ofm))
-            #fieldobj.offsets_x.append(a_to_cinit_string(of[(nb-1)//2,:]))
-            #fieldobj.offset_mult_x.append(a_to_cinit_string(ofm[(nb-1)//2,:]))
+            # fieldobj.offsets_x.append(a_to_cinit_string(of[(nb-1)//2,:]))
+            # fieldobj.offset_mult_x.append(a_to_cinit_string(ofm[(nb-1)//2,:]))
             fieldobj.nblocks_x.append(nb)
-            fieldobj.nbasis_x.append(of.shape[1]) #assumption that each block has the same number of basis functions, which is fundamental
+            fieldobj.nbasis_x.append(of.shape[1])  # assumption that each block has the same number of basis functions, which is fundamental
 
-            nb = elem.get_nblocks(ci,1)
-            of, ofm = elem.get_offsets(ci,1)
+            nb = elem.get_nblocks(ci, 1)
+            of, ofm = elem.get_offsets(ci, 1)
             fieldobj.offsets_y.append(a_to_cinit_string(of))
             fieldobj.offset_mult_y.append(a_to_cinit_string(ofm))
-            #fieldobj.offsets_y.append(a_to_cinit_string(of[(nb-1)//2,:]))
-            #fieldobj.offset_mult_y.append(a_to_cinit_string(ofm[(nb-1)//2,:]))
+            # fieldobj.offsets_y.append(a_to_cinit_string(of[(nb-1)//2,:]))
+            # fieldobj.offset_mult_y.append(a_to_cinit_string(ofm[(nb-1)//2,:]))
             fieldobj.nblocks_y.append(nb)
-            fieldobj.nbasis_y.append(of.shape[1]) #assumption that each block has the same number of basis functions, which is fundamental
+            fieldobj.nbasis_y.append(of.shape[1])  # assumption that each block has the same number of basis functions, which is fundamental
 
-            nb = elem.get_nblocks(ci,2)
-            of, ofm = elem.get_offsets(ci,2)
+            nb = elem.get_nblocks(ci, 2)
+            of, ofm = elem.get_offsets(ci, 2)
             fieldobj.offsets_z.append(a_to_cinit_string(of))
             fieldobj.offset_mult_z.append(a_to_cinit_string(ofm))
-            #fieldobj.offsets_z.append(a_to_cinit_string(of[(nb-1)//2,:]))
-            #fieldobj.offset_mult_z.append(a_to_cinit_string(ofm[(nb-1)//2,:]))
+            # fieldobj.offsets_z.append(a_to_cinit_string(of[(nb-1)//2,:]))
+            # fieldobj.offset_mult_z.append(a_to_cinit_string(ofm[(nb-1)//2,:]))
             fieldobj.nblocks_z.append(nb)
-            fieldobj.nbasis_z.append(of.shape[1]) #assumption that each block has the same number of basis functions, which is fundamental
+            fieldobj.nbasis_z.append(of.shape[1])  # assumption that each block has the same number of basis functions, which is fundamental
 
             dmname = 'DM da_' + fieldobj.name + '_' + str(ci)
             vecname = 'Vec ' + fieldobj.name + '_' + str(ci)
@@ -245,87 +248,89 @@ def generate_assembly_routine(mesh, space1, space2, kernel):
 
     for constant in constantlist:
         constant_args_string = constant_args_string + ',' + 'double ' + constant.name()
-        
+
     tabulations = []
 
     for tabulation in kernel.tabulations:
 
         tabobj = TabObject()
         tabobj.name = tabulation['name']
-        
+
         # get the quadrature points for the tabulation
-        shape = tabulation['shape']        
+        shape = tabulation['shape']
         ps = kernel.finatquad.point_set
-        
+
         if kernel.integral_type == 'cell':
             allpts = []
-            if isinstance(ps,TensorPointSet):
-                ps1,ps2 = ps.factors
-                if isinstance(ps1,TensorPointSet):
-                    subps1,subps2 = ps1.factors
+            if isinstance(ps, TensorPointSet):
+                ps1, ps2 = ps.factors
+                if isinstance(ps1, TensorPointSet):
+                    subps1, subps2 = ps1.factors
                     allpts.append(subps1.points[:, 0])
-                    allpts.append(subps2.points[:, 0])                
-                    allpts.append(ps2.points[:, 0])                
+                    allpts.append(subps2.points[:, 0])
+                    allpts.append(ps2.points[:, 0])
                 else:
                     allpts.append(ps1.points[:, 0])
                     allpts.append(ps2.points[:, 0])
             else:
                 allpts.append(ps.points[:, 0])
             pts = allpts[tabulation['shiftaxis']]
-            
-        elif kernel.integral_type in exterior_facet_types + interior_facet_types:
-            restrict = tabulation['restrict'] 
 
-            if restrict == 'p': zerodim_pts = np.zeros(shape[0])
-            elif restrict == 'm': zerodim_pts = np.ones(shape[0])
+        elif kernel.integral_type in exterior_facet_types + interior_facet_types:
+            restrict = tabulation['restrict']
+
+            if restrict == 'p':
+                zerodim_pts = np.zeros(shape[0])
+            elif restrict == 'm':
+                zerodim_pts = np.ones(shape[0])
             elif restrict == '':
-                 if kernel.facet_exterior_boundary == 'upper': zerodim_pts = np.ones(shape[0])
-                 elif kernel.facet_exterior_boundary == 'lower': zerodim_pts = np.zeros(shape[0])
-                     
-            if ndims == 1: # pointwise integrals
-                allpts = [zerodim_pts,None,None]
-                     
-            elif ndims == 2: #line integrals
-                if kernel.integral_type in ['interior_facet_horiz','exterior_facet_top','exterior_facet_bottom']: # always y facets
-                    actualpts = ps.factors[0].points[:,0]
-                elif kernel.integral_type in ['interior_facet_vert','exterior_facet_vert']: #always x facets
-                    actualpts = ps.factors[1].points[:,0]
-                elif kernel.integral_type in ['interior_facet','exterior_facet']:  # x or y facets
-                    actualpts = ps.points[:,0]
-                if kernel.facet_direc == 0: # x facets
+                if kernel.facet_exterior_boundary == 'upper':
+                    zerodim_pts = np.ones(shape[0])
+                elif kernel.facet_exterior_boundary == 'lower':
+                    zerodim_pts = np.zeros(shape[0])
+
+            if ndims == 1:  # pointwise integrals
+                allpts = [zerodim_pts, None, None]
+
+            elif ndims == 2:  # line integrals
+                if kernel.integral_type in ['interior_facet_horiz', 'exterior_facet_top', 'exterior_facet_bottom']:  # always y facets
+                    actualpts = ps.factors[0].points[:, 0]
+                elif kernel.integral_type in ['interior_facet_vert', 'exterior_facet_vert']:  # always x facets
+                    actualpts = ps.factors[1].points[:, 0]
+                elif kernel.integral_type in ['interior_facet', 'exterior_facet']:  # x or y facets
+                    actualpts = ps.points[:, 0]
+                if kernel.facet_direc == 0:  # x facets
                     allpts = [zerodim_pts, actualpts, None]
-                if kernel.facet_direc == 1: # y facets
+                if kernel.facet_direc == 1:  # y facets
                     allpts = [actualpts, zerodim_pts, None]
 
-            
-            elif ndims == 3: #facet integrals
-                if kernel.integral_type in ['interior_facet_horiz','exterior_facet_top','exterior_facet_bottom']: # always z facets
-                    ptsx = ps.factors[0].factors[0].points[:,0]
-                    ptsy = ps.factors[0].factors[1].points[:,0]
+            elif ndims == 3:  # facet integrals
+                if kernel.integral_type in ['interior_facet_horiz', 'exterior_facet_top', 'exterior_facet_bottom']:  # always z facets
+                    ptsx = ps.factors[0].factors[0].points[:, 0]
+                    ptsy = ps.factors[0].factors[1].points[:, 0]
                     ptsz = zerodim_pts
-                elif kernel.integral_type in ['interior_facet_vert','exterior_facet_vert']:
-                    if kernel.facet_direc == 0: # x facets
-                        ptsy = ps.factors[0].points[:,0]
-                        ptsz = ps.factors[1].points[:,0]
+                elif kernel.integral_type in ['interior_facet_vert', 'exterior_facet_vert']:
+                    if kernel.facet_direc == 0:  # x facets
+                        ptsy = ps.factors[0].points[:, 0]
+                        ptsz = ps.factors[1].points[:, 0]
                         ptsx = zerodim_pts
-                    if kernel.facet_direc == 1: # z facets
-                        ptsx = ps.factors[0].points[:,0]
-                        ptsz = ps.factors[1].points[:,0]
+                    if kernel.facet_direc == 1:  # z facets
+                        ptsx = ps.factors[0].points[:, 0]
+                        ptsz = ps.factors[1].points[:, 0]
                         ptsy = zerodim_pts
-                elif kernel.integral_type in ['interior_facet','exterior_facet']:  #x, y or z facets
+                elif kernel.integral_type in ['interior_facet', 'exterior_facet']:  # x, y or z facets
                     raise NotImplementedError('Facet integrals for non-TP in 3D are not yet implemented')
-                    
-                allpts = [ptsx,ptsy,ptsz]
-                
+
+                allpts = [ptsx, ptsy, ptsz]
+
             pts = allpts[tabulation['shiftaxis']]
- 
+
         if tabulation['discont'] is False:
             uflelem = FiniteElement("CG", interval, tabulation['order'], variant=tabulation['variant'])
         if tabulation['discont'] is True:
             uflelem = FiniteElement("DG", interval, tabulation['order'], variant=tabulation['variant'])
         tabelem = ThemisElement(uflelem)
-        
-        
+
         if tabulation['derivorder'] == 0:
             vals = tabelem.get_basis(0, 0, pts)
         if tabulation['derivorder'] == 1:
@@ -333,15 +338,13 @@ def generate_assembly_routine(mesh, space1, space2, kernel):
         if tabulation['derivorder'] == 2:
             vals = tabelem.get_derivs2(0, 0, pts)
 # HACK
-        #tabobj.values = a_to_cinit_string(vals[(vals.shape[0]-1)//2,:,:])
+        # tabobj.values = a_to_cinit_string(vals[(vals.shape[0]-1)//2,:,:])
         tabobj.values = a_to_cinit_string(vals)
         tabobj.npts = vals.shape[1]
         tabobj.nbasis = vals.shape[2]
         tabobj.nblocks = vals.shape[0]
         tabobj.shiftaxis = tabulation['shiftaxis']
-        
 
-        
         tabobj.cell = 'bad'
         # Key: we define 1 = - and 2 = +
         if kernel.integral_type in interior_facet_types:
@@ -354,23 +357,22 @@ def generate_assembly_routine(mesh, space1, space2, kernel):
                 tabobj.cell = '2'
             if kernel.facet_exterior_boundary == 'upper':
                 tabobj.cell = '1'
-                
+
         # sanity checks
         assert(tabulation['shape'] == vals.shape[1:])
-        assert(tabelem.get_nblocks(0,0) == vals.shape[0])
-        
+        assert(tabelem.get_nblocks(0, 0) == vals.shape[0])
+
         tabulations.append(tabobj)
 
         # construct element (or get it from the list of fields/space1/space2/coords)?
         # add tabulations to templateVars
     templateVars['tabulations'] = tabulations
 
-
-    if kernel.integral_type in ['interior_facet_horiz','exterior_facet_bottom','exterior_facet_top']:
+    if kernel.integral_type in ['interior_facet_horiz', 'exterior_facet_bottom', 'exterior_facet_top']:
         templateVars['extruded'] = 1
     else:
         templateVars['extruded'] = 0
-        
+
     if kernel.formdim == 2:
         matlist = ''
         for ci1 in range(space1size):
@@ -388,8 +390,6 @@ def generate_assembly_routine(mesh, space1, space2, kernel):
         templateVars['kernelstr'] = kernel.ast
         templateVars['kernelname'] = kernel.name
 
-
-    
     templateVars['formdim'] = kernel.formdim
     templateVars['assemblytype'] = kernel.integral_type
 
@@ -467,7 +467,7 @@ def generate_assembly_routine(mesh, space1, space2, kernel):
 
 def generate_evaluate_routine(mesh, kernel):
     # load templates
-    templateLoader = jinja2.FileSystemLoader(searchpath=["../../gitrepo/themis","../gitrepo/themis" ])
+    templateLoader = jinja2.FileSystemLoader(searchpath=["../../gitrepo/themis", "../gitrepo/themis"])
 
     # create environment
     templateEnv = jinja2.Environment(loader=templateLoader, trim_blocks=True)
@@ -485,23 +485,23 @@ def generate_evaluate_routine(mesh, kernel):
     # get the list of fields
     fieldlist = []
     fieldlist.append((mesh.coordinates, 0))
-    
+
     field = kernel.field
 # EVALUATION ON AN UNSPLIT MIXED FIELD SHOULD FAIL!
-    if isinstance(field,Function):
+    if isinstance(field, Function):
         if field.name() == mesh.coordinates.name():
             evalfieldindex = 0
         else:
             for si in range(field.function_space().nspaces):
                 fieldlist.append((field, si))
             evalfieldindex = 1
-    if isinstance(field,SplitFunction):
+    if isinstance(field, SplitFunction):
         for si in range(field._parentfunction.function_space().nspaces):
             fieldlist.append((field._parentfunction, si))
         evalfieldindex = field._si + 1
 
     pts = kernel.quad.get_pts()
-    
+
     for field, si in fieldlist:
         fspace = field.function_space().get_space(si)
         fieldobj = FieldObject()
@@ -523,43 +523,43 @@ def generate_evaluate_routine(mesh, kernel):
         fieldobj.derivs_z = []
         fieldobj.nblocks_x = []
         fieldobj.nblocks_y = []
-        fieldobj.nblocks_z = []        
+        fieldobj.nblocks_z = []
         fieldobj.ndofs = fspace.get_space(si).themis_element().ndofs()
         for ci in range(fspace.get_space(si).ncomp):
             elem = fspace.get_space(si).themis_element()
 
-            nb = elem.get_nblocks(ci,0)
-            of, ofm = elem.get_offsets(ci,0)
-            b = elem.get_basis(ci,0,pts[0])
-            d = elem.get_derivs(ci,0,pts[0])
+            nb = elem.get_nblocks(ci, 0)
+            of, ofm = elem.get_offsets(ci, 0)
+            b = elem.get_basis(ci, 0, pts[0])
+            d = elem.get_derivs(ci, 0, pts[0])
             fieldobj.basis_x.append(a_to_cinit_string(b))
             fieldobj.derivs_x.append(a_to_cinit_string(d))
             fieldobj.offsets_x.append(a_to_cinit_string(of))
             fieldobj.offset_mult_x.append(a_to_cinit_string(ofm))
             fieldobj.nblocks_x.append(nb)
-            fieldobj.nbasis_x.append(of.shape[1]) #assumption that each block has the same number of basis functions, which is fundamental
+            fieldobj.nbasis_x.append(of.shape[1])  # assumption that each block has the same number of basis functions, which is fundamental
 
-            nb = elem.get_nblocks(ci,1)
-            of, ofm = elem.get_offsets(ci,1)
-            b = elem.get_basis(ci,1,pts[1])
-            d = elem.get_derivs(ci,1,pts[1])
+            nb = elem.get_nblocks(ci, 1)
+            of, ofm = elem.get_offsets(ci, 1)
+            b = elem.get_basis(ci, 1, pts[1])
+            d = elem.get_derivs(ci, 1, pts[1])
             fieldobj.basis_y.append(a_to_cinit_string(b))
             fieldobj.derivs_y.append(a_to_cinit_string(d))
             fieldobj.offsets_y.append(a_to_cinit_string(of))
             fieldobj.offset_mult_y.append(a_to_cinit_string(ofm))
             fieldobj.nblocks_y.append(nb)
-            fieldobj.nbasis_y.append(of.shape[1]) #assumption that each block has the same number of basis functions, which is fundamental
+            fieldobj.nbasis_y.append(of.shape[1])  # assumption that each block has the same number of basis functions, which is fundamental
 
-            nb = elem.get_nblocks(ci,2)
-            of, ofm = elem.get_offsets(ci,2)
-            b = elem.get_basis(ci,2,pts[2])
-            d = elem.get_derivs(ci,2,pts[2])
+            nb = elem.get_nblocks(ci, 2)
+            of, ofm = elem.get_offsets(ci, 2)
+            b = elem.get_basis(ci, 2, pts[2])
+            d = elem.get_derivs(ci, 2, pts[2])
             fieldobj.basis_z.append(a_to_cinit_string(b))
             fieldobj.derivs_z.append(a_to_cinit_string(d))
             fieldobj.offsets_z.append(a_to_cinit_string(of))
             fieldobj.offset_mult_z.append(a_to_cinit_string(ofm))
             fieldobj.nblocks_z.append(nb)
-            fieldobj.nbasis_z.append(of.shape[1]) #assumption that each block has the same number of basis functions, which is fundamental
+            fieldobj.nbasis_z.append(of.shape[1])  # assumption that each block has the same number of basis functions, which is fundamental
 
             dmname = 'DM da_' + fieldobj.name + '_' + str(ci)
             vecname = 'Vec ' + fieldobj.name + '_' + str(ci)
@@ -568,7 +568,6 @@ def generate_evaluate_routine(mesh, kernel):
         fieldobj.nbasis_total = np.sum(np.array(fieldobj.nbasis_x, dtype=np.int32) * np.array(fieldobj.nbasis_y, dtype=np.int32) * np.array(fieldobj.nbasis_z, dtype=np.int32))
         fieldobj.ncomp = fspace.get_space(si).ncomp
         fieldobjs.append(fieldobj)
-
 
     vals_args_string = ''
     dmname = 'DM da_vals'

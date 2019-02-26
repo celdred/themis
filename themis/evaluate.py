@@ -1,7 +1,8 @@
 from petscshim import PETSc
-from assembly import extract_fields,compile_functional
+from assembly import extract_fields, compile_functional
 import numpy as np
-from function import Function,SplitFunction
+from function import Function, SplitFunction
+
 
 class QuadCoefficient():
     def __init__(self, mesh, ctype, etype, evalfield, quad, name='xquad'):
@@ -11,7 +12,6 @@ class QuadCoefficient():
         self.evalfield = evalfield
 # NEED A GOOD DEFAULT NAME HERE!!!
         self._name = name
-
 
         dm = mesh.get_cell_da()
         nquadlist = quad.get_nquad()
@@ -32,12 +32,12 @@ class QuadCoefficient():
             shape.append(mesh.ndim)
             shape.append(mesh.ndim)
 
-        self.dm  = newdm
+        self.dm = newdm
         self.shape = shape
         self.vec = newdm.createGlobalVector()
-		
-        self.evalkernel = EvalKernel(mesh,evalfield,quad,ctype,etype,name)
-        
+
+        self.evalkernel = EvalKernel(mesh, evalfield, quad, ctype, etype, name)
+
     def getarray(self):
         arr = self.dm.getVecArray(self.vec)[:]
         arr = np.reshape(arr, self.shape)
@@ -45,36 +45,38 @@ class QuadCoefficient():
 
     def name(self):
         return self._name
-        
+
     def evaluate(self):
-        EvaluateCoefficient(self,self.evalkernel)
+        EvaluateCoefficient(self, self.evalkernel)
+
 
 class EvalKernel():
-    def __init__(self,mesh,field, quad, ctype,etype,name):
-        
+    def __init__(self, mesh, field, quad, ctype, etype, name):
+
         self.integral_type = 'cell'
         self.oriented = False
         self.coefficient_numbers = [0, ]
-        self.coefficient_map = [0,] 
+        self.coefficient_map = [0, ]
         self.zero = False
         self.assemblycompiled = False
         self.evaluate = True
-        
+
         self.ctype = ctype
         self.etype = etype
         self.name = name
         self.mesh = mesh
-        if isinstance(field,Function):
-            self.coefficients = [field,]
-        if isinstance(field,SplitFunction):
-            self.coefficients = [field._parentfunction,]
+        if isinstance(field, Function):
+            self.coefficients = [field, ]
+        if isinstance(field, SplitFunction):
+            self.coefficients = [field._parentfunction, ]
         self.field = field
         self.quad = quad
-        
+
+
 def EvaluateCoefficient(coefficient, evalkernel):
     with PETSc.Log.Stage(coefficient.name() + '_evaluate'):
 
-        #compile the kernel
+        # compile the kernel
         with PETSc.Log.Event('compile'):
             if not evalkernel.assemblycompiled:
                 compile_functional(evalkernel, None, None, coefficient.mesh)
@@ -86,6 +88,4 @@ def EvaluateCoefficient(coefficient, evalkernel):
         # evaluate
         with PETSc.Log.Event('evaluate'):
             for da, assemblefunc in zip(evalkernel.dalist, evalkernel.assemblyfunc_list):
-                assemblefunc([da, ] +  [coefficient.dm,coefficient.vec] + evalkernel.fieldargs_list, evalkernel.constantargs_list)
-
-
+                assemblefunc([da, ] + [coefficient.dm, coefficient.vec] + evalkernel.fieldargs_list, evalkernel.constantargs_list)

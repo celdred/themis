@@ -106,6 +106,6 @@ def lagrange_poly_support(i, p, x):
     '''
     try:
         n = len(p)
-    except:
+    except TypeError:
         n = p.shape[0]
     return LagrangePoly(x, n-1, i, xi=p)

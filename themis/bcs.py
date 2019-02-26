@@ -7,47 +7,46 @@ class DirichletBC():
 
     def __init__(self, space, val, subdomain, method='topological'):
         if not method == 'topological':
-            raise ValueError('%s method for setting boundary nodes is not supported',method)
-		
-		#ADD VAL CHECKS- SHOULD SUPPORT CONSTANTS/LITERALS, EXPRESSIONS AND FUNCTIONS
-		#ADD VAL DETERMINATION/CONVERSION IE TURN EXPRESSION INTO A FUNCTION!
-        
+            raise ValueError('%s method for setting boundary nodes is not supported', method)
+
+            # ADD VAL CHECKS- SHOULD SUPPORT CONSTANTS/LITERALS, EXPRESSIONS AND FUNCTIONS
+            # ADD VAL DETERMINATION/CONVERSION IE TURN EXPRESSION INTO A FUNCTION!
+
         self._space = space
         self._val = val
-        
-        #turn subdomains into a set of boundary nodes and create bvals and zerovals arrays
+
+        # turn subdomains into a set of boundary nodes and create bvals and zerovals arrays
 
         self._splitfieldglobalrows = []
         self._globalrows = []
         self._localrows = []
         self._bvals = []
         self._zerovals = []
-        
+
         direclist = space._mesh.get_boundary_direcs(subdomain)
         self.si = space._si
 
-
         localrowoffset = 0
-        for i in range(0,self.si):
+        for i in range(0, self.si):
             for ci in range(space._parent.get_space(i).ncomp):
                 localrowoffset = localrowoffset + space._parent.get_space(i).get_localghostedndofs(ci)
-                #PETSc.Sys.Print(space._parent.get_space(self.si).get_localndofs(ci, 0),space._parent.get_space(self.si).get_localghostedndofs(ci, 0))
-                #localrowoffset = localrowoffset + space._parent.get_space(self.si).get_localndofs(ci, 0)
+                # PETSc.Sys.Print(space._parent.get_space(self.si).get_localndofs(ci, 0),space._parent.get_space(self.si).get_localghostedndofs(ci, 0))
+                # localrowoffset = localrowoffset + space._parent.get_space(self.si).get_localndofs(ci, 0)
 
-        #PETSc.Sys.Print(space,space._si,localrowoffset)
+        # PETSc.Sys.Print(space,space._si,localrowoffset)
 
         for direc in direclist:
             for ci in range(space.get_space(self.si).ncomp):
                 rows = space.get_space(self.si).get_boundary_indices(ci, direc)  # returns split component local rows
                 if rows[0] == -1:
-                    rows = np.array([],dtype=np.int32)
-                
-                #PETSc.Sys.Print(direc,ci,rows,space.get_component_compositelgmap(self.si, ci, bi).apply(rows))
-                
+                    rows = np.array([], dtype=np.int32)
+
+                # PETSc.Sys.Print(direc,ci,rows,space.get_component_compositelgmap(self.si, ci, bi).apply(rows))
+
                 self._splitfieldglobalrows.append(space._parent.get_space(self.si).get_component_compositelgmap(self.si, ci).apply(rows))  # turns rows from split component local into split field global
                 self._globalrows.append(space._parent.get_component_compositelgmap(self.si, ci).apply(rows))  # turn rows from split component local into monolithic global
                 self._localrows.append(rows + localrowoffset)
-                
+
                 if len(rows) == 0:
                     self._bvals.append([])
                     self._zerovals.append([])
@@ -55,27 +54,26 @@ class DirichletBC():
                     self._bvals.append(np.ones(len(rows)) * float(val))  # WE CURRENTLY SUPPORT ONLY LITERALS FOR VAL
                     self._zerovals.append(np.zeros(len(rows)))
 
-        
         if not (len(direclist) == 0):
             self._splitfieldglobalrows = np.concatenate(self._splitfieldglobalrows)
             self._globalrows = np.concatenate(self._globalrows)
             self._localrows = np.concatenate(self._localrows)
             self._zerovals = np.concatenate(self._zerovals)
             self._bvals = np.concatenate(self._bvals)
-            
-        #PETSc.Sys.Print(self._localrows)
-        #PETSc.Sys.Print(self._globalrows)
-               		
+
+        # PETSc.Sys.Print(self._localrows)
+        # PETSc.Sys.Print(self._globalrows)
+
     def get_boundary_indices_local(self):
         return self._localrows
 
     def get_boundary_indices_global(self):
         return self._globalrows
-    
-    #IS THIS NEEDED?
-    #def get_boundary_indices_splitglobal(self):
-    #    return self._splitfieldglobalrows
-        
+
+    # IS THIS NEEDED?
+    # def get_boundary_indices_splitglobal(self):
+    #     return self._splitfieldglobalrows
+
     def apply_vector(self, vector, zero=False):
         if zero:
             vector.setValues(self._globalrows, self._zerovals, addv=PETSc.InsertMode.INSERT_VALUES)
@@ -83,11 +81,11 @@ class DirichletBC():
             vector.setValues(self._globalrows, self._bvals, addv=PETSc.InsertMode.INSERT_VALUES)
         vector.assemble()
 
-    def apply_mat(self,mat,mat_type):
-        
+    def apply_mat(self, mat, mat_type):
+
         if mat_type == 'aij':
-            mat.zeroRows(self._globalrows,1.0)
-            
+            mat.zeroRows(self._globalrows, 1.0)
+
         if mat_type == 'nest':
             space = self._space._parent
             isrow = space.get_field_lis(self.si)
@@ -99,7 +97,7 @@ class DirichletBC():
                 else:
                     submat.zeroRows(self._splitfieldglobalrows, 0.0)
                 restore_block(isrow, iscol, mat, submat)
-                
+
 # class DirichletBC():
 
     # # THIS DOES NOT SUPPORT SETTING BCS ON COMPONENTS OF A VECTOR SPACE
@@ -110,7 +108,6 @@ class DirichletBC():
     # # 2) A FUNCTION (IN SPACE)
     # # 3) A UFL EXPRESSION (THAT IS THEN PROJECTED INTO SPACE)
     # # 4) A CONSTANT (WHICH MIGHT HAVE TO BE PROJECTED INTO SPACE IFF THE SPACE IS NOT NODAL)
-
 
     # def __init__(self, space, si, val, direc):
 
@@ -174,11 +171,11 @@ class DirichletBC():
                 # iscol = self._space.get_field_lis(si)
                 # submat = get_block(mat, isrow, iscol)
                 # if (si == self.si):
-                    # submat.zeroRowsColumns(self._splitfieldglobalrows, 1.0)
-                    # # submat.zeroRows(self._splitfieldglobalrows,1.0)
+                # submat.zeroRowsColumns(self._splitfieldglobalrows, 1.0)
+                # # submat.zeroRows(self._splitfieldglobalrows,1.0)
                 # else:
-                    # submat.zeroRowsColumns(self._splitfieldglobalrows, 0.0)
-                    # # submat.zeroRows(self._splitfieldglobalrows,0.0)
+                # submat.zeroRowsColumns(self._splitfieldglobalrows, 0.0)
+                # # submat.zeroRows(self._splitfieldglobalrows,0.0)
                 # restore_block(isrow, iscol, mat, submat)
 
         # if mattype == 'aij':  # or (form.mattype == 'block' and (len(form.matrices) == 1) and (len(form.matrices[0]) == 1)):
