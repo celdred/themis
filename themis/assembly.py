@@ -1,6 +1,6 @@
 import numpy as np
 from petscshim import PETSc
-from codegenerator import generate_assembly_routine,generate_evaluate_routine
+from codegenerator import generate_assembly_routine, generate_evaluate_routine
 # import instant
 # from compilation_options import *
 # from tsfc_interface import compile_form
@@ -9,7 +9,7 @@ from mpi4py import MPI
 from function import Function
 from constant import Constant
 import functools
-#import time
+# import time
 
 from pyop2.utils import get_petsc_dir
 from pyop2 import compilation
@@ -53,93 +53,93 @@ def compile_functional(kernel, tspace, sspace, mesh):
         facet_exterior_boundary_list.append('')
 
     if kernel.integral_type == 'interior_facet':
-        kernel.dalist.append(mesh._edgex_da)
+        kernel.dalist.append(mesh.get_cell_da())
         facet_direc_list.append(0)
         facet_exterior_boundary_list.append('')
         if mesh.ndim >= 2:
-            kernel.dalist.append(mesh._edgey_da)
+            kernel.dalist.append(mesh.get_cell_da())
             facet_direc_list.append(1)
             facet_exterior_boundary_list.append('')
         if mesh.ndim >= 3:
-            kernel.dalist.append(mesh._edgez_da)
+            kernel.dalist.append(mesh.get_cell_da())
             facet_direc_list.append(2)
             facet_exterior_boundary_list.append('')
 
     if kernel.integral_type == 'exterior_facet':
         if mesh.bcs[0] == 'nonperiodic':
-            kernel.dalist.append(mesh._edgex_da)
-            kernel.dalist.append(mesh._edgex_da)
+            kernel.dalist.append(mesh.get_cell_da())
+            kernel.dalist.append(mesh.get_cell_da())
             facet_direc_list.append(0)
             facet_exterior_boundary_list.append('upper')
             facet_direc_list.append(0)
             facet_exterior_boundary_list.append('lower')
         if mesh.ndim >= 2 and mesh.bcs[1] == 'nonperiodic':
-            kernel.dalist.append(mesh._edgey_da)
-            kernel.dalist.append(mesh._edgey_da)
+            kernel.dalist.append(mesh.get_cell_da())
+            kernel.dalist.append(mesh.get_cell_da())
             facet_direc_list.append(1)
             facet_exterior_boundary_list.append('upper')
             facet_direc_list.append(1)
             facet_exterior_boundary_list.append('lower')
         if mesh.ndim >= 3 and mesh.bcs[2] == 'nonperiodic':
-            kernel.dalist.append(mesh._edgez_da)
-            kernel.dalist.append(mesh._edgez_da)
+            kernel.dalist.append(mesh.get_cell_da())
+            kernel.dalist.append(mesh.get_cell_da())
             facet_direc_list.append(2)
             facet_exterior_boundary_list.append('upper')
             facet_direc_list.append(2)
             facet_exterior_boundary_list.append('lower')
 
-    if kernel.integral_type == 'interior_facet_vert': # side facets
-        kernel.dalist.append(mesh._edgex_da)
+    if kernel.integral_type == 'interior_facet_vert':  # side facets
+        kernel.dalist.append(mesh.get_cell_da())
         facet_direc_list.append(0)
         facet_exterior_boundary_list.append('')
         if mesh.extrusion_dim == 2:
-            kernel.dalist.append(mesh._edgey_da)
+            kernel.dalist.append(mesh.get_cell_da())
             facet_direc_list.append(1)
             facet_exterior_boundary_list.append('')
-            
-    if kernel.integral_type == 'interior_facet_horiz': # extruded facets
+
+    if kernel.integral_type == 'interior_facet_horiz':  # extruded facets
         if mesh.extrusion_dim == 1:
-            kernel.dalist.append(mesh._edgey_da)
+            kernel.dalist.append(mesh.get_cell_da())
             facet_direc_list.append(1)
             facet_exterior_boundary_list.append('')
         if mesh.extrusion_dim == 2:
-            kernel.dalist.append(mesh._edgez_da)
+            kernel.dalist.append(mesh.get_cell_da())
             facet_direc_list.append(2)
             facet_exterior_boundary_list.append('')
-            
-    if kernel.integral_type == 'exterior_facet_vert': # side exterior facets
+
+    if kernel.integral_type == 'exterior_facet_vert':  # side exterior facets
         if mesh.bcs[0] == 'nonperiodic':
-            kernel.dalist.append(mesh._edgex_da)
-            kernel.dalist.append(mesh._edgex_da)
+            kernel.dalist.append(mesh.get_cell_da())
+            kernel.dalist.append(mesh.get_cell_da())
             facet_direc_list.append(0)
             facet_exterior_boundary_list.append('upper')
             facet_direc_list.append(0)
             facet_exterior_boundary_list.append('lower')
         if mesh.extrusion_dim == 2 and mesh.bcs[1] == 'nonperiodic':
-            kernel.dalist.append(mesh._edgey_da)
-            kernel.dalist.append(mesh._edgey_da)
+            kernel.dalist.append(mesh.get_cell_da())
+            kernel.dalist.append(mesh.get_cell_da())
             facet_direc_list.append(1)
             facet_exterior_boundary_list.append('upper')
             facet_direc_list.append(1)
             facet_exterior_boundary_list.append('lower')
-            
-    if kernel.integral_type == 'exterior_facet_top': # extruded exterior facet top
+
+    if kernel.integral_type == 'exterior_facet_top':  # extruded exterior facet top
         if mesh.extrusion_dim == 1:
-            kernel.dalist.append(mesh._edgey_da)
+            kernel.dalist.append(mesh.get_cell_da())
             facet_direc_list.append(1)
             facet_exterior_boundary_list.append('upper')
         if mesh.extrusion_dim == 2:
-            kernel.dalist.append(mesh._edgez_da)
+            kernel.dalist.append(mesh.get_cell_da())
             facet_direc_list.append(2)
             facet_exterior_boundary_list.append('upper')
-                 
-    if kernel.integral_type == 'exterior_facet_bottom': # extruded exterior facet bottom
+
+    if kernel.integral_type == 'exterior_facet_bottom':  # extruded exterior facet bottom
         if mesh.extrusion_dim == 1:
-            kernel.dalist.append(mesh._edgey_da)
+            kernel.dalist.append(mesh.get_cell_da())
             facet_direc_list.append(1)
             facet_exterior_boundary_list.append('lower')
         if mesh.extrusion_dim == 2:
-            kernel.dalist.append(mesh._edgez_da)
+            kernel.dalist.append(mesh.get_cell_da())
             facet_direc_list.append(2)
             facet_exterior_boundary_list.append('lower')
 
@@ -179,25 +179,25 @@ def compile_functional(kernel, tspace, sspace, mesh):
 
     if (tspace is not None) and (sspace is not None):  # 2-form
 
-            for ci1 in range(tspace.ncomp):  # Mat
-                for ci2 in range(sspace.ncomp):
-                    tensorlist.append(ctypes.c_voidp)
-            for ci1 in range(tspace.ncomp):  # tda
+        for ci1 in range(tspace.ncomp):  # Mat
+            for ci2 in range(sspace.ncomp):
                 tensorlist.append(ctypes.c_voidp)
-            for ci2 in range(sspace.ncomp):  # sda
-                tensorlist.append(ctypes.c_voidp)
+        for ci1 in range(tspace.ncomp):  # tda
+            tensorlist.append(ctypes.c_voidp)
+        for ci2 in range(sspace.ncomp):  # sda
+            tensorlist.append(ctypes.c_voidp)
 
     if (tspace is not None) and (sspace is None):  # 1-form
 
-            for ci1 in range(tspace.ncomp):  # Vec
-                tensorlist.append(ctypes.c_voidp)
-            for ci1 in range(tspace.ncomp):  # tda
-                tensorlist.append(ctypes.c_voidp)
-                    
-    if kernel.evaluate == True:
-        tensorlist.append(ctypes.c_voidp) # DM
-        tensorlist.append(ctypes.c_voidp) # Vec
-		
+        for ci1 in range(tspace.ncomp):  # Vec
+            tensorlist.append(ctypes.c_voidp)
+        for ci1 in range(tspace.ncomp):  # tda
+            tensorlist.append(ctypes.c_voidp)
+
+    if kernel.evaluate is True:
+        tensorlist.append(ctypes.c_voidp)  # DM
+        tensorlist.append(ctypes.c_voidp)  # Vec
+
     argtypeslist = [ctypes.c_voidp, ] + tensorlist + fieldargtypeslist + constantargtypeslist
 
     restype = ctypes.c_int
@@ -208,10 +208,11 @@ def compile_functional(kernel, tspace, sspace, mesh):
         kernel.facet_direc = facet_direc
         kernel.facet_exterior_boundary = facet_exterior_boundary
 
-        if kernel.evaluate == True:
+        if kernel.evaluate is True:
             assembly_routine = generate_evaluate_routine(mesh, kernel)
         else:
             assembly_routine = generate_assembly_routine(mesh, tspace, sspace, kernel)
+            # print(assembly_routine)
         assembly_function = CompiledKernel(assembly_routine, "assemble", cppargs=["-O3"], argtypes=argtypeslist, restype=restype)
         kernel.assemblyfunc_list.append(assembly_function)
 
@@ -249,20 +250,20 @@ def AssembleTwoForm(mat, tspace, sspace, kernel, zeroassembly=False):
             kernel.zero = True
         # compile functional IFF form not already compiled
         # also extract coefficient and geometry args lists
-        #time1 = time.time()
+        # time1 = time.time()
         with PETSc.Log.Event('compile'):
             if not kernel.assemblycompiled:
                 compile_functional(kernel, tspace, sspace, mesh)
-        #print('compiled-2',time.time()-time1,zeroassembly)
-		
+        # print('compiled-2',time.time()-time1,zeroassembly)
+
         # scatter fields into local vecs
-        #time1 = time.time()
+        # time1 = time.time()
         with PETSc.Log.Event('extract'):
             extract_fields(kernel)
-        #print('extracted-2',time.time()-time1,zeroassembly)
+        # print('extracted-2',time.time()-time1,zeroassembly)
 
         # assemble
-        #time1 = time.time()
+        # time1 = time.time()
         with PETSc.Log.Event('assemble'):
 
             # get the list of das
@@ -282,12 +283,12 @@ def AssembleTwoForm(mat, tspace, sspace, kernel, zeroassembly=False):
                     submatlist.append(mat.getLocalSubMatrix(isrow_block, iscol_block))
 
             for da, assemblefunc in zip(kernel.dalist, kernel.assemblyfunc_list):
-                #PETSc.Sys.Print('assembling 2-form',kernel.integral_type,da)
-                #PETSc.Sys.Print(submatlist)
-                #PETSc.Sys.Print(tdalist)
-                #PETSc.Sys.Print(sdalist)
-                #PETSc.Sys.Print(kernel.fieldargs_list)
-                #PETSc.Sys.Print(kernel.constantargs_list)
+                # PETSc.Sys.Print('assembling 2-form',kernel.integral_type,da)
+                # PETSc.Sys.Print(submatlist)
+                # PETSc.Sys.Print(tdalist)
+                # PETSc.Sys.Print(sdalist)
+                # PETSc.Sys.Print(kernel.fieldargs_list)
+                # PETSc.Sys.Print(kernel.constantargs_list)
                 assemblefunc([da, ] + submatlist + tdalist + sdalist + kernel.fieldargs_list, kernel.constantargs_list)
 
             # restore sub matrices
@@ -301,7 +302,7 @@ def AssembleTwoForm(mat, tspace, sspace, kernel, zeroassembly=False):
 
         if zeroassembly:
             kernel.zero = False
-        #print('assembled-2',time.time()-time1,zeroassembly)
+        # print('assembled-2',time.time()-time1,zeroassembly)
 
 
 def AssembleZeroForm(mesh, kernellist):
@@ -352,20 +353,20 @@ def AssembleOneForm(veclist, space, kernel):
 
         # compile functional IFF form not already compiled
         # also extract coefficient and geometry args lists
-        #time1 = time.time()
+        # time1 = time.time()
         with PETSc.Log.Event('compile'):
             if not kernel.assemblycompiled:
                 compile_functional(kernel, space, None, mesh)
-        #print('compiled-1',time.time()-time1)
+        # print('compiled-1',time.time()-time1)
 
         # scatter fields into local vecs
-        #time1 = time.time()
+        # time1 = time.time()
         with PETSc.Log.Event('extract'):
             extract_fields(kernel)
-        #print('extracted-1',time.time()-time1)
+        # print('extracted-1',time.time()-time1)
 
         # assemble
-        #time1 = time.time()
+        # time1 = time.time()
         with PETSc.Log.Event('assemble'):
 
             # get the list of das
@@ -374,37 +375,56 @@ def AssembleOneForm(veclist, space, kernel):
                 tdalist.append(space.get_da(ci1))
 
             for da, assemblefunc in zip(kernel.dalist, kernel.assemblyfunc_list):
-                #PETSc.Sys.Print('assembling 1-form',kernel.integral_type,da)
-                #PETSc.Sys.Print(veclist)
-                #PETSc.Sys.Print(tdalist)
-                #PETSc.Sys.Print(kernel.fieldargs_list)
-                #PETSc.Sys.Print(kernel.constantargs_list)
-                #PETSc.Sys.Print(kernel.fieldargs_list[0].getGhostRanges())
+                # PETSc.Sys.Print('assembling 1-form',kernel.integral_type,da)
+                # PETSc.Sys.Print(veclist)
+                # PETSc.Sys.Print(tdalist)
+                # PETSc.Sys.Print(kernel.fieldargs_list)
+                # PETSc.Sys.Print(kernel.constantargs_list)
+                # PETSc.Sys.Print(kernel.fieldargs_list[0].getGhostRanges())
                 assemblefunc([da, ] + veclist + tdalist + kernel.fieldargs_list, kernel.constantargs_list)
-        #print('assembled-1',time.time()-time1)
+        # print('assembled-1',time.time()-time1)
 
 
-def compute_1d_bounds(ci1, ci2, i, elem1, elem2, ncell, ndofs, interior_facet, bc, ranges1, ranges2):
+def compute_bi(i, xmax, M, NB):
+    if (i < M):
+        bi = i
+    if ((i >= M) and (i < xmax-M)):
+        bi = M
+    if (i >= xmax-M):
+        bi = NB - (xmax - i)
+    return bi
+
+
+def compute_1d_bounds(ci1, ci2, direc, elem1, elem2, ncell, ndofs, interior_facet, bc, ranges1, ranges2):
     dnnz = np.zeros((ndofs), dtype=np.int32)
     nnz = np.zeros((ndofs), dtype=np.int32)
 
     # clip values to a range
     py_clip = lambda x, l, u: l if x < l else u if x > u else x
 
-    icells = elem1.get_icells(ci1, i, ncell, bc, interior_facet)
-    leftmost_offsets, leftmost_offsetmult = elem2.get_offsets(ci2, i)
-    rightmost_offsets, rightmost_offsetmult = elem2.get_offsets(ci2, i)
+    icells = elem1.get_icells(ci1, direc, ncell, bc, interior_facet)
+    leftmost_offsets, leftmost_offsetmult = elem2.get_offsets(ci2, direc)
+    rightmost_offsets, rightmost_offsetmult = elem2.get_offsets(ci2, direc)
 
     leftmostcells = icells[:, 0]
     rightmostcells = icells[:, 1]
 
+    NB = elem2.get_nblocks(ci2, direc)
+    M = (NB-1)//2
+    # print(icells,direc,NB,M)
+    bileft = M
+    biright = M
     for i in range(ranges1[0], ranges1[1]):
         leftmostcell = leftmostcells[i]
         rightmostcell = rightmostcells[i]
-        leftbound = leftmost_offsets[0] + leftmostcell * leftmost_offsetmult[0]
-        rightbound = rightmost_offsets[-1] + rightmostcell * rightmost_offsetmult[-1]
+        if bc == 'nonperiodic' and NB > 1:
+            bileft = compute_bi(leftmostcell, ncell, M, NB)
+            biright = compute_bi(rightmostcell, ncell, M, NB)
+        leftbound = leftmost_offsets[bileft][0] + leftmostcell * leftmost_offsetmult[bileft][0]
+        rightbound = rightmost_offsets[biright][-1] + rightmostcell * rightmost_offsetmult[biright][-1]
         nnz[i-ranges1[0]] = rightbound - leftbound + 1  # this is the total size
         dnnz[i-ranges1[0]] = py_clip(rightbound, ranges2[0], ranges2[1]-1) - py_clip(leftbound, ranges2[0], ranges2[1]-1) + 1
+    # PETSc.Sys.Print('nnz',bc,ncell,ndofs,nnz,dnnz)
     return dnnz, nnz
 
 
@@ -451,6 +471,9 @@ def two_form_preallocate_opt(mesh, space1, space2, ci1, ci2, interior_x, interio
     if mesh.ndim == 3:
         if (mesh.bcs[2] == 'periodic') and (nprocs[2] == 1):
             dnnz_z = nnz_z
+    # PETSc.Sys.Print('nnz_x',mesh.bcs[0],mesh.nxs[0],nx1s[0],nnz_x,dnnz_x)
+    # PETSc.Sys.Print('nnz_y',mesh.bcs[1],mesh.nxs[1],nx1s[1],nnz_y,dnnz_y)
+    # PETSc.Sys.Print('nnz_z',mesh.bcs[2],mesh.nxs[2],nx1s[2],nnz_z,dnnz_z)
 
     if mesh.ndim == 1:
         dnnzarr = dnnz_x
@@ -469,8 +492,8 @@ def two_form_preallocate_opt(mesh, space1, space2, ci1, ci2, interior_x, interio
 
     # see http://stackoverflow.com/questions/17138393/numpy-outer-product-of-n-vectors
 
-    #print(dnnzarr)
-    #print(onnzarr)
+    # print(dnnzarr)
+    # print(onnzarr)
 
     return dnnzarr, onnzarr
 
@@ -479,16 +502,19 @@ def two_form_preallocate_opt(mesh, space1, space2, ci1, ci2, interior_x, interio
 # Mostly intended for applications that want to use Themis/UFL to handle the creation and assembly of a PETSc matrix, and then do something with it
 # Doesn't interact with solver stuff, although this might be subject to change at some point
 
+# EVENTUALLY ALSO ADD 1-FORM ASSEMBLY HERE
+# THIS WILL BE VERY USEFUL FOR MASS-LUMPED VARIANTS IE FULLY EXPLICIT TIME STEPPING WITHOUT LINEAR SOLVES...
+
 def assemble(f, bcs=None, form_compiler_parameters=None, mat_type='aij'):
     import ufl
     from solver import _extract_bcs
     from form import TwoForm
 
     if not isinstance(f, ufl.Form):
-        raise TypeError("Provided 2-Form is a '%s', not a Form" % type(f).__name__)
+        raise TypeError("Provided f is a '%s', not a Form" % type(f).__name__)
 
     if len(f.arguments()) != 2:
-        raise ValueError("Provided 2-Form is not a bilinear form")
+        raise ValueError("Provided f is not a bilinear form")
 
     bcs = _extract_bcs(bcs)
 

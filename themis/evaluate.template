@@ -12,9 +12,9 @@ ierr = PetscMemzero({{ 'C0_'~field.name~'_'~k }},sizeof(PetscScalar[{{field.ndof
 {# ********************************************* #}
 
 {%macro EXTRACT_FIELD(field,k) -%}
-#define kk (k*{{field.name}}_{{k}}_offset_mult_z[lz] + {{field.name}}_{{k}}_offsets_z[lz]) 
-#define jj (j*{{field.name}}_{{k}}_offset_mult_y[ly] + {{field.name}}_{{k}}_offsets_y[ly]) 
-#define ii (i*{{field.name}}_{{k}}_offset_mult_x[lx] + {{field.name}}_{{k}}_offsets_x[lx]) 
+#define kk (k*{{field.name}}_{{k}}_offset_mult_z[bi_{{field.name}}_z_{{k}}][lz] + {{field.name}}_{{k}}_offsets_z[bi_{{field.name}}_z_{{k}}][lz]) 
+#define jj (j*{{field.name}}_{{k}}_offset_mult_y[bi_{{field.name}}_y_{{k}}][ly] + {{field.name}}_{{k}}_offsets_y[bi_{{field.name}}_y_{{k}}][ly]) 
+#define ii (i*{{field.name}}_{{k}}_offset_mult_x[bi_{{field.name}}_x_{{k}}][lx] + {{field.name}}_{{k}}_offsets_x[bi_{{field.name}}_x_{{k}}][lx]) 
 
 for (lx=0;lx<{{ field.nbasis_x[k] }};lx++){
 for (ly=0;ly<{{ field.nbasis_y[k] }};ly++){
@@ -22,13 +22,13 @@ for (lz=0;lz<{{ field.nbasis_z[k] }};lz++){
 for (qz=0;qz<{{ npts_z }};qz++) { //loop over quadrature pts in z
 for (d=0;d<{{ field.ndofs }};d++){
 {% if ndim == 3 %}
-C01_{{ field.name }}_{{k}}[d][qz][lx][ly] += data_{{field.name}}_{{k}}[kk][jj][ii][d] * {{field.name}}_{{k}}_basis_z[qz][lz];
+C01_{{ field.name }}_{{k}}[d][qz][lx][ly] += data_{{field.name}}_{{k}}[kk][jj][ii][d] * {{field.name}}_{{k}}_basis_z[bi_{{field.name}}_z_{{k}}][qz][lz];
 {% endif %}
 {% if ndim == 2 %}
-C01_{{ field.name }}_{{k}}[d][qz][lx][ly] += data_{{field.name}}_{{k}}[jj][ii][d] * {{field.name}}_{{k}}_basis_z[qz][lz];
+C01_{{ field.name }}_{{k}}[d][qz][lx][ly] += data_{{field.name}}_{{k}}[jj][ii][d] * {{field.name}}_{{k}}_basis_z[bi_{{field.name}}_z_{{k}}][qz][lz];
 {% endif %}
 {% if ndim == 1 %}
-C01_{{ field.name }}_{{k}}[d][qz][lx][ly] += data_{{field.name}}_{{k}}[ii][d] * {{field.name}}_{{k}}_basis_z[qz][lz];
+C01_{{ field.name }}_{{k}}[d][qz][lx][ly] += data_{{field.name}}_{{k}}[ii][d] * {{field.name}}_{{k}}_basis_z[bi_{{field.name}}_z_{{k}}][qz][lz];
 {% endif %}
 }}}}}
 
@@ -37,7 +37,7 @@ for (lx=0;lx<{{ field.nbasis_x[k] }};lx++){
 for (ly=0;ly<{{ field.nbasis_y[k] }};ly++){
 for (qy=0;qy<{{ npts_y }};qy++) { //loop over quadrature pts in y
 for (d=0;d<{{ field.ndofs }};d++){
-C02_{{ field.name }}_{{k}}[d][qy][qz][lx] += C01_{{ field.name }}_{{k}}[d][qz][lx][ly] * {{field.name}}_{{k}}_basis_y[qy][ly];
+C02_{{ field.name }}_{{k}}[d][qy][qz][lx] += C01_{{ field.name }}_{{k}}[d][qz][lx][ly] * {{field.name}}_{{k}}_basis_y[bi_{{field.name}}_y_{{k}}][qy][ly];
 }}}}}
 
 for (qy=0;qy<{{ npts_y }};qy++) { //loop over quadrature pts in y
@@ -45,7 +45,7 @@ for (qz=0;qz<{{ npts_z }};qz++) { //loop over quadrature pts in z
 for (lx=0;lx<{{ field.nbasis_x[k] }};lx++){
 for (qx=0;qx<{{ npts_x }};qx++) { //loop over quadrature pts in x
 for (d=0;d<{{ field.ndofs }};d++){
-C0_{{  field.name }}_{{k}}[d][qx][qy][qz] += C02_{{ field.name }}_{{k}}[d][qy][qz][lx] * {{field.name}}_{{k}}_basis_x[qx][lx];
+C0_{{  field.name }}_{{k}}[d][qx][qy][qz] += C02_{{ field.name }}_{{k}}[d][qy][qz][lx] * {{field.name}}_{{k}}_basis_x[bi_{{field.name}}_x_{{k}}][qx][lx];
 }}}}}
 
 #undef ii
@@ -64,11 +64,10 @@ ierr = PetscMemzero({{ 'D0_'~field.name~'_'~k }},sizeof(PetscScalar[3][{{field.n
 
 {# ********************************************* #}
 
-
 {%macro EXTRACT_DERIVS(field,k) -%}
-#define kk (k*{{field.name}}_{{k}}_offset_mult_z[lz] + {{field.name}}_{{k}}_offsets_z[lz]) 
-#define jj (j*{{field.name}}_{{k}}_offset_mult_y[ly] + {{field.name}}_{{k}}_offsets_y[ly]) 
-#define ii (i*{{field.name}}_{{k}}_offset_mult_x[lx] + {{field.name}}_{{k}}_offsets_x[lx]) 
+#define kk (k*{{field.name}}_{{k}}_offset_mult_z[bi_{{field.name}}_z_{{k}}][lz] + {{field.name}}_{{k}}_offsets_z[bi_{{field.name}}_z_{{k}}][lz]) 
+#define jj (j*{{field.name}}_{{k}}_offset_mult_y[bi_{{field.name}}_y_{{k}}][ly] + {{field.name}}_{{k}}_offsets_y[bi_{{field.name}}_y_{{k}}][ly]) 
+#define ii (i*{{field.name}}_{{k}}_offset_mult_x[bi_{{field.name}}_x_{{k}}][lx] + {{field.name}}_{{k}}_offsets_x[bi_{{field.name}}_x_{{k}}][lx]) 
 
 for (lx=0;lx<{{ field.nbasis_x[k] }};lx++){
 for (ly=0;ly<{{ field.nbasis_y[k] }};ly++){
@@ -76,19 +75,19 @@ for (lz=0;lz<{{ field.nbasis_z[k] }};lz++){
 for (qz=0;qz<{{ npts_z }};qz++) { //loop over quadrature pts in z
 for (d=0;d<{{ field.ndofs }};d++){
 {% if ndim == 3 %}
-D01_{{ field.name }}_{{k}}[0][d][qz][lx][ly] += data_{{field.name}}_{{k}}[kk][jj][ii][d] * {{field.name}}_{{k}}_basis_z[qz][lz];
-D01_{{ field.name }}_{{k}}[1][d][qz][lx][ly] += data_{{field.name}}_{{k}}[kk][jj][ii][d] * {{field.name}}_{{k}}_basis_z[qz][lz];
-D01_{{ field.name }}_{{k}}[2][d][qz][lx][ly] += data_{{field.name}}_{{k}}[kk][jj][ii][d] * {{field.name}}_{{k}}_derivs_z[qz][lz];
+D01_{{ field.name }}_{{k}}[0][d][qz][lx][ly] += data_{{field.name}}_{{k}}[kk][jj][ii][d] * {{field.name}}_{{k}}_basis_z[bi_{{field.name}}_z_{{k}}][qz][lz];
+D01_{{ field.name }}_{{k}}[1][d][qz][lx][ly] += data_{{field.name}}_{{k}}[kk][jj][ii][d] * {{field.name}}_{{k}}_basis_z[bi_{{field.name}}_z_{{k}}][qz][lz];
+D01_{{ field.name }}_{{k}}[2][d][qz][lx][ly] += data_{{field.name}}_{{k}}[kk][jj][ii][d] * {{field.name}}_{{k}}_derivs_z[bi_{{field.name}}_z_{{k}}][qz][lz];
 {% endif %}
 {% if ndim == 2 %}
-D01_{{ field.name }}_{{k}}[0][d][qz][lx][ly] += data_{{field.name}}_{{k}}[jj][ii][d] * {{field.name}}_{{k}}_basis_z[qz][lz];
-D01_{{ field.name }}_{{k}}[1][d][qz][lx][ly] += data_{{field.name}}_{{k}}[jj][ii][d] * {{field.name}}_{{k}}_basis_z[qz][lz];
-D01_{{ field.name }}_{{k}}[2][d][qz][lx][ly] += data_{{field.name}}_{{k}}[jj][ii][d] * {{field.name}}_{{k}}_derivs_z[qz][lz];
+D01_{{ field.name }}_{{k}}[0][d][qz][lx][ly] += data_{{field.name}}_{{k}}[jj][ii][d] * {{field.name}}_{{k}}_basis_z[bi_{{field.name}}_z_{{k}}][qz][lz];
+D01_{{ field.name }}_{{k}}[1][d][qz][lx][ly] += data_{{field.name}}_{{k}}[jj][ii][d] * {{field.name}}_{{k}}_basis_z[bi_{{field.name}}_z_{{k}}][qz][lz];
+D01_{{ field.name }}_{{k}}[2][d][qz][lx][ly] += data_{{field.name}}_{{k}}[jj][ii][d] * {{field.name}}_{{k}}_derivs_z[bi_{{field.name}}_z_{{k}}][qz][lz];
 {% endif %}
 {% if ndim == 1 %}
-D01_{{ field.name }}_{{k}}[0][d][qz][lx][ly] += data_{{field.name}}_{{k}}[ii][d] * {{field.name}}_{{k}}_basis_z[qz][lz];
-D01_{{ field.name }}_{{k}}[1][d][qz][lx][ly] += data_{{field.name}}_{{k}}[ii][d] * {{field.name}}_{{k}}_basis_z[qz][lz];
-D01_{{ field.name }}_{{k}}[2][d][qz][lx][ly] += data_{{field.name}}_{{k}}[ii][d] * {{field.name}}_{{k}}_derivs_z[qz][lz];
+D01_{{ field.name }}_{{k}}[0][d][qz][lx][ly] += data_{{field.name}}_{{k}}[ii][d] * {{field.name}}_{{k}}_basis_z[bi_{{field.name}}_z_{{k}}][qz][lz];
+D01_{{ field.name }}_{{k}}[1][d][qz][lx][ly] += data_{{field.name}}_{{k}}[ii][d] * {{field.name}}_{{k}}_basis_z[bi_{{field.name}}_z_{{k}}][qz][lz];
+D01_{{ field.name }}_{{k}}[2][d][qz][lx][ly] += data_{{field.name}}_{{k}}[ii][d] * {{field.name}}_{{k}}_derivs_z[bi_{{field.name}}_z_{{k}}][qz][lz];
 {% endif %}
 }}}}}
 
@@ -97,9 +96,9 @@ for (lx=0;lx<{{ field.nbasis_x[k] }};lx++){
 for (ly=0;ly<{{ field.nbasis_y[k] }};ly++){
 for (qy=0;qy<{{ npts_y }};qy++) { //loop over quadrature pts in y
 for (d=0;d<{{ field.ndofs }};d++){
-D02_{{ field.name }}_{{k}}[0][d][qy][qz][lx] += D01_{{ field.name }}_{{k}}[0][d][qz][lx][ly] * {{field.name}}_{{k}}_basis_y[qy][ly];
-D02_{{ field.name }}_{{k}}[1][d][qy][qz][lx] += D01_{{ field.name }}_{{k}}[1][d][qz][lx][ly] * {{field.name}}_{{k}}_derivs_y[qy][ly];
-D02_{{ field.name }}_{{k}}[2][d][qy][qz][lx] += D01_{{ field.name }}_{{k}}[2][d][qz][lx][ly] * {{field.name}}_{{k}}_basis_y[qy][ly];
+D02_{{ field.name }}_{{k}}[0][d][qy][qz][lx] += D01_{{ field.name }}_{{k}}[0][d][qz][lx][ly] * {{field.name}}_{{k}}_basis_y[bi_{{field.name}}_y_{{k}}][qy][ly];
+D02_{{ field.name }}_{{k}}[1][d][qy][qz][lx] += D01_{{ field.name }}_{{k}}[1][d][qz][lx][ly] * {{field.name}}_{{k}}_derivs_y[bi_{{field.name}}_y_{{k}}][qy][ly];
+D02_{{ field.name }}_{{k}}[2][d][qy][qz][lx] += D01_{{ field.name }}_{{k}}[2][d][qz][lx][ly] * {{field.name}}_{{k}}_basis_y[bi_{{field.name}}_y_{{k}}][qy][ly];
 }}}}}
 
 for (qy=0;qy<{{ npts_y }};qy++) { //loop over quadrature pts in y
@@ -107,9 +106,9 @@ for (qz=0;qz<{{ npts_z }};qz++) { //loop over quadrature pts in z
 for (lx=0;lx<{{ field.nbasis_x[k] }};lx++){
 for (qx=0;qx<{{ npts_x }};qx++) { //loop over quadrature pts in x
 for (d=0;d<{{ field.ndofs }};d++){
-D0_{{  field.name }}_{{k}}[0][d][qx][qy][qz] += D02_{{ field.name }}_{{k}}[0][d][qy][qz][lx] * {{field.name}}_{{k}}_derivs_x[qx][lx];
-D0_{{  field.name }}_{{k}}[1][d][qx][qy][qz] += D02_{{ field.name }}_{{k}}[1][d][qy][qz][lx] * {{field.name}}_{{k}}_basis_x[qx][lx];
-D0_{{  field.name }}_{{k}}[2][d][qx][qy][qz] += D02_{{ field.name }}_{{k}}[2][d][qy][qz][lx] * {{field.name}}_{{k}}_basis_x[qx][lx];
+D0_{{  field.name }}_{{k}}[0][d][qx][qy][qz] += D02_{{ field.name }}_{{k}}[0][d][qy][qz][lx] * {{field.name}}_{{k}}_derivs_x[bi_{{field.name}}_x_{{k}}][qx][lx];
+D0_{{  field.name }}_{{k}}[1][d][qx][qy][qz] += D02_{{ field.name }}_{{k}}[1][d][qy][qz][lx] * {{field.name}}_{{k}}_basis_x[bi_{{field.name}}_x_{{k}}][qx][lx];
+D0_{{  field.name }}_{{k}}[2][d][qx][qy][qz] += D02_{{ field.name }}_{{k}}[2][d][qy][qz][lx] * {{field.name}}_{{k}}_basis_x[bi_{{field.name}}_x_{{k}}][qx][lx];
 }}}}}
 
 #undef ii
@@ -296,7 +295,7 @@ PetscScalar assemble(DM da {{ valsargs }} {{ fieldargs }} )
    PetscInt d,d1,d2; //field dof indices
    PetscInt n1,n2; //dimension indices
    PetscInt s,s1,s2; //eval coeff dof indices
-  PetscInt xs,xm,ys,ym,zs,zm;
+  PetscInt xs,xm,ys,ym,zs,zm,xmax,ymax,zmax;
 
 //J[a][b] is a-th component, b-th derivative ie J[0][0] is dx/dxhat, J[1][2] is dy/dzhat, etc.
 PetscScalar J[{{ npts_x }}][{{ npts_y }}][{{ npts_z }}][{{ ndim }}][{{ ndim }}];
@@ -318,19 +317,24 @@ PetscScalar JTinv[{{ npts_x }}][{{ npts_y }}][{{ npts_z }}][{{ ndim }}][{{ ndim 
 						
  {% for field in fieldlist %}
  {% for k in range(field.ncomp) %}
-const   PetscInt {{field.name}}_{{k}}_offsets_x[{{ field.nbasis_x[k] }}] = {{ field.offsets_x[k] }};
-const   PetscInt {{field.name}}_{{k}}_offsets_y[{{ field.nbasis_y[k] }}] = {{ field.offsets_y[k] }};
-const   PetscInt {{field.name}}_{{k}}_offsets_z[{{ field.nbasis_z[k] }}] = {{ field.offsets_z[k] }};
-const   PetscInt {{field.name}}_{{k}}_offset_mult_x[{{ field.nbasis_x[k] }}] = {{ field.offset_mult_x[k] }};
-const   PetscInt {{field.name}}_{{k}}_offset_mult_y[{{ field.nbasis_y[k] }}] = {{ field.offset_mult_y[k] }};
-const   PetscInt {{field.name}}_{{k}}_offset_mult_z[{{ field.nbasis_z[k] }}] = {{ field.offset_mult_z[k] }};
+const   PetscInt {{field.name}}_{{k}}_offsets_x[{{ field.nblocks_x[k] }}][{{ field.nbasis_x[k] }}] = {{ field.offsets_x[k] }};
+const   PetscInt {{field.name}}_{{k}}_offsets_y[{{ field.nblocks_y[k] }}][{{ field.nbasis_y[k] }}] = {{ field.offsets_y[k] }};
+const   PetscInt {{field.name}}_{{k}}_offsets_z[{{ field.nblocks_z[k] }}][{{ field.nbasis_z[k] }}] = {{ field.offsets_z[k] }};
+const   PetscInt {{field.name}}_{{k}}_offset_mult_x[{{ field.nblocks_x[k] }}][{{ field.nbasis_x[k] }}] = {{ field.offset_mult_x[k] }};
+const   PetscInt {{field.name}}_{{k}}_offset_mult_y[{{ field.nblocks_y[k] }}][{{ field.nbasis_y[k] }}] = {{ field.offset_mult_y[k] }};
+const   PetscInt {{field.name}}_{{k}}_offset_mult_z[{{ field.nblocks_z[k] }}][{{ field.nbasis_z[k] }}] = {{ field.offset_mult_z[k] }};
 
-const   PetscScalar {{field.name}}_{{k}}_basis_x[{{ npts_x }}][{{ field.nbasis_x[k] }}] = {{ field.basis_x[k] }};
-const   PetscScalar {{field.name}}_{{k}}_basis_y[{{ npts_y }}][{{ field.nbasis_y[k] }}] = {{ field.basis_y[k] }};
-const   PetscScalar {{field.name}}_{{k}}_basis_z[{{ npts_z }}][{{ field.nbasis_z[k] }}] = {{ field.basis_z[k] }};
-const   PetscScalar {{field.name}}_{{k}}_derivs_x[{{ npts_x }}][{{ field.nbasis_x[k] }}] = {{ field.derivs_x[k] }};
-const   PetscScalar {{field.name}}_{{k}}_derivs_y[{{ npts_y }}][{{ field.nbasis_y[k] }}] = {{ field.derivs_y[k] }};
-const   PetscScalar {{field.name}}_{{k}}_derivs_z[{{ npts_z }}][{{ field.nbasis_z[k] }}] = {{ field.derivs_z[k] }};
+const   PetscScalar {{field.name}}_{{k}}_basis_x[{{ field.nblocks_x[k] }}][{{ npts_x }}][{{ field.nbasis_x[k] }}] = {{ field.basis_x[k] }};
+const   PetscScalar {{field.name}}_{{k}}_basis_y[{{ field.nblocks_y[k] }}][{{ npts_y }}][{{ field.nbasis_y[k] }}] = {{ field.basis_y[k] }};
+const   PetscScalar {{field.name}}_{{k}}_basis_z[{{ field.nblocks_z[k] }}][{{ npts_z }}][{{ field.nbasis_z[k] }}] = {{ field.basis_z[k] }};
+const   PetscScalar {{field.name}}_{{k}}_derivs_x[{{ field.nblocks_x[k] }}][{{ npts_x }}][{{ field.nbasis_x[k] }}] = {{ field.derivs_x[k] }};
+const   PetscScalar {{field.name}}_{{k}}_derivs_y[{{ field.nblocks_y[k] }}][{{ npts_y }}][{{ field.nbasis_y[k] }}] = {{ field.derivs_y[k] }};
+const   PetscScalar {{field.name}}_{{k}}_derivs_z[{{ field.nblocks_z[k] }}][{{ npts_z }}][{{ field.nbasis_z[k] }}] = {{ field.derivs_z[k] }};
+
+   PetscInt bi_{{field.name}}_x_{{k}} = -1000;
+   PetscInt bi_{{field.name}}_y_{{k}} = -1000;
+   PetscInt bi_{{field.name}}_z_{{k}} = -1000;
+   
 PetscScalar C01_{{ field.name }}_{{k}}[{{ field.ndofs }}][{{ npts_z }}][{{field.nbasis_x[k] }}][{{ field.nbasis_y[k] }}] = { { { {  0.,},},},};
 PetscScalar C02_{{ field.name }}_{{k}}[{{ field.ndofs }}][{{ npts_y }}][{{ npts_z }}][{{ field.nbasis_x[k] }}] = { { { {  0.,},},},};
 PetscScalar C0_{{  field.name }}_{{k}}[{{ field.ndofs }}][{{ npts_x }}][{{ npts_y }}][{{ npts_z }}] = { { { {  0.,},},},};
@@ -357,6 +361,7 @@ PetscScalar D0_{{  field.name }}_{{k}}[3][{{ field.ndofs }}][{{ npts_x }}][{{ np
 
 	//get DMDA ranges
   ierr = DMDAGetCorners(da,&xs,&ys,&zs,&xm,&ym,&zm);CHKERRQ(ierr);
+   ierr = DMDAGetInfo(da,0,&xmax,&ymax,&zmax,0,0,0,0,0,0,0,0,0);CHKERRQ(ierr);
 
 //create vals pointer for evaluate
 #define quadss [qz + {{ npts_z }} * (qy + {{ npts_y }} * qx)]
@@ -391,10 +396,20 @@ ierr = DMDAVecGetArrayDOF(da_vals , evals , &data_vals );CHKERRQ(ierr);
  #define PVALS data_vals TENSORINDICES(s1,s2)
 {% endif %}
 
+
+ {% from 'setblocks.template' import SET_PERIODIC_FIELDS with context %}
+ {% from 'setblocks.template' import SET_NONPERIODIC_X_FIELDS with context %}
+ {% from 'setblocks.template' import SET_NONPERIODIC_Y_FIELDS with context %}
+ {% from 'setblocks.template' import SET_NONPERIODIC_Z_FIELDS with context %}
+ 
+{{ SET_PERIODIC_FIELDS() }}
 for (k=zs; k<zs+zm; k++) {
+{{ SET_NONPERIODIC_Z_FIELDS() }}
    for (j=ys; j<ys+ym; j++) {
+     {{ SET_NONPERIODIC_Y_FIELDS() }}
       for (i=xs; i<xs+xm; i++) {
-		
+	      {{ SET_NONPERIODIC_X_FIELDS() }}
+    
 		//compute eval
 {% if evaltype == 'h1' %}
 {{ h1_eval(evalfield) }}

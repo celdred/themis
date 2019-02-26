@@ -1,7 +1,6 @@
 import tsfc
 from formmanipulation import split_form
 import tsfc.kernel_interface.themis as themis_interface
-import numpy as np
 
 
 class ThemisKernel():
@@ -22,7 +21,6 @@ def compile_form(form):
     coefficient_numbers = dict((c, n) for (n, c) in enumerate(form.coefficients()))
     for idx, f in split_form(form):
 
-
         # Map local coefficient numbers (as seen inside the
         # compiler) to the global coefficient numbers
         number_map = dict((n, coefficient_numbers[c]) for (n, c) in enumerate(f.coefficients()))
@@ -33,7 +31,7 @@ def compile_form(form):
         for kernel in tsfc_kernels:
             tkernel = ThemisKernel(kernel)
             tkernel.formdim = len(f.arguments())
-            
+
             # map kernel coefficient numbers to global coefficient numbers
             numbers = tuple(number_map[c] for c in kernel.coefficient_numbers)
             tkernel.coefficient_map = numbers
@@ -44,15 +42,15 @@ def compile_form(form):
 
             tkernel.tabulations = []
 
-            #for tabname,pts in kernel.tabulations: 
-            for tabname,shape in kernel.tabulations: 
+            # for tabname,pts in kernel.tabulations:
+            for tabname, shape in kernel.tabulations:
                 splittab = tabname.split('_')
 
                 tabobj = {}
                 tabobj['name'] = tabname
 
                 # this matches the string generated in runtime_tabulated.py in FInAT
-                # ie variant_order_derivorder_{d,c}_psid_eid_restriction
+                # ie variant_order_derivorder_shiftaxis_{d,c}_restrict
                 tabobj['variant'] = splittab[1]
                 tabobj['order'] = int(splittab[2])
                 tabobj['derivorder'] = int(splittab[3])
@@ -61,15 +59,9 @@ def compile_form(form):
                     tabobj['discont'] = True
                 if splittab[5] == 'c':
                     tabobj['discont'] = False
-                # splittab[6] is the psid, which is not needed
-                #tabobj['restrict'] = splittab[7]
                 tabobj['restrict'] = splittab[6]
-                
-                #broken now
-                #tabobj['pts'] = pts
                 tabobj['shape'] = shape
 
-                
                 tkernel.tabulations.append(tabobj)
 
             kernels.append(tkernel)

@@ -3,7 +3,7 @@ import ufl
 import ufl_expr
 from petscshim import PETSc
 from form import TwoForm, OneForm
-#import time
+# import time
 
 # ADD FIREDRAKE ATTRIBUTION
 
@@ -210,8 +210,8 @@ class NonlinearVariationalSolver():  # solving_utils.ParametersMixin
         """
 
         # Apply the boundary conditions to the initial guess.
-		
-        #time1 = time.time()
+
+        # time1 = time.time()
         for bc in self.problem.bcs:
             bc.apply_vector(self.problem.u._activevector)
 
@@ -223,8 +223,8 @@ class NonlinearVariationalSolver():  # solving_utils.ParametersMixin
 
         # ADD THIS BACK IN!
         # solving_utils.check_snes_convergence(self.snes)
-		
-        #print('full solve',time.time()-time1)
+
+        # print('full solve',time.time()-time1)
     def destroy(self):
         self.snes.destroy()
 

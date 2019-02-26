@@ -1,6 +1,5 @@
 from ufl import Coefficient
 from petscshim import PETSc
-import numpy as np
 
 
 class SplitFunction():
@@ -38,11 +37,12 @@ class SplitFunction():
 
     def name(self):
         return self._name
-        
+
+
 class Function(Coefficient):
 
     def copy(self):
-        newfunc = Function(self.space,self._name)
+        newfunc = Function(self.space, self._name)
         self._vector.copy(result=newfunc._vector)
         return newfunc
 

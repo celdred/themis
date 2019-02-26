@@ -38,7 +38,7 @@ def create_matrix(mat_type, target, source, blocklist, kernellist):
                     matrices[si1][si2].setOption(PETSc.Mat.Option.NO_OFF_PROC_ZERO_ROWS, False)
 
         # create nest
-        #PETSc.Sys.Print(matrices)
+        # PETSc.Sys.Print(matrices)
         mat = PETSc.Mat().createNest(matrices, comm=PETSc.COMM_WORLD)
 
     # monolithic matrix
@@ -133,7 +133,7 @@ def create_mono(target, source, blocklist, kernellist):
                 for ci2 in range(sspace.ncomp):
                     if ((si1, si2) in blocklist):
                         bindex = blocklist.index((si1, si2))
-                        interior_x, interior_y, interior_z = get_interior_flags(tspace.mesh(),kernellist[bindex])
+                        interior_x, interior_y, interior_z = get_interior_flags(tspace.mesh(), kernellist[bindex])
                         dnnz, onnz = two_form_preallocate_opt(tspace.mesh(), tspace, sspace, ci1, ci2, interior_x, interior_y, interior_z)
                         dnnz = np.ravel(dnnz)
                         onnz = np.ravel(onnz)
@@ -148,11 +148,8 @@ def create_mono(target, source, blocklist, kernellist):
 
     return mat
 
-# SHOULD BE CHANGED FOR HORIZ/VERT SPLIT
-# REALLY WE SUPPORT CELL, ds,dS,ds_horiz,ds_vert,dS_bottom,dS_top,dS_horiz
 
-
-def get_interior_flags(mesh,kernellist):
+def get_interior_flags(mesh, kernellist):
     interior_x = False
     interior_y = False
     interior_z = False
@@ -163,16 +160,13 @@ def get_interior_flags(mesh,kernellist):
             interior_z = True
         if kernel.integral_type == 'interior_facet_horiz':
             interior_x = True
-            #if mesh.extrusion_dim == 1: interior_y = False
-            if mesh.extrusion_dim == 2: interior_y = True
+            if mesh.extrusion_dim == 2:
+                interior_y = True
             interior_z = False
         if kernel.integral_type == 'interior_facet_vert':
-            #interior_x = False
-            if mesh.extrusion_dim == 1: 
+            if mesh.extrusion_dim == 1:
                 interior_y = True
-                #interior_z = False
             if mesh.extrusion_dim == 2:
-                #interior_y = False
                 interior_z = True
     return interior_x, interior_y, interior_z
 
@@ -231,10 +225,6 @@ class OneForm():
 
         # compile local assembly kernels
         idx_kernels = compile_form(F)
-
-        # self.local_assembly_kernels = {}
-        # for idx,subkernels in idx_kernels:
-        # self.local_assembly_kernels[idx] = subkernels
         self.local_assembly_idx = []
         self.local_assembly_kernels = []
         for idx, kernels in idx_kernels:
@@ -272,8 +262,6 @@ class OneForm():
             lvec.set(0.0)
 
         # assemble
-        # blocklist = self.local_assembly_kernels.keys()
-        # kernellist = self.local_assembly_kernels.values()
         blocklist = self.local_assembly_idx
         kernellist = self.local_assembly_kernels
         for si1 in range(self.space.nspaces):
@@ -301,6 +289,9 @@ class TwoForm():
 
         self.target = J.arguments()[0].function_space()
         self.source = J.arguments()[1].function_space()
+        if not (Jp is None):
+            self.ptarget = Jp.arguments()[0].function_space()
+            self.psource = Jp.arguments()[1].function_space()
 
         self.activefield = activefield
         self._pre_j_callback = pre_j_callback
@@ -320,9 +311,6 @@ class TwoForm():
 
         # compile local assembly kernels
         idx_kernels = compile_form(self.J)
-        # self.mat_local_assembly_kernels = {}
-        # for idx,subkernels in idx_kernels:
-        # self.mat_local_assembly_kernels[idx] = subkernels
         self.mat_local_assembly_idx = []
         self.mat_local_assembly_kernels = []
         for idx, kernels in idx_kernels:
@@ -331,41 +319,36 @@ class TwoForm():
 
         if not (self.Jp is None):
             idx_kernels = compile_form(self.Jp)
-            # self.pmat_local_assembly_kernels = {}
-            # for idx,subkernels in idx_kernels:
-            # self.pmat_local_assembly_kernels[idx] = subkernels
             self.pmat_local_assembly_idx = []
             self.pmat_local_assembly_kernels = []
             for idx, kernels in idx_kernels:
                 self.pmat_local_assembly_idx.append(idx)
                 self.pmat_local_assembly_kernels.append(kernels)
-        
-        #PETSc.Sys.Print(mat_type,bcs)
-        #PETSc.Sys.Print('originalmaps',self.target.get_overall_lgmap())
-        #PETSc.Sys.Print('originalindices',self.target.get_overall_lgmap().getIndices())
-        
+
+        # PETSc.Sys.Print(mat_type,bcs)
+        # PETSc.Sys.Print('originalmaps',self.target.get_overall_lgmap())
+        # PETSc.Sys.Print('originalindices',self.target.get_overall_lgmap().getIndices())
+
         # create matrices
-        # self.mat = create_matrix(mat_type,self.target,self.source,self.mat_local_assembly_kernels.keys(),self.mat_local_assembly_kernels.values())
         self.mat = create_matrix(mat_type, self.target, self.source, self.mat_local_assembly_idx, self.mat_local_assembly_kernels)
         if not (self.Jp is None):
-            # self.pmat = create_matrix(pmat_type,self.target,self.source,self.pmat_local_assembly_kernels.keys(),self.pmat_local_assembly_kernels.values())
-            self.pmat = create_matrix(pmat_type, self.target, self.source, self.pmat_local_assembly_idx, self.pmat_local_assembly_kernels)
+            self.pmat = create_matrix(pmat_type, self.ptarget, self.psource, self.pmat_local_assembly_idx, self.pmat_local_assembly_kernels)
 
         # apply the boundary conditions
         for bc in self.bcs:
-            rowlgmap,collgmap = self.mat.getLGMap()
-            #PETSc.Sys.Print(self.mat)
+            rowlgmap, collgmap = self.mat.getLGMap()
+            # PETSc.Sys.Print(self.mat)
             rowindices = rowlgmap.getIndices()
             colindices = collgmap.getIndices()
-            #PETSc.Sys.Print(colindices)
+            # PETSc.Sys.Print(colindices)
             bcind = bc.get_boundary_indices_local()
-            #PETSc.Sys.Print(bcind)
+            # PETSc.Sys.Print(bcind)
             rowindices[bcind] = -1
             colindices[bcind] = -1
-            #PETSc.Sys.Print('modified indices',rowindices)
-            #PETSc.Sys.Print(rowindices)
-            #PETSc.Sys.Print(colindices)
-            
+            # PETSc.Sys.Print('modified indices',rowindices)
+            # PETSc.Sys.Print(rowindices)
+            # PETSc.Sys.Print(colindices)
+
     def destroy(self):
         self.mat.destroy()  # DOES DESTROYING A NEST AUTOMATICALLY DESTROY THE SUB MATRICES?
         if not (self.Jp is None):
@@ -390,7 +373,7 @@ class TwoForm():
         if (not (self.Jp is None)) and (not ((self.Pconstant is True) and (self.Passembled is True))):
 
             # assemble
-            self._assemblehelper(P, self.pmat_type, self.pmat_local_assembly_idx, self.pmat_local_assembly_kernels)
+            self._assemblehelper(P, self.pmat_type, self.pmat_local_assembly_idx, self.pmat_local_assembly_kernels, pmat=True)
             self.Passembled = True
 
         # restore the old active field
@@ -398,22 +381,28 @@ class TwoForm():
 
         # print(self.J)
         # self.mat.view()
+        PETSc.Sys.Print('mat', self.mat.getInfo(info=3))
+        if not (self.Jp is None):
+            PETSc.Sys.Print('pmat', self.pmat.getInfo(info=3))
 
         # WHAT SHOULD I REALLY BE RETURNING HERE?
         return PETSc.Mat.Structure.SAME_NONZERO_PATTERN
 
-    def _assemblehelper(self, mat, mat_type, blocklist, kernellist):
+    def _assemblehelper(self, mat, mat_type, blocklist, kernellist, pmat=False):
 
         # zero out matrix
         mat.zeroEntries()
 
         # assemble
-        fill_mono(mat, self.target, self.source, blocklist, kernellist)
+        if pmat:
+            fill_mono(mat, self.ptarget, self.psource, blocklist, kernellist)
+        else:
+            fill_mono(mat, self.target, self.source, blocklist, kernellist)
 
         # set boundary rows equal to zero
         for bc in self.bcs:
-            bc.apply_mat(mat,mat_type)
-                
+            bc.apply_mat(mat, mat_type)
+
 
 class ZeroForm():
 

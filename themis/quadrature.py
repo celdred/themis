@@ -1,8 +1,9 @@
 import sympy
-from lagrange import gauss_lobatto, gauss_legendre,lagrange_poly_support
+from lagrange import gauss_lobatto, gauss_legendre, lagrange_poly_support
 import numpy as np
 from finat.quadrature import TensorProductQuadratureRule
 from finat.point_set import TensorPointSet
+
 
 def rescale_pts(pts):
     return 0.5 * pts + 0.5
@@ -86,6 +87,8 @@ class ThemisQuadratureExact(ThemisQuadrature):
             self.wts.append(wt)
 
 # THIS CAN BE ELIMINATED- IT IS NOT USED ANYMORE!
+
+
 class ThemisQuadratureFinat(ThemisQuadrature):
 
     def __init__(self, finatquad):
@@ -94,22 +97,22 @@ class ThemisQuadratureFinat(ThemisQuadrature):
         nquadptslist = []
         self.pts = []
         self.wts = []
-        
+
         if isinstance(finatquad, TensorProductQuadratureRule):
             pslist = []
             qrlist = []
-            ps1,ps2 = finatquad.point_set.factors
-            qr1,qr2 = finatquad.factors
-            #from petscshim import PETSc
-            #PETSc.Sys.Print(finatquad.point_set.factors)
-            #PETSc.Sys.Print(finatquad.factors)
-            
+            ps1, ps2 = finatquad.point_set.factors
+            qr1, qr2 = finatquad.factors
+            # from petscshim import PETSc
+            # PETSc.Sys.Print(finatquad.point_set.factors)
+            # PETSc.Sys.Print(finatquad.factors)
+
             # THIS MIGHT BE BROKEN FOR UNEQUAL QUADRATURE BETWEEN HORIZ AND VERT?
             # IE REALLY NEED TO BE CAREFUL IN HOW QUADRATURE POINTS/WTS ARE ASSOCIATED WITH EXTRUDED...
             # ESPECIALLY FOR 3D AND ALSO FOR FACET INTEGRALS!
-            if isinstance(ps1,TensorPointSet): # recursively unroll TP
-                subps1,subps2 = ps1.factors
-                subqr1,subqr2 = qr1.factors
+            if isinstance(ps1, TensorPointSet):  # recursively unroll TP
+                subps1, subps2 = ps1.factors
+                subqr1, subqr2 = qr1.factors
                 pslist.append(subps1)
                 pslist.append(subps2)
                 qrlist.append(subqr1)
@@ -119,7 +122,7 @@ class ThemisQuadratureFinat(ThemisQuadrature):
                 qrlist.append(qr1)
             pslist.append(ps2)
             qrlist.append(qr2)
-            for ps, qr in zip(pslist,qrlist):
+            for ps, qr in zip(pslist, qrlist):
                 try:
                     self.pts.append(ps.points[:, 0])
                     nquadptslist.append(ps.points.shape[0])
@@ -155,27 +158,30 @@ class ThemisQuadratureFinat(ThemisQuadrature):
         self.nquadpts = np.array(nquadptslist, dtype=np.int32)
 
 
-##### ALL OF THESE QUADRATURE RULES ARE DEFINED ON THE INTERVAL -1,1 ########
+# ALL OF THESE QUADRATURE RULES ARE DEFINED ON THE INTERVAL -1,1
 
 def NewtonCotesOpen1D(n):
 
-	pts = np.linspace(-1.,1.,n+2)
-	pts = pts[1:-1]
-	wts = np.zeros((n))
-	x = sympy.var('x')
-	for i in range(n):
-		li = lagrange_poly_support(i,pts,x)
-		wts[i] = sympy.integrate(li,(x,-1.,1.))
-		
-	return pts,wts
+    pts = np.linspace(-1., 1., n+2)
+    pts = pts[1:-1]
+    wts = np.zeros((n))
+    x = sympy.var('x')
+    for i in range(n):
+        li = lagrange_poly_support(i, pts, x)
+        wts[i] = sympy.integrate(li, (x, -1., 1.))
 
-#NOTE: THIS RULE IS INTENDED ONLY FOR PLOTTING, AND THEREFORE WTS IS USELESS
+    return pts, wts
+
+# NOTE: THIS RULE IS INTENDED ONLY FOR PLOTTING, AND THEREFORE WTS IS USELESS
+
+
 def Pascal1D(n):
-	pts = np.linspace(-1.,1.,2*n+1)
-	pts = pts[1:-1:2]
-	wts = np.zeros((n))
-	return pts,wts
-	
+    pts = np.linspace(-1., 1., 2*n+1)
+    pts = pts[1:-1:2]
+    wts = np.zeros((n))
+    return pts, wts
+
+
 def GaussLegendre1D(n):
 
     pts = np.array(gauss_legendre(n), dtype=np.float64)

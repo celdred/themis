@@ -1,0 +1,235 @@
+
+
+// set blocks for periodic directions and if nblocks = 1 since it is constant in both cases
+{%macro SET_PERIODIC_FIELDS(cell) -%}
+{% for field in fieldlist %}
+{% for k in range(field.ncomp) %}
+{% if (bcs[0] == 'periodic') or (field.nblocks_x[k] == 1) %}
+bi{{cell}}_{{field.name}}_x_{{k}} = ({{ field.nblocks_x[k] }} - 1) / 2;
+{% endif %}
+{% if (bcs[1] == 'periodic') or (field.nblocks_y[k] == 1) %}
+bi{{cell}}_{{field.name}}_y_{{k}} = ({{ field.nblocks_y[k] }} - 1) / 2;
+{% endif %}
+{% if (bcs[2] == 'periodic') or (field.nblocks_z[k] == 1) %}
+bi{{cell}}_{{field.name}}_z_{{k}} = ({{ field.nblocks_z[k] }} - 1) / 2;
+{% endif %}
+{% endfor %}
+{% endfor %}
+{% endmacro %}
+
+{%macro SET_PERIODIC_OTHER(cell) -%}
+
+{% if formdim >= 1 %}
+{% for ci1 in range(nci1) %}
+{% if (bcs[0] == 'periodic') or (nblocks1_x[ci1] == 1) %}
+bi{{cell}}_1_x_{{  ci1 }}  = ({{ nblocks1_x[ci1] }} - 1) / 2;
+{% endif %}
+{% if (bcs[1] == 'periodic') or (nblocks1_y[ci1] == 1) %}
+bi{{cell}}_1_y_{{  ci1 }}  = ({{ nblocks1_y[ci1] }} - 1) / 2;
+{% endif %}
+{% if (bcs[2] == 'periodic') or (nblocks1_z[ci1] == 1) %}
+bi{{cell}}_1_z_{{  ci1 }}  = ({{ nblocks1_z[ci1] }} - 1) / 2;
+{% endif %}
+{% endfor %}
+{% endif %}
+
+
+{% if formdim == 2 %}
+{% for ci2 in range(nci2) %}
+{% if (bcs[0] == 'periodic') or (nblocks2_x[ci2] == 1) %}
+bi{{cell}}_2_x_{{  ci2 }}  = ({{ nblocks2_x[ci2] }} - 1) / 2;
+{% endif %}
+{% if (bcs[1] == 'periodic') or (nblocks2_y[ci2] == 1) %}
+bi{{cell}}_2_y_{{  ci2 }}  = ({{ nblocks2_y[ci2] }} - 1) / 2;
+{% endif %}
+{% if (bcs[2] == 'periodic') or (nblocks2_z[ci2] == 1) %}
+bi{{cell}}_2_z_{{  ci2 }}  = ({{ nblocks2_z[ci2] }} - 1) / 2;
+{% endif %}
+{% endfor %}
+{% endif %}
+
+
+{% for tabulation in tabulations %}
+{% if (tabulation.nblocks == 1 or bcs[0] == 'periodic') and tabulation.shiftaxis == 0 %}
+bi{{cell}}_{{ tabulation.name }}_x_0 = ({{ tabulation.nblocks }} - 1) / 2;
+{% endif %}
+{% if (tabulation.nblocks == 1 or bcs[1] == 'periodic') and tabulation.shiftaxis == 1 %}
+bi{{cell}}_{{ tabulation.name }}_y_0 = ({{ tabulation.nblocks }} - 1) / 2;
+{% endif %}
+{% if (tabulation.nblocks == 1 or bcs[2] == 'periodic') and tabulation.shiftaxis == 2 %}
+bi{{cell}}_{{ tabulation.name }}_z_0 = ({{ tabulation.nblocks }} - 1) / 2;
+{% endif %}
+{% endfor %}
+
+{% endmacro %}
+
+
+
+
+
+{%macro set_x_dir(name,cell,ci,NB) -%}
+{%set M = (NB -1)//2 %}
+if (i{{cell}}cell < {{M}}) bi{{cell}}_{{name}}_x_{{ci}} = i{{cell}}cell ;
+if ((i{{cell}}cell >= {{M}}) && (i{{cell}}cell < (xmax - {{M}}))) bi{{cell}}_{{name}}_x_{{ci}} = {{M}};
+if (i{{cell}}cell >= (xmax - {{M}})) bi{{cell}}_{{name}}_x_{{ci}} = {{NB}} - (xmax - i{{cell}}cell);
+{% endmacro %}
+
+{%macro set_y_dir(name,cell,ci,NB) -%}
+{%set M = (NB -1)//2 %}
+if (j{{cell}}cell < {{M}}) bi{{cell}}_{{name}}_y_{{ci}} = j{{cell}}cell ;
+if ((j{{cell}}cell >= {{M}}) && (j{{cell}}cell < (ymax - {{M}}))) bi{{cell}}_{{name}}_y_{{ci}} = {{M}};
+if (j{{cell}}cell >= (ymax - {{M}})) bi{{cell}}_{{name}}_y_{{ci}} = {{NB}} - (ymax - j{{cell}}cell);
+{% endmacro %}
+
+{%macro set_z_dir(name,cell,ci,NB) -%}
+{%set M = (NB -1)//2 %}
+if (k{{cell}}cell < {{M}}) bi{{cell}}_{{name}}_z_{{ci}} = k{{cell}}cell ;
+if ((k{{cell}}cell >= {{M}}) && (k{{cell}}cell < (zmax - {{M}}))) bi{{cell}}_{{name}}_z_{{ci}} = {{M}};
+if (k{{cell}}cell >= (zmax - {{M}})) bi{{cell}}_{{name}}_z_{{ci}} = {{NB}} - (zmax - k{{cell}}cell);
+{% endmacro %}
+
+
+
+
+
+
+//set blocks for nonperiodic directions with nblocks > 1
+// x direction
+{%macro SET_NONPERIODIC_X_FIELDS(cell) -%}
+{% for field in fieldlist %}
+{% for k in range(field.ncomp) %}
+{% if (bcs[0] == 'nonperiodic') and (field.nblocks_x[k] > 1) %}
+{{ set_x_dir(field.name,cell,k,field.nblocks_x[k]) }}
+{% endif %}
+{% endfor %}
+{% endfor %}
+{% endmacro %}
+
+{%macro SET_NONPERIODIC_X_OTHER(cell) -%}
+{% if formdim >= 1 %}
+{% for ci1 in range(nci1) %}
+{% if (bcs[0] == 'nonperiodic') and (nblocks1_x[ci1] > 1) %}
+{{ set_x_dir('1',cell,ci1,nblocks1_x[ci1]) }}
+{% endif %}
+{% endfor %}
+{% endif %}
+
+{% if formdim == 2 %}
+{% for ci2 in range(nci2) %}
+{% if (bcs[0] == 'nonperiodic') and (nblocks2_x[ci2] > 1) %}
+{{ set_x_dir('2',cell,ci2,nblocks2_x[ci2]) }}
+{% endif %}
+{% endfor %}
+{% endif %}
+
+{% for tabulation in tabulations %}
+{% if (tabulation.nblocks > 1) and (bcs[0] == 'nonperiodic' and tabulation.shiftaxis == 0) %}
+{{ set_x_dir(tabulation.name,cell,0,tabulation.nblocks) }}
+{% endif %}
+{% endfor %}
+
+{% endmacro %}
+
+
+
+
+
+
+
+//y direction
+{%macro SET_NONPERIODIC_Y_FIELDS(cell) -%}
+{% for field in fieldlist %}
+{% for k in range(field.ncomp) %}
+{% if (bcs[1] == 'nonperiodic') and (field.nblocks_y[k] > 1) %}
+{{ set_y_dir(field.name,cell,k,field.nblocks_y[k]) }}
+{% endif %}
+{% endfor %}
+{% endfor %}
+{% endmacro %}
+
+{%macro SET_NONPERIODIC_Y_OTHER(cell) -%}
+{% if formdim >= 1 %}
+{% for ci1 in range(nci1) %}
+{% if (bcs[1] == 'nonperiodic') and (nblocks1_y[ci1] > 1) %}
+{{ set_y_dir('1',cell,ci1,nblocks1_y[ci1]) }}
+{% endif %}
+{% endfor %}
+{% endif %}
+
+{% if formdim == 2 %}
+{% for ci2 in range(nci2) %}
+{% if (bcs[1] == 'nonperiodic') and (nblocks2_y[ci2] > 1) %}
+{{ set_y_dir('2',cell,ci2,nblocks2_y[ci2]) }}
+{% endif %}
+{% endfor %}
+{% endif %}
+
+{% for tabulation in tabulations %}
+{% if (tabulation.nblocks > 1) and (bcs[1] == 'nonperiodic' and tabulation.shiftaxis == 1) %}
+{{ set_y_dir(tabulation.name,cell,0,tabulation.nblocks) }}
+{% endif %}
+{% endfor %}
+
+{% endmacro %}
+
+
+
+
+//z direction
+{%macro SET_NONPERIODIC_Z_FIELDS(cell) -%}
+{% for field in fieldlist %}
+{% for k in range(field.ncomp) %}
+{% if (bcs[2] == 'nonperiodic') and (field.nblocks_z[k] > 1) %}
+{{ set_z_dir(field.name,cell,k,field.nblocks_z[k]) }}
+{% endif %}
+{% endfor %}
+{% endfor %}
+{% endmacro %}
+
+{%macro SET_NONPERIODIC_Z_OTHER(cell) -%}
+{% if formdim >= 1 %}
+{% for ci1 in range(nci1) %}
+{% if (bcs[2] == 'nonperiodic') and (nblocks1_z[ci1] > 1) %}
+{{ set_z_dir('1',cell,ci1,nblocks1_z[ci1]) }}
+{% endif %}
+{% endfor %}
+{% endif %}
+
+{% if formdim == 2 %}
+{% for ci2 in range(nci2) %}
+{% if (bcs[2] == 'nonperiodic') and (nblocks2_z[ci2] > 1) %}
+{{ set_z_dir('2',cell,ci2,nblocks2_z[ci2]) }}
+{% endif %}
+{% endfor %}
+{% endif %}
+
+{% for tabulation in tabulations %}
+{% if (tabulation.nblocks > 1) and (bcs[2] == 'nonperiodic' and tabulation.shiftaxis == 2) %}
+{{ set_z_dir(tabulation.name,cell,0,tabulation.nblocks) }}
+{% endif %}
+{% endfor %}
+
+{% endmacro %}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
