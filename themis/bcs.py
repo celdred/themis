@@ -1,6 +1,10 @@
 import numpy as np
 from form import get_block, restore_block
 from petscshim import PETSc
+from function import Function
+from constant import Constant
+import ufl
+from project import Projector
 
 
 class DirichletBC():
@@ -9,8 +13,8 @@ class DirichletBC():
         if not method == 'topological':
             raise ValueError('%s method for setting boundary nodes is not supported', method)
 
-            # ADD VAL CHECKS- SHOULD SUPPORT CONSTANTS/LITERALS, EXPRESSIONS AND FUNCTIONS
-            # ADD VAL DETERMINATION/CONVERSION IE TURN EXPRESSION INTO A FUNCTION!
+        if isinstance(val, Function) and val.function_space() != space:
+            raise RuntimeError("%r is defined on incompatible FunctionSpace!" % val)
 
         self._space = space
         self._val = val
@@ -27,31 +31,50 @@ class DirichletBC():
         self.si = space._si
 
         localrowoffset = 0
+        # globalrowoffset = 0
         for i in range(0, self.si):
             for ci in range(space._parent.get_space(i).ncomp):
                 localrowoffset = localrowoffset + space._parent.get_space(i).get_localghostedndofs(ci)
+                # globalrowoffset = globalrowoffset + space._parent.get_space(i).get_localndofs(ci)
                 # PETSc.Sys.Print(space._parent.get_space(self.si).get_localndofs(ci, 0),space._parent.get_space(self.si).get_localghostedndofs(ci, 0))
                 # localrowoffset = localrowoffset + space._parent.get_space(self.si).get_localndofs(ci, 0)
 
-        # PETSc.Sys.Print(space,space._si,localrowoffset)
+        # PETSc.Sys.Print(space,space._si,localrowoffset,globalrowoffset)
 
         for direc in direclist:
             for ci in range(space.get_space(self.si).ncomp):
+
                 rows = space.get_space(self.si).get_boundary_indices(ci, direc)  # returns split component local rows
                 if rows[0] == -1:
                     rows = np.array([], dtype=np.int32)
 
                 # PETSc.Sys.Print(direc,ci,rows,space.get_component_compositelgmap(self.si, ci, bi).apply(rows))
 
-                self._splitfieldglobalrows.append(space._parent.get_space(self.si).get_component_compositelgmap(self.si, ci).apply(rows))  # turns rows from split component local into split field global
-                self._globalrows.append(space._parent.get_component_compositelgmap(self.si, ci).apply(rows))  # turn rows from split component local into monolithic global
+                split_global_rows = space._parent.get_space(self.si).get_component_compositelgmap(self.si, ci).apply(rows)
+                global_rows = space._parent.get_component_compositelgmap(self.si, ci).apply(rows)
+                self._splitfieldglobalrows.append(split_global_rows)  # turns rows from split component local into split field global
+                self._globalrows.append(global_rows)  # turn rows from split component local into monolithic global
                 self._localrows.append(rows + localrowoffset)
+
+                if isinstance(val, (int, float)):
+                    valarr = np.ones(len(rows)) * val
+                elif isinstance(val, Constant):
+                    valarr = np.ones(len(rows)) * float(val)
+                elif isinstance(val, Function):
+                    valarr = val._vector.getValues(global_rows)
+                elif isinstance(val, ufl.core.expr.Expr):
+                    valfunc = Function(space)
+                    projector = Projector(val, valfunc)
+                    projector.project()
+                    valarr = valfunc._vector.getValues(global_rows)
+                else:
+                    raise ValueError('dont know how to handle val of type', type(val))
 
                 if len(rows) == 0:
                     self._bvals.append([])
                     self._zerovals.append([])
                 else:
-                    self._bvals.append(np.ones(len(rows)) * float(val))  # WE CURRENTLY SUPPORT ONLY LITERALS FOR VAL
+                    self._bvals.append(valarr)
                     self._zerovals.append(np.zeros(len(rows)))
 
         if not (len(direclist) == 0):

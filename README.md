@@ -16,7 +16,7 @@ User programs are written using the high-level UFL language to express variation
 
 The majority of the code is written in Python, with performance critical parts either occuring natively in C through the petsc4py interface to PETSc (or in Numpy) or automatically generated in C using TSFC in conjuction with UFL.
 
-As it currently stands, Themis is in ALPHA and there is little documentation available. However, many examples can be found under the test directory, including 1D/2D/3D standard and mixed Helmholtz, Symmetric Interior Penalty DG, Vector Laplacian using mixed elements, and Bratu using H1 elements. A key design goal is that valid Themis programs are also valid Firedrake programs, so additional examples can found at https://www.firedrakeproject.org/. Additionally, an atmospheric dynamic core framework termed Mistral is being developed based on Themis, please send us an email if you would like access to the repository.
+As it currently stands, Themis is in ALPHA and there is little documentation available. However, many examples can be found under the tests directory, including 1D/2D/3D standard and mixed Helmholtz, Symmetric Interior Penalty DG, Vector Laplacian using mixed elements, and Bratu using H1 elements. A key design goal is that valid Themis programs are also valid Firedrake programs, so additional examples can found at https://www.firedrakeproject.org/. Additionally, a framework for quasi-Hamiltonian numerical models (based on discretizing the Poisson bracket and Hamiltonian rather than the equations of motion) termed Mistral is under development using Themis, initially targeted towards atmospheric dynamical cores. Please send us an email if you would like access to the repository.
 
 Our primary scientific focus is atmospheric dynamical cores, and our choice of applications reflects this. We would welcome contributions from other fields!
 
@@ -25,7 +25,8 @@ Our primary scientific focus is atmospheric dynamical cores, and our choice of a
 * Support for single-block, structured grids in 1, 2 and 3 dimensions
 * Automated generation and compilation of assembly code or matrix-free operator evaluation using UFL and TSFC
 * Arbitrary mappings between physical and reference space
-* Support for mixed, vector and standard tensor-product Galerkin function spaces using the mimetic Galerkin difference $MGD_n$ and $Q_r^- \Lambda^K$ families
+* Support for mixed, vector and standard tensor-product Galerkin function spaces using the mimetic Galerkin difference $MGD_n$ and $Q_r^- \Lambda^K$ families 
+* Arbitrary choice of $H^1$ and $L_2$ basis functions in 1D (extended to nD via tensor-products) for the $Q_r^- \Lambda^K$ family, including Bernstein polynomials and defining a compatible $L_2$ basis from an $H_1$ basis (gives the mimetic spectral element family)
 * Variational forms of degree 0, 1 and 2 and fields defined on those function spaces
 * Solution of linear and nonlinear variational problems involving forms and fields on those function spaces
 * Support for essential, natural and periodic boundary conditions
@@ -34,7 +35,7 @@ Our primary scientific focus is atmospheric dynamical cores, and our choice of a
 
 ### Planned Future Capabilities ###
 
-* New compatible Galerkin families: mimetic spectral element, isogeometric differential forms
+* New compatible Galerkin family: isogeometric differential forms
 * Multi-block, structured grids
 * Geometric multigrid
 * Support for composable preconditioners

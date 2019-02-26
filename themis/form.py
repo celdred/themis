@@ -381,7 +381,7 @@ class TwoForm():
 
         # print(self.J)
         # self.mat.view()
-        PETSc.Sys.Print('mat', self.mat.getInfo(info=3))
+        # PETSc.Sys.Print('mat', self.mat.getInfo(info=3))
         if not (self.Jp is None):
             PETSc.Sys.Print('pmat', self.pmat.getInfo(info=3))
 
