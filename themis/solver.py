@@ -198,11 +198,31 @@ class NonlinearVariationalSolver():  # solving_utils.ParametersMixin
 
         ismixed = self.problem.u.space.nspaces > 1
         pc = self.snes.getKSP().getPC()
-        if ismixed:
-            for si1 in range(self.Jform.target.nspaces):
-                indices = self.Jform.target.get_field_gis(si1)
-                name = str(si1)
-                pc.setFieldSplitIS((name, indices))
+        if ismixed and pc.getType() == 'fieldsplit':
+            optprefix = pc.getOptionsPrefix()
+            fieldsplit_type = OptDB.getString(optprefix + 'pc_fieldsplit_type')
+            if fieldsplit_type == 'schur':
+                split0fields = OptDB.getString(optprefix + 'pc_fieldsplit_0_fields')
+                split1fields = OptDB.getString(optprefix + 'pc_fieldsplit_1_fields')
+                # PETSc.Sys.Print(fieldsplit_type, split0fields, split1fields)
+                split0fields = split0fields.split(",")
+                split1fields = split1fields.split(",")
+
+                indices = self.Jform.target.get_field_gis(int(split0fields[0]))
+                for i in range(1, len(split0fields)):
+                    indices = indices.expand(self.Jform.target.get_field_gis(int(split0fields[i])))
+                pc.setFieldSplitIS((str(0), indices))
+
+                indices = self.Jform.target.get_field_gis(int(split1fields[0]))
+                for i in range(1, len(split1fields)):
+                    indices = indices.expand(self.Jform.target.get_field_gis(int(split1fields[i])))
+                pc.setFieldSplitIS((str(1), indices))
+
+            else:
+                for si1 in range(self.Jform.target.nspaces):
+                    indices = self.Jform.target.get_field_gis(si1)
+                    name = str(si1)
+                    pc.setFieldSplitIS((name, indices))
 
     def solve(self):
         """Solve the variational problem.

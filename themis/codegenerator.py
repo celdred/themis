@@ -32,10 +32,12 @@ class TabObject():
 exterior_facet_types = ['exterior_facet', 'exterior_facet_vert', 'exterior_facet_bottom', 'exterior_facet_top']
 interior_facet_types = ['interior_facet', 'interior_facet_vert', 'interior_facet_horiz']
 
+template_path = "/home/celdred/Dropbox/Research/Code/postdoc/firedrake-themis/gitrepo/themis"
+
 
 def generate_assembly_routine(mesh, space1, space2, kernel):
     # load templates
-    templateLoader = jinja2.FileSystemLoader(searchpath=["../../gitrepo/themis", "../gitrepo/themis"])
+    templateLoader = jinja2.FileSystemLoader(searchpath=template_path)
 
     # create environment
     templateEnv = jinja2.Environment(loader=templateLoader, trim_blocks=True)
@@ -467,7 +469,7 @@ def generate_assembly_routine(mesh, space1, space2, kernel):
 
 def generate_evaluate_routine(mesh, kernel):
     # load templates
-    templateLoader = jinja2.FileSystemLoader(searchpath=["../../gitrepo/themis", "../gitrepo/themis"])
+    templateLoader = jinja2.FileSystemLoader(searchpath=template_path)
 
     # create environment
     templateEnv = jinja2.Environment(loader=templateLoader, trim_blocks=True)
