@@ -29,9 +29,9 @@ def create_matrix(mat_type, target, source, blocklist, kernellist):
                     bindex = blocklist.index((si1, si2))
                     fill_mono(matrices[si1][si2], target.get_space(si1), source.get_space(si2), [(0, 0), ], [kernellist[bindex], ], zeroassembly=True)
                     # this catches bugs in pre-allocation and the initial assembly by locking the non-zero structure
-                    matrices[si1][si2].setOption(PETSc.Mat.Option.NEW_NONZERO_LOCATION_ERR, True)
-                    matrices[si1][si2].setOption(PETSc.Mat.Option.UNUSED_NONZERO_LOCATION_ERR, True)
-                    matrices[si1][si2].setOption(PETSc.Mat.Option.NEW_NONZERO_ALLOCATION_ERR, True)
+                    matrices[si1][si2].setOption(PETSc.Mat.Option.NEW_NONZERO_LOCATION_ERR, False)
+                    matrices[si1][si2].setOption(PETSc.Mat.Option.UNUSED_NONZERO_LOCATION_ERR, False)
+                    matrices[si1][si2].setOption(PETSc.Mat.Option.NEW_NONZERO_ALLOCATION_ERR, False)
 
                     # These are for zeroRows- the first keeps the non-zero structure when zeroing rows, the 2nd tells PETSc that the process only zeros owned rows
                     matrices[si1][si2].setOption(PETSc.Mat.Option.KEEP_NONZERO_PATTERN, True)
@@ -51,9 +51,9 @@ def create_matrix(mat_type, target, source, blocklist, kernellist):
     mat.assemble()
 
     # this catches bugs in pre-allocation and the initial assembly by locking the non-zero structure
-    mat.setOption(PETSc.Mat.Option.NEW_NONZERO_LOCATION_ERR, True)
-    mat.setOption(PETSc.Mat.Option.UNUSED_NONZERO_LOCATION_ERR, True)
-    mat.setOption(PETSc.Mat.Option.NEW_NONZERO_ALLOCATION_ERR, True)
+    mat.setOption(PETSc.Mat.Option.NEW_NONZERO_LOCATION_ERR, False)
+    mat.setOption(PETSc.Mat.Option.UNUSED_NONZERO_LOCATION_ERR, False)
+    mat.setOption(PETSc.Mat.Option.NEW_NONZERO_ALLOCATION_ERR, False)
     # These are for zeroRows- the first keeps the non-zero structure when zeroing rows, the 2nd tells PETSc that the process only zeros owned rows
     mat.setOption(PETSc.Mat.Option.KEEP_NONZERO_PATTERN, True)
     mat.setOption(PETSc.Mat.Option.NO_OFF_PROC_ZERO_ROWS, False)
@@ -142,15 +142,11 @@ def create_mono(target, source, blocklist, kernellist):
             i = i + 1  # increment row block
     mat.setPreallocationNNZ((dnnzarr, onnzarr))
     mat.setOption(PETSc.Mat.Option.IGNORE_ZERO_ENTRIES, False)
-    mat.setOption(PETSc.Mat.Option.NEW_NONZERO_ALLOCATION_ERR, True)
+    mat.setOption(PETSc.Mat.Option.NEW_NONZERO_ALLOCATION_ERR, False)
     mat.setUp()
     mat.zeroEntries()
 
     return mat
-
-# SHOULD BE CHANGED FOR HORIZ/VERT SPLIT
-# REALLY WE SUPPORT CELL, ds,dS,ds_horiz,ds_vert,dS_bottom,dS_top,dS_horiz
-
 
 def get_interior_flags(mesh,kernellist):
     interior_x = False
@@ -301,6 +297,9 @@ class TwoForm():
 
         self.target = J.arguments()[0].function_space()
         self.source = J.arguments()[1].function_space()
+        if not (Jp is None):
+            self.ptarget = Jp.arguments()[0].function_space()
+            self.psource = Jp.arguments()[1].function_space()
 
         self.activefield = activefield
         self._pre_j_callback = pre_j_callback
@@ -349,7 +348,7 @@ class TwoForm():
         self.mat = create_matrix(mat_type, self.target, self.source, self.mat_local_assembly_idx, self.mat_local_assembly_kernels)
         if not (self.Jp is None):
             # self.pmat = create_matrix(pmat_type,self.target,self.source,self.pmat_local_assembly_kernels.keys(),self.pmat_local_assembly_kernels.values())
-            self.pmat = create_matrix(pmat_type, self.target, self.source, self.pmat_local_assembly_idx, self.pmat_local_assembly_kernels)
+            self.pmat = create_matrix(pmat_type, self.ptarget, self.psource, self.pmat_local_assembly_idx, self.pmat_local_assembly_kernels)
 
         # apply the boundary conditions
         for bc in self.bcs:
@@ -390,7 +389,7 @@ class TwoForm():
         if (not (self.Jp is None)) and (not ((self.Pconstant is True) and (self.Passembled is True))):
 
             # assemble
-            self._assemblehelper(P, self.pmat_type, self.pmat_local_assembly_idx, self.pmat_local_assembly_kernels)
+            self._assemblehelper(P, self.pmat_type, self.pmat_local_assembly_idx, self.pmat_local_assembly_kernels,pmat=True)
             self.Passembled = True
 
         # restore the old active field
@@ -398,18 +397,23 @@ class TwoForm():
 
         # print(self.J)
         # self.mat.view()
-        PETSc.Sys.Print(self.mat.getInfo(info=3))
+        PETSc.Sys.Print('mat',self.mat.getInfo(info=3))
+        if not (self.Jp is None):
+            PETSc.Sys.Print('pmat',self.pmat.getInfo(info=3))
 
         # WHAT SHOULD I REALLY BE RETURNING HERE?
         return PETSc.Mat.Structure.SAME_NONZERO_PATTERN
 
-    def _assemblehelper(self, mat, mat_type, blocklist, kernellist):
+    def _assemblehelper(self, mat, mat_type, blocklist, kernellist,pmat=False):
 
         # zero out matrix
         mat.zeroEntries()
 
         # assemble
-        fill_mono(mat, self.target, self.source, blocklist, kernellist)
+        if pmat:
+            fill_mono(mat, self.ptarget, self.psource, blocklist, kernellist)
+        else:
+            fill_mono(mat, self.target, self.source, blocklist, kernellist)
 
         # set boundary rows equal to zero
         for bc in self.bcs:

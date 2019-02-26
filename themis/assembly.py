@@ -53,71 +53,71 @@ def compile_functional(kernel, tspace, sspace, mesh):
         facet_exterior_boundary_list.append('')
 
     if kernel.integral_type == 'interior_facet':
-        kernel.dalist.append(mesh._edgex_da)
+        kernel.dalist.append(mesh.get_cell_da())
         facet_direc_list.append(0)
         facet_exterior_boundary_list.append('')
         if mesh.ndim >= 2:
-            kernel.dalist.append(mesh._edgey_da)
+            kernel.dalist.append(mesh.get_cell_da())
             facet_direc_list.append(1)
             facet_exterior_boundary_list.append('')
         if mesh.ndim >= 3:
-            kernel.dalist.append(mesh._edgez_da)
+            kernel.dalist.append(mesh.get_cell_da())
             facet_direc_list.append(2)
             facet_exterior_boundary_list.append('')
 
     if kernel.integral_type == 'exterior_facet':
         if mesh.bcs[0] == 'nonperiodic':
-            kernel.dalist.append(mesh._edgex_da)
-            kernel.dalist.append(mesh._edgex_da)
+            kernel.dalist.append(mesh.get_cell_da())
+            kernel.dalist.append(mesh.get_cell_da())
             facet_direc_list.append(0)
             facet_exterior_boundary_list.append('upper')
             facet_direc_list.append(0)
             facet_exterior_boundary_list.append('lower')
         if mesh.ndim >= 2 and mesh.bcs[1] == 'nonperiodic':
-            kernel.dalist.append(mesh._edgey_da)
-            kernel.dalist.append(mesh._edgey_da)
+            kernel.dalist.append(mesh.get_cell_da())
+            kernel.dalist.append(mesh.get_cell_da())
             facet_direc_list.append(1)
             facet_exterior_boundary_list.append('upper')
             facet_direc_list.append(1)
             facet_exterior_boundary_list.append('lower')
         if mesh.ndim >= 3 and mesh.bcs[2] == 'nonperiodic':
-            kernel.dalist.append(mesh._edgez_da)
-            kernel.dalist.append(mesh._edgez_da)
+            kernel.dalist.append(mesh.get_cell_da())
+            kernel.dalist.append(mesh.get_cell_da())
             facet_direc_list.append(2)
             facet_exterior_boundary_list.append('upper')
             facet_direc_list.append(2)
             facet_exterior_boundary_list.append('lower')
 
     if kernel.integral_type == 'interior_facet_vert': # side facets
-        kernel.dalist.append(mesh._edgex_da)
+        kernel.dalist.append(mesh.get_cell_da())
         facet_direc_list.append(0)
         facet_exterior_boundary_list.append('')
         if mesh.extrusion_dim == 2:
-            kernel.dalist.append(mesh._edgey_da)
+            kernel.dalist.append(mesh.get_cell_da())
             facet_direc_list.append(1)
             facet_exterior_boundary_list.append('')
             
     if kernel.integral_type == 'interior_facet_horiz': # extruded facets
         if mesh.extrusion_dim == 1:
-            kernel.dalist.append(mesh._edgey_da)
+            kernel.dalist.append(mesh.get_cell_da())
             facet_direc_list.append(1)
             facet_exterior_boundary_list.append('')
         if mesh.extrusion_dim == 2:
-            kernel.dalist.append(mesh._edgez_da)
+            kernel.dalist.append(mesh.get_cell_da())
             facet_direc_list.append(2)
             facet_exterior_boundary_list.append('')
             
     if kernel.integral_type == 'exterior_facet_vert': # side exterior facets
         if mesh.bcs[0] == 'nonperiodic':
-            kernel.dalist.append(mesh._edgex_da)
-            kernel.dalist.append(mesh._edgex_da)
+            kernel.dalist.append(mesh.get_cell_da())
+            kernel.dalist.append(mesh.get_cell_da())
             facet_direc_list.append(0)
             facet_exterior_boundary_list.append('upper')
             facet_direc_list.append(0)
             facet_exterior_boundary_list.append('lower')
         if mesh.extrusion_dim == 2 and mesh.bcs[1] == 'nonperiodic':
-            kernel.dalist.append(mesh._edgey_da)
-            kernel.dalist.append(mesh._edgey_da)
+            kernel.dalist.append(mesh.get_cell_da())
+            kernel.dalist.append(mesh.get_cell_da())
             facet_direc_list.append(1)
             facet_exterior_boundary_list.append('upper')
             facet_direc_list.append(1)
@@ -125,21 +125,21 @@ def compile_functional(kernel, tspace, sspace, mesh):
             
     if kernel.integral_type == 'exterior_facet_top': # extruded exterior facet top
         if mesh.extrusion_dim == 1:
-            kernel.dalist.append(mesh._edgey_da)
+            kernel.dalist.append(mesh.get_cell_da())
             facet_direc_list.append(1)
             facet_exterior_boundary_list.append('upper')
         if mesh.extrusion_dim == 2:
-            kernel.dalist.append(mesh._edgez_da)
+            kernel.dalist.append(mesh.get_cell_da())
             facet_direc_list.append(2)
             facet_exterior_boundary_list.append('upper')
                  
     if kernel.integral_type == 'exterior_facet_bottom': # extruded exterior facet bottom
         if mesh.extrusion_dim == 1:
-            kernel.dalist.append(mesh._edgey_da)
+            kernel.dalist.append(mesh.get_cell_da())
             facet_direc_list.append(1)
             facet_exterior_boundary_list.append('lower')
         if mesh.extrusion_dim == 2:
-            kernel.dalist.append(mesh._edgez_da)
+            kernel.dalist.append(mesh.get_cell_da())
             facet_direc_list.append(2)
             facet_exterior_boundary_list.append('lower')
 
@@ -289,7 +289,7 @@ def AssembleTwoForm(mat, tspace, sspace, kernel, zeroassembly=False):
                 #PETSc.Sys.Print(sdalist)
                 #PETSc.Sys.Print(kernel.fieldargs_list)
                 #PETSc.Sys.Print(kernel.constantargs_list)
-                assemblefunc([da, ] + submatlist + tdalist + sdalist + kernel.fieldargs_list, kernel.constantargs_list)
+                assemblefunc([da,] + submatlist + tdalist + sdalist + kernel.fieldargs_list, kernel.constantargs_list)
 
             # restore sub matrices
             k = 0
@@ -329,7 +329,7 @@ def AssembleZeroForm(mesh, kernellist):
             with PETSc.Log.Event('assemble'):
 
                 for da, assemblefunc in zip(kernel.dalist, kernel.assemblyfunc_list):
-                    lvalue = assemblefunc([da, ] + kernel.fieldargs_list, kernel.constantargs_list)
+                    lvalue = assemblefunc([da,] + kernel.fieldargs_list, kernel.constantargs_list)
 
                 if PETSc.COMM_WORLD.Get_size() == 1:
                     value = value + lvalue
@@ -381,7 +381,7 @@ def AssembleOneForm(veclist, space, kernel):
                 #PETSc.Sys.Print(kernel.fieldargs_list)
                 #PETSc.Sys.Print(kernel.constantargs_list)
                 #PETSc.Sys.Print(kernel.fieldargs_list[0].getGhostRanges())
-                assemblefunc([da, ] + veclist + tdalist + kernel.fieldargs_list, kernel.constantargs_list)
+                assemblefunc([da,] + veclist + tdalist + kernel.fieldargs_list, kernel.constantargs_list)
         #print('assembled-1',time.time()-time1)
 
 
@@ -408,9 +408,8 @@ def compute_1d_bounds(ci1, ci2, direc, elem1, elem2, ncell, ndofs, interior_face
     NB = elem2.get_nblocks(ci2,direc)
     M = (NB-1)//2
     #print(icells,direc,NB,M)
-    #if bc == 'periodic' or NB == 1:
-    bileft = 0
-    biright = 0
+    bileft = M
+    biright = M
     for i in range(ranges1[0], ranges1[1]):
         leftmostcell = leftmostcells[i]
         rightmostcell = rightmostcells[i]
@@ -421,7 +420,7 @@ def compute_1d_bounds(ci1, ci2, direc, elem1, elem2, ncell, ndofs, interior_face
         rightbound = rightmost_offsets[biright][-1] + rightmostcell * rightmost_offsetmult[biright][-1]
         nnz[i-ranges1[0]] = rightbound - leftbound + 1  # this is the total size
         dnnz[i-ranges1[0]] = py_clip(rightbound, ranges2[0], ranges2[1]-1) - py_clip(leftbound, ranges2[0], ranges2[1]-1) + 1
-    #print('nnz',bc,ncell,ndofs,nnz,dnnz)
+    #PETSc.Sys.Print('nnz',bc,ncell,ndofs,nnz,dnnz)
     return dnnz, nnz
 
 
@@ -468,6 +467,9 @@ def two_form_preallocate_opt(mesh, space1, space2, ci1, ci2, interior_x, interio
     if mesh.ndim == 3:
         if (mesh.bcs[2] == 'periodic') and (nprocs[2] == 1):
             dnnz_z = nnz_z
+    # PETSc.Sys.Print('nnz_x',mesh.bcs[0],mesh.nxs[0],nx1s[0],nnz_x,dnnz_x)
+    # PETSc.Sys.Print('nnz_y',mesh.bcs[1],mesh.nxs[1],nx1s[1],nnz_y,dnnz_y)
+    # PETSc.Sys.Print('nnz_z',mesh.bcs[2],mesh.nxs[2],nx1s[2],nnz_z,dnnz_z)
 
     if mesh.ndim == 1:
         dnnzarr = dnnz_x

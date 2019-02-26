@@ -95,7 +95,7 @@ class FunctionSpace(UFLFunctionSpace):
 
     # DOES THIS WORK FOR VECTOR SPACES?
     # NO, IT DOESN'T TAKE INTO ACCOUNT THAT NDOF IS NOT EQUAL TO 1...
-    # returns the SPLIT LOCAL indices of the owned portion of the physical boundary for component ci, block bi in direc
+    # returns the SPLIT LOCAL indices of the owned portion of the physical boundary for component ci in direc
     def get_boundary_indices(self, ci, direc):
 
         # check if this space has any nodes on the boundary for ci in direc

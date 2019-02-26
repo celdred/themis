@@ -541,6 +541,9 @@ def _CG_interaction_cells(ncell, bc, interior_facet, order):
     if interior_facet:
         interaction_cells[:, 0] = leftmost_bound - 1
         interaction_cells[:, 1] = rightmost_bound + 1
+        if bc == 'nonperiodic':
+            interaction_cells[0:order, 0] = interaction_cells[0:order, 0] + 1
+            interaction_cells[(ncell-1)*(order):ncell*(order), 1] = interaction_cells[(ncell-1)*(order):ncell*(order), 1] - 1
     #print('cg',interaction_cells)
     return interaction_cells
 
@@ -555,6 +558,10 @@ def _DG_interaction_cells(ncell, bc, interior_facet, order):
     if interior_facet:
         interaction_cells[:, 0] = rightmost_bound - 1
         interaction_cells[:, 1] = rightmost_bound + 1
+        if bc == 'nonperiodic':
+            interaction_cells[0:(order+1), 0] = interaction_cells[0:(order+1), 0] + 1
+            interaction_cells[(ncell-1)*(order+1):ncell*(order+1), 1] = interaction_cells[(ncell-1)*(order+1):ncell*(order+1), 1] - 1
+
     #print('dg',interaction_cells)
     return interaction_cells
 
@@ -680,21 +687,31 @@ def _GD_interaction_cells(ncell, bc, interior_facet, order):
     interaction_cells = np.zeros((ncell+off, 2), dtype=np.int32)
     ilist = np.arange(0, interaction_cells.shape[0])
     if order == 3 and bc == 'nonperiodic':
-        interaction_cells[0,:] = np.array([0,1],dtype=np.int32)
-        interaction_cells[1,:] = np.array([-1,1],dtype=np.int32)
-        interaction_cells[2,:] = np.array([-2,1],dtype=np.int32)
-        interaction_cells[3,:] = np.array([-3,1],dtype=np.int32)
-        interaction_cells[4:ncell+off-4,:] = np.array([-2,1],dtype=np.int32)
-        interaction_cells[ncell+off-4,:] = np.array([-2,2],dtype=np.int32)
-        interaction_cells[ncell+off-3,:] = np.array([-2,1],dtype=np.int32)
-        interaction_cells[ncell+off-2,:] = np.array([-2,0],dtype=np.int32)
-        interaction_cells[ncell+off-1,:] = np.array([-2,-1],dtype=np.int32)
+        if interior_facet:
+            interaction_cells[0,:] = np.array([0,2],dtype=np.int32)
+            interaction_cells[1,:] = np.array([-1,2],dtype=np.int32)
+            interaction_cells[2,:] = np.array([-2,2],dtype=np.int32)
+            interaction_cells[3,:] = np.array([-3,2],dtype=np.int32)
+            interaction_cells[4:ncell+off-4,:] = np.array([-3,2],dtype=np.int32)
+            interaction_cells[ncell+off-4,:] = np.array([-3,2],dtype=np.int32)
+            interaction_cells[ncell+off-3,:] = np.array([-3,1],dtype=np.int32)
+            interaction_cells[ncell+off-2,:] = np.array([-3,0],dtype=np.int32)
+            interaction_cells[ncell+off-1,:] = np.array([-3,-1],dtype=np.int32)
+        else:
+            interaction_cells[0,:] = np.array([0,1],dtype=np.int32)
+            interaction_cells[1,:] = np.array([-1,1],dtype=np.int32)
+            interaction_cells[2,:] = np.array([-2,1],dtype=np.int32)
+            interaction_cells[3,:] = np.array([-3,1],dtype=np.int32)
+            interaction_cells[4:ncell+off-4,:] = np.array([-2,1],dtype=np.int32)
+            interaction_cells[ncell+off-4,:] = np.array([-2,2],dtype=np.int32)
+            interaction_cells[ncell+off-3,:] = np.array([-2,1],dtype=np.int32)
+            interaction_cells[ncell+off-2,:] = np.array([-2,0],dtype=np.int32)
+            interaction_cells[ncell+off-1,:] = np.array([-2,-1],dtype=np.int32)
         interaction_cells = interaction_cells + np.expand_dims(ilist,axis=1)
-        # FACET INTEGRAL STUFF?        
     else:
         leftmost = -(order-1)//2-1
         rightmost = (order-1)//2
-        if interior_facet: # IS THIS CORRECT?
+        if interior_facet:
             leftmost = leftmost - 1
             rightmost = rightmost + 1
         interaction_offsets = np.array([leftmost, rightmost], dtype=np.int32)
@@ -704,24 +721,33 @@ def _GD_interaction_cells(ncell, bc, interior_facet, order):
             interaction_cells[-1,-1] = ncell-1
     return interaction_cells
 
-# CORRECT FACET INTEGRAL STUFF??
 def _DGD_interaction_cells(ncell, bc, interior_facet, order):
     interaction_cells = np.zeros((ncell, 2), dtype=np.int32)
     ilist = np.arange(0, interaction_cells.shape[0])
     if order == 2 and bc == 'nonperiodic':
-        interaction_cells[0,:] = np.array([0,1],dtype=np.int32)
-        interaction_cells[1,:] = np.array([-1,1],dtype=np.int32)
-        interaction_cells[2,:] = np.array([-2,1],dtype=np.int32)
-        interaction_cells[3:ncell-3,:] = np.array([-1,1],dtype=np.int32)
-        interaction_cells[ncell-3,:] = np.array([-1,2],dtype=np.int32)
-        interaction_cells[ncell-2,:] = np.array([-1,1],dtype=np.int32)
-        interaction_cells[ncell-1,:] = np.array([-1,0],dtype=np.int32)
+        if interior_facet:
+            interaction_cells[0,:] = np.array([0,2],dtype=np.int32)
+            interaction_cells[1,:] = np.array([-1,2],dtype=np.int32)
+            interaction_cells[2,:] = np.array([-2,2],dtype=np.int32)
+            interaction_cells[3:ncell-3,:] = np.array([-2,2],dtype=np.int32)
+            interaction_cells[ncell-3,:] = np.array([-2,2],dtype=np.int32)
+            interaction_cells[ncell-2,:] = np.array([-2,1],dtype=np.int32)
+            interaction_cells[ncell-1,:] = np.array([-2,0],dtype=np.int32)
+        else:
+            interaction_cells[0,:] = np.array([0,1],dtype=np.int32)
+            interaction_cells[1,:] = np.array([-1,1],dtype=np.int32)
+            interaction_cells[2,:] = np.array([-2,1],dtype=np.int32)
+            interaction_cells[3:ncell-3,:] = np.array([-1,1],dtype=np.int32)
+            interaction_cells[ncell-3,:] = np.array([-1,2],dtype=np.int32)
+            interaction_cells[ncell-2,:] = np.array([-1,1],dtype=np.int32)
+            interaction_cells[ncell-1,:] = np.array([-1,0],dtype=np.int32)
         interaction_cells = interaction_cells + np.expand_dims(ilist,axis=1)
-        # FACET INTEGRAL STUFF?                
+
+            #ADD THIS                
     else:
         leftmost = -(order-1)//2
         rightmost = (order-1)//2+1
-        if interior_facet:
+        if interior_facet: #is this correct?
             leftmost = leftmost - 1
             rightmost = rightmost + 1
         interaction_offsets = np.array([leftmost, rightmost], dtype=np.int32)

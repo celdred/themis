@@ -207,31 +207,31 @@ class SingleBlockMesh(Mesh):
         cell_da.setUp()
         
         # print self.cell_da.getProcSizes()
-        edgex_da = PETSc.DMDA().create(dim=self.ndim, dof=1, sizes=edgex_nxs, proc_sizes=cell_da.getProcSizes(), boundary_type=self._blist, stencil_type=PETSc.DMDA.StencilType.BOX, stencil_width=1, setup=False)
+        #edgex_da = PETSc.DMDA().create(dim=self.ndim, dof=1, sizes=edgex_nxs, proc_sizes=cell_da.getProcSizes(), boundary_type=self._blist, stencil_type=PETSc.DMDA.StencilType.BOX, stencil_width=1, setup=False)
         # THIS IS AN UGLY HACK NEEDED BECAUSE OWNERSHIP RANGES ARGUMENT TO petc4py DMDA_CREATE is BROKEN
-        decompfunction([cell_da, edgex_da], [self.ndim, 1, 1, 1, bdx, 0, 0])
-        edgex_da.setUp()
+        #decompfunction([cell_da, edgex_da], [self.ndim, 1, 1, 1, bdx, 0, 0])
+        #edgex_da.setUp()
 
-        if self.ndim >= 2:
-            edgey_da = PETSc.DMDA().create(dim=self.ndim, dof=1, sizes=edgey_nxs, proc_sizes=cell_da.getProcSizes(), boundary_type=self._blist, stencil_type=PETSc.DMDA.StencilType.BOX, stencil_width=1, setup=False)
+        #if self.ndim >= 2:
+        #    edgey_da = PETSc.DMDA().create(dim=self.ndim, dof=1, sizes=edgey_nxs, proc_sizes=cell_da.getProcSizes(), boundary_type=self._blist, stencil_type=PETSc.DMDA.StencilType.BOX, stencil_width=1, setup=False)
             # THIS IS AN UGLY HACK NEEDED BECAUSE OWNERSHIP RANGES ARGUMENT TO petc4py DMDA_CREATE is BROKEN
-            decompfunction([cell_da, edgey_da], [self.ndim, 1, 1, 1, 0, bdy, 0])
-            edgey_da.setUp()
-        if self.ndim >= 3:
-            edgez_da = PETSc.DMDA().create(dim=self.ndim, dof=1, sizes=edgez_nxs, proc_sizes=cell_da.getProcSizes(), boundary_type=self._blist, stencil_type=PETSc.DMDA.StencilType.BOX, stencil_width=1, setup=False)
+        #    decompfunction([cell_da, edgey_da], [self.ndim, 1, 1, 1, 0, bdy, 0])
+        #    edgey_da.setUp()
+        #if self.ndim >= 3:
+        #    edgez_da = PETSc.DMDA().create(dim=self.ndim, dof=1, sizes=edgez_nxs, proc_sizes=cell_da.getProcSizes(), boundary_type=self._blist, stencil_type=PETSc.DMDA.StencilType.BOX, stencil_width=1, setup=False)
             # THIS IS AN UGLY HACK NEEDED BECAUSE OWNERSHIP RANGES ARGUMENT TO petc4py DMDA_CREATE is BROKEN
-            decompfunction([cell_da, edgez_da], [self.ndim, 1, 1, 1, 0, 0, bdz])
-            edgez_da.setUp()
+        #    decompfunction([cell_da, edgez_da], [self.ndim, 1, 1, 1, 0, 0, bdz])
+        #    edgez_da.setUp()
 
         self._cell_da = cell_da
-        self._edgex_da = edgex_da
-        self._edgex_nxs = edgex_nxs
-        if self.ndim >= 2:
-            self._edgey_da = edgey_da
-            self._edgey_nxs = edgey_nxs
-        if self.ndim >= 3:
-            self._edgez_da = edgez_da
-            self._edgez_nxs = edgez_nxs
+        #self._edgex_da = edgex_da
+        #self._edgex_nxs = edgex_nxs
+        #if self.ndim >= 2:
+        #    self._edgey_da = edgey_da
+        #    self._edgey_nxs = edgey_nxs
+        #if self.ndim >= 3:
+        #    self._edgez_da = edgez_da
+        #    self._edgez_nxs = edgez_nxs
 
         if (coordelem is None):
             if len(nxs) == 1:

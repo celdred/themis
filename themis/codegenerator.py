@@ -85,6 +85,8 @@ def generate_assembly_routine(mesh, space1, space2, kernel):
             of, ofm = elem1.get_offsets(ci1,0)
             offsets1_x.append(a_to_cinit_string(of))
             offset_mult1_x.append(a_to_cinit_string(ofm))
+            #offsets1_x.append(a_to_cinit_string(of[(nb-1)//2,:]))
+            #offset_mult1_x.append(a_to_cinit_string(ofm[(nb-1)//2,:]))
             nblocks1_x.append(nb)
             nbasis1_x.append(of.shape[1]) #assumption that each block has the same number of basis functions, which is fundamental
 
@@ -92,6 +94,8 @@ def generate_assembly_routine(mesh, space1, space2, kernel):
             of, ofm = elem1.get_offsets(ci1,1)
             offsets1_y.append(a_to_cinit_string(of))
             offset_mult1_y.append(a_to_cinit_string(ofm))
+            #offsets1_y.append(a_to_cinit_string(of[(nb-1)//2,:]))
+            #offset_mult1_y.append(a_to_cinit_string(ofm[(nb-1)//2,:]))
             nblocks1_y.append(nb)
             nbasis1_y.append(of.shape[1]) #assumption that each block has the same number of basis functions, which is fundamental
 			
@@ -99,6 +103,8 @@ def generate_assembly_routine(mesh, space1, space2, kernel):
             of, ofm = elem1.get_offsets(ci1,2)
             offsets1_z.append(a_to_cinit_string(of))
             offset_mult1_z.append(a_to_cinit_string(ofm))
+            #offsets1_z.append(a_to_cinit_string(of[(nb-1)//2,:]))
+            #offset_mult1_z.append(a_to_cinit_string(ofm[(nb-1)//2,:]))
             nblocks1_z.append(nb)
             nbasis1_z.append(of.shape[1]) #assumption that each block has the same number of basis functions, which is fundamental
 
@@ -128,6 +134,8 @@ def generate_assembly_routine(mesh, space1, space2, kernel):
             of, ofm = elem2.get_offsets(ci2,0)
             offsets2_x.append(a_to_cinit_string(of))
             offset_mult2_x.append(a_to_cinit_string(ofm))
+            #offsets2_x.append(a_to_cinit_string(of[(nb-1)//2,:]))
+            #offset_mult2_x.append(a_to_cinit_string(ofm[(nb-1)//2,:]))
             nblocks2_x.append(nb)
             nbasis2_x.append(of.shape[1]) #assumption that each block has the same number of basis functions, which is fundamental
 
@@ -136,6 +144,8 @@ def generate_assembly_routine(mesh, space1, space2, kernel):
             of, ofm = elem2.get_offsets(ci2,1)
             offsets2_y.append(a_to_cinit_string(of))
             offset_mult2_y.append(a_to_cinit_string(ofm))
+            #offsets2_y.append(a_to_cinit_string(of[(nb-1)//2,:]))
+            #offset_mult2_y.append(a_to_cinit_string(ofm[(nb-1)//2,:]))
             nblocks2_y.append(nb)
             nbasis2_y.append(of.shape[1]) #assumption that each block has the same number of basis functions, which is fundamental
 
@@ -143,6 +153,8 @@ def generate_assembly_routine(mesh, space1, space2, kernel):
             of, ofm = elem2.get_offsets(ci2,2)
             offsets2_z.append(a_to_cinit_string(of))
             offset_mult2_z.append(a_to_cinit_string(ofm))
+            #offsets2_z.append(a_to_cinit_string(of[(nb-1)//2,:]))
+            #offset_mult2_z.append(a_to_cinit_string(ofm[(nb-1)//2,:]))
             nblocks2_z.append(nb)
             nbasis2_z.append(of.shape[1]) #assumption that each block has the same number of basis functions, which is fundamental
 			
@@ -199,6 +211,8 @@ def generate_assembly_routine(mesh, space1, space2, kernel):
             of, ofm = elem.get_offsets(ci,0)
             fieldobj.offsets_x.append(a_to_cinit_string(of))
             fieldobj.offset_mult_x.append(a_to_cinit_string(ofm))
+            #fieldobj.offsets_x.append(a_to_cinit_string(of[(nb-1)//2,:]))
+            #fieldobj.offset_mult_x.append(a_to_cinit_string(ofm[(nb-1)//2,:]))
             fieldobj.nblocks_x.append(nb)
             fieldobj.nbasis_x.append(of.shape[1]) #assumption that each block has the same number of basis functions, which is fundamental
 
@@ -206,6 +220,8 @@ def generate_assembly_routine(mesh, space1, space2, kernel):
             of, ofm = elem.get_offsets(ci,1)
             fieldobj.offsets_y.append(a_to_cinit_string(of))
             fieldobj.offset_mult_y.append(a_to_cinit_string(ofm))
+            #fieldobj.offsets_y.append(a_to_cinit_string(of[(nb-1)//2,:]))
+            #fieldobj.offset_mult_y.append(a_to_cinit_string(ofm[(nb-1)//2,:]))
             fieldobj.nblocks_y.append(nb)
             fieldobj.nbasis_y.append(of.shape[1]) #assumption that each block has the same number of basis functions, which is fundamental
 
@@ -213,6 +229,8 @@ def generate_assembly_routine(mesh, space1, space2, kernel):
             of, ofm = elem.get_offsets(ci,2)
             fieldobj.offsets_z.append(a_to_cinit_string(of))
             fieldobj.offset_mult_z.append(a_to_cinit_string(ofm))
+            #fieldobj.offsets_z.append(a_to_cinit_string(of[(nb-1)//2,:]))
+            #fieldobj.offset_mult_z.append(a_to_cinit_string(ofm[(nb-1)//2,:]))
             fieldobj.nblocks_z.append(nb)
             fieldobj.nbasis_z.append(of.shape[1]) #assumption that each block has the same number of basis functions, which is fundamental
 
@@ -314,17 +332,29 @@ def generate_assembly_routine(mesh, space1, space2, kernel):
             vals = tabelem.get_derivs(0, 0, pts)
         if tabulation['derivorder'] == 2:
             vals = tabelem.get_derivs2(0, 0, pts)
-        #tabobj.values = a_to_cinit_string(vals[0,:,:])
-        #tabobj.npts = vals.shape[0]
-        #tabobj.nbasis = vals.shape[1]
+# HACK
+        #tabobj.values = a_to_cinit_string(vals[(vals.shape[0]-1)//2,:,:])
         tabobj.values = a_to_cinit_string(vals)
         tabobj.npts = vals.shape[1]
         tabobj.nbasis = vals.shape[2]
         tabobj.nblocks = vals.shape[0]
         tabobj.shiftaxis = tabulation['shiftaxis']
-        #print(uflelem,tabelem._basis[0][0])
-        #print(uflelem,tabelem._derivs[0][0])
         
+
+        
+        tabobj.cell = 'bad'
+        # Key: we define 1 = - and 2 = +
+        if kernel.integral_type in interior_facet_types:
+            if tabulation['restrict'] == 'p':
+                tabobj.cell = '2'
+            if tabulation['restrict'] == 'm':
+                tabobj.cell = '1'
+        if kernel.integral_type in exterior_facet_types:
+            if kernel.facet_exterior_boundary == 'lower':
+                tabobj.cell = '2'
+            if kernel.facet_exterior_boundary == 'upper':
+                tabobj.cell = '1'
+                
         # sanity checks
         assert(tabulation['shape'] == vals.shape[1:])
         assert(tabelem.get_nblocks(0,0) == vals.shape[0])
