@@ -308,11 +308,11 @@ class TwoForm():
         self.pmat_type = pmat_type
         self.J = J
         self.Jp = Jp
-        
+
         # FIX THIS
         if self.mat_type == 'matfree':
             pass
-            
+
         # compile local assembly kernels
         idx_kernels = compile_form(self.J)
         self.mat_local_assembly_idx = []
@@ -387,7 +387,7 @@ class TwoForm():
         # self.mat.view()
         # PETSc.Sys.Print('mat', self.mat.getInfo(info=3))
         # if not (self.Jp is None):
-            # PETSc.Sys.Print('pmat', self.pmat.getInfo(info=3))
+        #   PETSc.Sys.Print('pmat', self.pmat.getInfo(info=3))
 
         # WHAT SHOULD I REALLY BE RETURNING HERE?
         return PETSc.Mat.Structure.SAME_NONZERO_PATTERN
