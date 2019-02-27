@@ -308,7 +308,11 @@ class TwoForm():
         self.pmat_type = pmat_type
         self.J = J
         self.Jp = Jp
-
+        
+        # FIX THIS
+        if self.mat_type == 'matfree':
+            pass
+            
         # compile local assembly kernels
         idx_kernels = compile_form(self.J)
         self.mat_local_assembly_idx = []
