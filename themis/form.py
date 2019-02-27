@@ -382,8 +382,8 @@ class TwoForm():
         # print(self.J)
         # self.mat.view()
         # PETSc.Sys.Print('mat', self.mat.getInfo(info=3))
-        if not (self.Jp is None):
-            PETSc.Sys.Print('pmat', self.pmat.getInfo(info=3))
+        # if not (self.Jp is None):
+            # PETSc.Sys.Print('pmat', self.pmat.getInfo(info=3))
 
         # WHAT SHOULD I REALLY BE RETURNING HERE?
         return PETSc.Mat.Structure.SAME_NONZERO_PATTERN
