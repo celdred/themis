@@ -451,16 +451,6 @@ def generate_assembly_routine(mesh, space1, space2, kernel):
     templateVars['fieldplusconstantslist'] = fieldplusconstantslist
     templateVars['constantargs'] = constant_args_string
 
-    templateVars['evaluate'] = 0
-
-    # FIX THIS- HOW DO WE DETERMINE MATRIX FREE?
-    # HOW ARE MATRIX-FREE KERNELS SUPPORTED?
-
-    # if functional.assemblytype == 'tensor-product-matrixfree':
-    # templateVars['matrixfree'] = 1
-    # else:
-    # templateVars['matrixfree'] = 0
-
     # Process template to produce source code
     outputText = template.render(templateVars)
 

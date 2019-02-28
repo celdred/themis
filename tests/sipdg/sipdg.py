@@ -3,6 +3,7 @@ from common import FunctionSpace, SpatialCoordinate, Function, Projector, Nonlin
 from common import TestFunction, pi, TrialFunction
 from common import QuadCoefficient, ThemisQuadratureNumerical, ds_v, ds_t, ds_b, dS_h, dS_v
 from common import create_mesh, create_elems
+from common import derivative
 
 OptDB = PETSc.Options()
 order = OptDB.getInt('order', 1)
@@ -89,7 +90,8 @@ Rlhs = action(a, x)
 Rrhs = u * rhs * dx
 
 # create solvers
-problem = NonlinearVariationalProblem(Rlhs - Rrhs, x, bcs=[])
+J = derivative(Rlhs - Rrhs, x)
+problem = NonlinearVariationalProblem(Rlhs - Rrhs, x, J=J, Jp=J, bcs=[])
 problem._constant_jacobian = True
 solver = NonlinearVariationalSolver(problem, options_prefix='linsys_', solver_parameters={'snes_type': 'ksponly'})
 

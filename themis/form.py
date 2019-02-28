@@ -3,11 +3,14 @@ from petscshim import PETSc
 import numpy as np
 from assembly import two_form_preallocate_opt, AssembleTwoForm, AssembleOneForm, AssembleZeroForm
 from tsfc_interface import compile_form
+from function import Function
+from ufl_expr import adjoint
+import ufl
 
 # 3
 
 
-def create_matrix(mat_type, target, source, blocklist, kernellist):
+def create_matrix(form, mat_type, target, source, blocklist, kernellist):
     # block matrix
     if mat_type == 'nest' and (target.nspaces > 1 or source.nspaces > 1):
         # create matrix array
@@ -284,6 +287,211 @@ class OneForm():
             v.destroy()
 
 
+class Matrix():
+
+    def __init__(self, form, target, source, bcs, mat_type):
+        self._form = form
+        self._bcs = bcs
+        self._target = target
+        self._source = source
+        self._mat_type = mat_type
+        self._assembled = False
+
+        idx_kernels = compile_form(self._form)
+        self.mat_local_assembly_idx = []
+        self.mat_local_assembly_kernels = []
+        for idx, kernels in idx_kernels:
+            self.mat_local_assembly_idx.append(idx)
+            self.mat_local_assembly_kernels.append(kernels)
+
+        self.petscmat = create_matrix(self, mat_type, target, source, self.mat_local_assembly_idx, self.mat_local_assembly_kernels)
+
+        for bc in self._bcs:
+            rowlgmap, collgmap = self.petscmat.getLGMap()
+            rowindices = rowlgmap.getIndices()
+            colindices = collgmap.getIndices()
+            bcind = bc.get_boundary_indices_local()
+            rowindices[bcind] = -1
+            colindices[bcind] = -1
+
+    def assemble(self, mat):
+
+        # zero out matrix
+        mat.zeroEntries()
+
+        # assemble
+        fill_mono(mat, self._target, self._source, self.mat_local_assembly_idx, self.mat_local_assembly_kernels)
+
+        # set boundary rows equal to zero
+        for bc in self._bcs:
+            bc.apply_mat(mat, self._mat_type)
+
+        self._assembled = True
+
+# DOES DESTROYING A NEST AUTOMATICALLY DESTROY THE SUB MATRICES?
+    def destroy(self):
+        self.petscmat.destroy()
+
+
+class ImplicitMatrix():
+
+    def __init__(self, form, target, source, rowbcs, colbcs):
+        self._twoform = form
+        self._rowbcs = rowbcs
+        self._target = target
+        self._source = source
+        self._colbcs = colbcs
+
+        self._x = Function(target, name='internalx')
+        self._y = Function(source, name='internaly')
+
+        self._form = ufl.action(form, self._x)
+        self._formT = ufl.action(adjoint(form), self._y)
+        self._assembled = False
+
+        if len(rowbcs) > 0:
+            self._xbcs = Function(target)
+        if len(colbcs) > 0:
+            self._ybcs = Function(source)
+
+        idx_kernels = compile_form(self._form)
+        self.local_assembly_idx = []
+        self.local_assembly_kernels = []
+        for idx, kernels in idx_kernels:
+            self.local_assembly_idx.append(idx)
+            self.local_assembly_kernels.append(kernels)
+
+        idx_kernels = compile_form(self._formT)
+        self.Tlocal_assembly_idx = []
+        self.Tlocal_assembly_kernels = []
+        for idx, kernels in idx_kernels:
+            self.Tlocal_assembly_idx.append(idx)
+            self.Tlocal_assembly_kernels.append(kernels)
+
+        # create matrix
+        mlist = []
+        nlist = []
+        for si1 in range(target.nspaces):
+            tspace = target.get_space(si1)
+            for ci1 in range(tspace.ncomp):
+                m = tspace.get_localndofs(ci1)
+                mlist.append(m)
+        for si2 in range(source.nspaces):
+            sspace = source.get_space(si2)
+            for ci2 in range(sspace.ncomp):
+                n = sspace.get_localndofs(ci2)
+                nlist.append(n)
+
+        M = np.sum(np.array(mlist, dtype=np.int32))
+        N = np.sum(np.array(nlist, dtype=np.int32))
+        self.petscmat = PETSc.Mat()
+        self.petscmat.create(PETSc.COMM_WORLD)
+        self.petscmat.setSizes(((M, None), (N, None)))
+        self.petscmat.setType('python')
+        self.petscmat.setPythonContext(self)
+        self.petscmat.setUp()
+        self.petscmat.assemblyBegin()
+        self.petscmat.assemblyEnd()
+
+    def mult(self, A, x, y):
+
+        # "copy" X (petsc Vec) into "active" field
+        self._x._activevector = x
+
+        # zero out local y
+        y.set(0.0)
+        for lvec in self._y._lvectors:
+            lvec.set(0.0)
+
+        # save xbcs
+        if len(self._rowbcs) > 0:
+            x.copy(result=self._xbcs._activevector)
+
+        # apply zero bcs to x
+        # sets x = [ xint   0  ]
+        for bc in self._colbcs:
+            bc.apply_vector(x, zero=True)
+
+        # compute multiplication  A * x
+        # This gives y = [ Aint xint    Junk  ] since we set xbc = 0
+        blocklist = self.local_assembly_idx
+        kernellist = self.local_assembly_kernels
+        for si1 in range(self._target.nspaces):
+            soff = self._target.get_space_offset(si1)
+            if (si1,) in blocklist:
+                bindex = blocklist.index((si1,))
+                for kernel in kernellist[bindex]:
+                    AssembleOneForm(self._y._lvectors[soff:soff+self._target.get_space(si1).ncomp], self._target.get_space(si1), kernel)
+
+        self._target.get_composite_da().gather(y, PETSc.InsertMode.ADD_VALUES, self._y._lvectors)
+
+        # apply bcs to y
+        # this corrects Junk
+        for bc in self._rowbcs:
+            bc.apply_vector(y, bvals=self._xbcs)
+
+        # y.view()
+        # restore active field
+        self._x._activevector = self._x._vector
+
+    def multTranspose(self, A, y, x):
+
+        # "copy" y (petsc Vec) into "active" field
+        self._y._activevector = y
+
+        # save ybcs
+        if len(self._colbcs) > 0:
+            y.copy(result=self._ybcs._activevector)
+
+        # zero out local x
+        x.set(0.0)
+        for lvec in self._x._lvectors:
+            lvec.set(0.0)
+
+        # apply zero bcs to y
+        # sets y = [ yint   0  ]
+        for bc in self._rowbcs:
+            bc.apply_vector(y, zero=True)
+
+        # compute multiplication  A * y
+        # This gives x = [ Aint yint    Junk  ] since we set ybc = 0
+        blocklist = self.Tlocal_assembly_idx
+        kernellist = self.Tlocal_assembly_kernels
+        for si1 in range(self._source.nspaces):
+            soff = self._source.get_space_offset(si1)
+            if (si1,) in blocklist:
+                bindex = blocklist.index((si1,))
+                for kernel in kernellist[bindex]:
+                    AssembleOneForm(self._x._lvectors[soff:soff+self._source.get_space(si1).ncomp], self._source.get_space(si1), kernel)
+
+        self._source.get_composite_da().gather(x, PETSc.InsertMode.ADD_VALUES, self._x._lvectors)
+
+        # apply bcs to x
+        # this corrects Junk
+        for bc in self._colbcs:
+            bc.apply_vector(x, bvals=self._ybcs)
+
+        # restore active field
+        self._y._activevector = self._y._vector
+
+    def assemble(self, mat):
+        self.petscmat.assemble()
+        self.assembled = True
+
+    def destroy(self):
+        self.petscmat.destroy()
+        self._x.destroy()
+        self._y.destroy()
+        self._xbcs.destroy()
+        self._ybcs.destroy()
+
+# HOW IS FIELDSPLIT HANDLED?
+# I see how to create implicit blocks, but what about explicit blocks
+# ie it would be great to be able to apply sub matrices in a matrix-free manner and also assemble some (possibly further approximated) preconditioner?
+    def createSubMatrix(self,):
+        pass
+
+
 class TwoForm():
     def __init__(self, J, activefield, Jp=None, mat_type='aij', pmat_type='aij', constantJ=False, constantP=False, bcs=[], pre_j_callback=None):
 
@@ -292,69 +500,40 @@ class TwoForm():
         if not (Jp is None):
             self.ptarget = Jp.arguments()[0].function_space()
             self.psource = Jp.arguments()[1].function_space()
+        # ADD A CHECK HERE THAT PSOOURCE AND PTARGET CAN DIFFER ONLY FOR MGD SPACES
 
         self.activefield = activefield
         self._pre_j_callback = pre_j_callback
 
         self.bcs = bcs
-        self.Jconstant = constantJ
-        self.Pconstant = constantP
-        self.Jassembled = False
-        self.Passembled = False
-        if self.Jconstant:
-            assert (self.Pconstant is True)
+        self.constantJ = constantJ
+        self.constantP = constantP
 
         self.mat_type = mat_type
         self.pmat_type = pmat_type
         self.J = J
         self.Jp = Jp
 
-        # FIX THIS
-        if self.mat_type == 'matfree':
-            pass
-
-        # compile local assembly kernels
-        idx_kernels = compile_form(self.J)
-        self.mat_local_assembly_idx = []
-        self.mat_local_assembly_kernels = []
-        for idx, kernels in idx_kernels:
-            self.mat_local_assembly_idx.append(idx)
-            self.mat_local_assembly_kernels.append(kernels)
-
-        if not (self.Jp is None):
-            idx_kernels = compile_form(self.Jp)
-            self.pmat_local_assembly_idx = []
-            self.pmat_local_assembly_kernels = []
-            for idx, kernels in idx_kernels:
-                self.pmat_local_assembly_idx.append(idx)
-                self.pmat_local_assembly_kernels.append(kernels)
-
-        # PETSc.Sys.Print(mat_type,bcs)
-        # PETSc.Sys.Print('originalmaps',self.target.get_overall_lgmap())
-        # PETSc.Sys.Print('originalindices',self.target.get_overall_lgmap().getIndices())
-
         # create matrices
-        self.mat = create_matrix(mat_type, self.target, self.source, self.mat_local_assembly_idx, self.mat_local_assembly_kernels)
-        if not (self.Jp is None):
-            self.pmat = create_matrix(pmat_type, self.ptarget, self.psource, self.pmat_local_assembly_idx, self.pmat_local_assembly_kernels)
+        if mat_type in ['aij', 'nest']:
+            self.mat = Matrix(self.J, self.target, self.source, bcs, mat_type)
+        elif mat_type == 'matfree':
+            self.mat = ImplicitMatrix(self.J, self.target, self.source, bcs, bcs)
 
-        # apply the boundary conditions
-        for bc in self.bcs:
-            rowlgmap, collgmap = self.mat.getLGMap()
-            # PETSc.Sys.Print(self.mat)
-            rowindices = rowlgmap.getIndices()
-            colindices = collgmap.getIndices()
-            # PETSc.Sys.Print(colindices)
-            bcind = bc.get_boundary_indices_local()
-            # PETSc.Sys.Print(bcind)
-            rowindices[bcind] = -1
-            colindices[bcind] = -1
-            # PETSc.Sys.Print('modified indices',rowindices)
-            # PETSc.Sys.Print(rowindices)
-            # PETSc.Sys.Print(colindices)
+        # bcs are okay here because MGD degrees of freedom are the same for every order
+# POSSIBLY RECONSTRUCT BCS HERE?
+# IE I COULD SEE THIS BECOMING A PROBLEM?
+# This should maybe actually be a python preconditioner?
+        if not (self.Jp is None):
+            if pmat_type in ['aij', 'nest']:
+                self.pmat = Matrix(self.Jp, self.ptarget, self.psource, bcs, pmat_type)
+            elif pmat_type == 'matfree':
+                raise ValueError('dont know how to treat an ImplicitMatrix pmat yet!')
+# ISSUE HERE WITH DIFFERENT SPACES FOR J and Jp since active field is not valid anymore!
+                # self.pmat = ImplicitMatrix(self.Jp, self.ptarget, self.psource, bcs, bcs)
 
     def destroy(self):
-        self.mat.destroy()  # DOES DESTROYING A NEST AUTOMATICALLY DESTROY THE SUB MATRICES?
+        self.mat.destroy()
         if not (self.Jp is None):
             self.pmat.destroy()
 
@@ -363,49 +542,28 @@ class TwoForm():
         # "copy" X into "active" field
         self.activefield._activevector = X
 
-        if (not ((self.Jconstant is True) and (self.Jassembled is True))) or ((not (self.Jp is None)) and (not ((self.Pconstant is True) and (self.Passembled is True)))):
+        if (not (self.constantJ and self.mat._assembled)) or ((self.Jp is not None) and (not (self.constantP and self.pmat.assembled))):
             # pre-jacobian callback
-            if not (self._pre_j_callback is None):
+            if self._pre_j_callback is not None:
                 self._pre_j_callback(X)
 
-        if not ((self.Jconstant is True) and (self.Jassembled is True)):
+        # assemble J unless J is constant and assembled
+        if not (self.constantJ and self.mat._assembled):
+            self.mat.assemble(J)
 
-            # assemble
-            self._assemblehelper(J, self.mat_type, self.mat_local_assembly_idx, self.mat_local_assembly_kernels)
-            self.Jassembled = True
-
-        if (not (self.Jp is None)) and (not ((self.Pconstant is True) and (self.Passembled is True))):
-
-            # assemble
-            self._assemblehelper(P, self.pmat_type, self.pmat_local_assembly_idx, self.pmat_local_assembly_kernels, pmat=True)
-            self.Passembled = True
+        # assemble Jp IF it exists unless Jp is constant and assembled
+        if (self.Jp is not None) and (not (self.constantP and self.pmat._assembled)):
+            self.pmat.assemble(P)
 
         # restore the old active field
         self.activefield._activevector = self.activefield._vector
 
-        # print(self.J)
-        # self.mat.view()
-        # PETSc.Sys.Print('mat', self.mat.getInfo(info=3))
+        # PETSc.Sys.Print('mat', self.mat.petscmat.getInfo(info=3))
         # if not (self.Jp is None):
-        #   PETSc.Sys.Print('pmat', self.pmat.getInfo(info=3))
+        #   PETSc.Sys.Print('pmat', self.pmat.petscmat.getInfo(info=3))
 
         # WHAT SHOULD I REALLY BE RETURNING HERE?
         return PETSc.Mat.Structure.SAME_NONZERO_PATTERN
-
-    def _assemblehelper(self, mat, mat_type, blocklist, kernellist, pmat=False):
-
-        # zero out matrix
-        mat.zeroEntries()
-
-        # assemble
-        if pmat:
-            fill_mono(mat, self.ptarget, self.psource, blocklist, kernellist)
-        else:
-            fill_mono(mat, self.target, self.source, blocklist, kernellist)
-
-        # set boundary rows equal to zero
-        for bc in self.bcs:
-            bc.apply_mat(mat, mat_type)
 
 
 class ZeroForm():

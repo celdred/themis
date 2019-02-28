@@ -5,6 +5,7 @@ from common import FunctionSpace, Function, NonlinearVariationalProblem, Nonline
 from common import TrialFunction, TestFunction, DirichletBC, Constant
 from common import QuadCoefficient, ThemisQuadratureNumerical
 from common import create_mesh, create_elems
+from common import derivative
 
 OptDB = PETSc.Options()
 order = OptDB.getInt('order', 1)
@@ -45,16 +46,17 @@ if cell in ['tpquad', 'tphex', 'tptri']:
 # Create forms and problem
 x = Function(h1, name='x')
 R = (-hhat * lambdaa * exp(x) + inner(grad(hhat), grad(x))) * dx  # degree=(order*2+1)
-J = (-hhat * lambdaa * exp(x) * h + inner(grad(hhat), grad(h))) * dx  # (degree=(order*2+1))
+# J = (-hhat * lambdaa * exp(x) * h + inner(grad(hhat), grad(h))) * dx  # (degree=(order*2+1))
+J = derivative(R, x)
 
 # create solvers
 if mgd_lowest:
     from mgd_helpers import lower_form_order
     Jp = lower_form_order(J)
-    problem = NonlinearVariationalProblem(R, x, J=J, Jp=Jp, bcs=bcs)
 else:
-    problem = NonlinearVariationalProblem(R, x, J=J, bcs=bcs)
+    Jp = J
 
+problem = NonlinearVariationalProblem(R, x, J=J, Jp=Jp, bcs=bcs)
 solver = NonlinearVariationalSolver(problem, options_prefix='nonlinsys_')
 
 # solve system

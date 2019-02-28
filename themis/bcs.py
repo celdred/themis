@@ -97,11 +97,15 @@ class DirichletBC():
     # def get_boundary_indices_splitglobal(self):
     #     return self._splitfieldglobalrows
 
-    def apply_vector(self, vector, zero=False):
+    def apply_vector(self, vector, bvals=None, zero=False):
         if zero:
             vector.setValues(self._globalrows, self._zerovals, addv=PETSc.InsertMode.INSERT_VALUES)
         else:
-            vector.setValues(self._globalrows, self._bvals, addv=PETSc.InsertMode.INSERT_VALUES)
+            if bvals is None:
+                vector.setValues(self._globalrows, self._bvals, addv=PETSc.InsertMode.INSERT_VALUES)
+            else:
+                bvalsarr = bvals._activevector.getValues(self._globalrows)
+                vector.setValues(self._globalrows, bvalsarr, addv=PETSc.InsertMode.INSERT_VALUES)
         vector.assemble()
 
     def apply_mat(self, mat, mat_type):

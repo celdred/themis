@@ -178,7 +178,6 @@ def compile_functional(kernel, tspace, sspace, mesh):
     tensorlist = []
 
     if (tspace is not None) and (sspace is not None):  # 2-form
-
         for ci1 in range(tspace.ncomp):  # Mat
             for ci2 in range(sspace.ncomp):
                 tensorlist.append(ctypes.c_voidp)

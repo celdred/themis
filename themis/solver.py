@@ -152,8 +152,8 @@ class NonlinearVariationalSolver():  # solving_utils.ParametersMixin
         # matrix-free
         mat_type = OptDB.getString(options_prefix + 'mat_type')
         pmat_type = OptDB.getString(options_prefix + 'pmat_type')
-        matfree = mat_type == "matfree"
-        pmatfree = pmat_type == "matfree"
+        matfree = (mat_type == "matfree")
+        pmatfree = (pmat_type == "matfree")
 
         # No preconditioner by default for matrix-free
         if (problem.Jp is not None and pmatfree) or matfree:
@@ -171,19 +171,23 @@ class NonlinearVariationalSolver():  # solving_utils.ParametersMixin
         # ADD FORM COMPILER OPTIONS
 
         self.Fform = OneForm(problem.F, self.problem.u, bcs=problem.bcs, pre_f_callback=pre_f_callback)
-        # WHAT OTHER ARGUMENTS HERE?
-        # DOES ABOVE NEED BVALS ARGUMENT?
 
         self.snes.setFunction(self.Fform.assembleform, self.Fform.vector)
 
-        # EVENTUALLY ADD ABILITY HERE TO HAVE J NON-CONSTANT AND P CONSTANT, ETC.
+        # print('solver F',problem.F)
+        # print('solver J',problem.J)
+        # print('solver Jp',problem.Jp)
+
+        # This logic allows us to create a variational problem that sets both J and Jp with J=Jp, and can switch between assembled J / no Jp and matfree J / assembled P
+        if (problem.J == problem.Jp) and (mat_type == pmat_type):
+            problem.Jp = None
+
         if problem.Jp is None:
             self.Jform = TwoForm(problem.J, self.problem.u, mat_type=mat_type, constantJ=problem._constant_jacobian, constantP=problem._constant_jacobian, bcs=problem.bcs, pre_j_callback=pre_j_callback)
-            self.snes.setJacobian(self.Jform.assembleform, self.Jform.mat)
-
+            self.snes.setJacobian(self.Jform.assembleform, self.Jform.mat.petscmat)
         else:
             self.Jform = TwoForm(problem.J, self.problem.u, Jp=problem.Jp, mat_type=mat_type, pmat_type=pmat_type, constantJ=problem._constant_jacobian, constantP=problem._constant_jacobian, bcs=problem.bcs, pre_j_callback=pre_j_callback)
-            self.snes.setJacobian(self.Jform.assembleform, self.Jform.mat, self.Jform.pmat)
+            self.snes.setJacobian(self.Jform.assembleform, self.Jform.mat.petscmat, self.Jform.pmat.petscmat)
 
         # SET NULLSPACE
         # SET NULLSPACE T
