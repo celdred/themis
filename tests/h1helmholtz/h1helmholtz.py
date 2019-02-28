@@ -4,6 +4,7 @@ from common import FunctionSpace, SpatialCoordinate, Function, Projector, Nonlin
 from common import TestFunction, DirichletBC, pi
 from common import QuadCoefficient, ThemisQuadratureNumerical
 from common import create_mesh, create_elems
+from common import derivative
 
 OptDB = PETSc.Options()
 order = OptDB.getInt('order', 1)
@@ -89,18 +90,17 @@ Rlhs = (hhat * h - scale*inner(grad(hhat), grad(h))) * dx  # degree=(order*2+1)
 Rrhs = hhat * rhs * dx  # degree=(order*2+1)
 
 # create solvers
-if mgd_lowest:
-    import ufl_expr
-    from mgd_helpers import lower_form_order
-    J = ufl_expr.derivative(Rlhs - Rrhs, h)
-    Jp = lower_form_order(J)
-    problem = NonlinearVariationalProblem(Rlhs - Rrhs, h, bcs=bcs, Jp=Jp)
-else:
-    problem = NonlinearVariationalProblem(Rlhs - Rrhs, h, bcs=bcs)
+J = derivative(Rlhs - Rrhs, h)
 
+if mgd_lowest:
+    from mgd_helpers import lower_form_order
+    Jp = lower_form_order(J)
+else:
+    Jp = J
+
+problem = NonlinearVariationalProblem(Rlhs - Rrhs, h, bcs=bcs, J=J, Jp=Jp)
 problem._constant_jacobian = True
 solver = NonlinearVariationalSolver(problem, options_prefix='linsys_', solver_parameters={'snes_type': 'ksponly'})
-
 
 # solve system
 solver.solve()

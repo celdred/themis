@@ -1,8 +1,6 @@
 import sympy
 from lagrange import gauss_lobatto, gauss_legendre, lagrange_poly_support
 import numpy as np
-from finat.quadrature import TensorProductQuadratureRule
-from finat.point_set import TensorPointSet
 
 
 def rescale_pts(pts):
@@ -86,79 +84,8 @@ class ThemisQuadratureExact(ThemisQuadrature):
             self.pts.append(pt)
             self.wts.append(wt)
 
-# THIS CAN BE ELIMINATED- IT IS NOT USED ANYMORE!
-
-
-class ThemisQuadratureFinat(ThemisQuadrature):
-
-    def __init__(self, finatquad):
-        self.exact = False
-        self.finatquad = finatquad
-        nquadptslist = []
-        self.pts = []
-        self.wts = []
-
-        if isinstance(finatquad, TensorProductQuadratureRule):
-            pslist = []
-            qrlist = []
-            ps1, ps2 = finatquad.point_set.factors
-            qr1, qr2 = finatquad.factors
-            # from petscshim import PETSc
-            # PETSc.Sys.Print(finatquad.point_set.factors)
-            # PETSc.Sys.Print(finatquad.factors)
-
-            # THIS MIGHT BE BROKEN FOR UNEQUAL QUADRATURE BETWEEN HORIZ AND VERT?
-            # IE REALLY NEED TO BE CAREFUL IN HOW QUADRATURE POINTS/WTS ARE ASSOCIATED WITH EXTRUDED...
-            # ESPECIALLY FOR 3D AND ALSO FOR FACET INTEGRALS!
-            if isinstance(ps1, TensorPointSet):  # recursively unroll TP
-                subps1, subps2 = ps1.factors
-                subqr1, subqr2 = qr1.factors
-                pslist.append(subps1)
-                pslist.append(subps2)
-                qrlist.append(subqr1)
-                qrlist.append(subqr2)
-            else:
-                pslist.append(ps1)
-                qrlist.append(qr1)
-            pslist.append(ps2)
-            qrlist.append(qr2)
-            for ps, qr in zip(pslist, qrlist):
-                try:
-                    self.pts.append(ps.points[:, 0])
-                    nquadptslist.append(ps.points.shape[0])
-                except IndexError:
-                    self.pts.append(np.array([0.5, ]))
-                    nquadptslist.append(1)
-                self.wts.append(qr.weights)
-
-        else:
-            # THIS CATCHES THE UNEXPLAINED CASE OF A FINAT POINTSET WITH NO POINTS AND A WEIGHT OF 1- ASK FIREDRAKE TEAM ABOUT IT!
-            # RELATED TO FACET INTEGRALS IN 1D MAYBE?
-            try:
-                self.pts.append(finatquad.point_set.points[:, 0])
-                nquadptslist.append(finatquad.point_set.points.shape[0])
-            except IndexError:
-                self.pts.append(np.array([0.5, ]))
-                nquadptslist.append(1)
-            self.wts.append(finatquad.weights)
-
-        if len(self.pts) == 1:
-            pt, wt = GaussLobattoLegendre1D(1)
-            self.pts.append(rescale_pts(pt))
-            self.pts.append(rescale_pts(pt))
-            self.wts.append(rescale_wts(wt))
-            self.wts.append(rescale_wts(wt))
-            nquadptslist.append(1)
-            nquadptslist.append(1)
-        elif len(self.pts) == 2:
-            pt, wt = GaussLobattoLegendre1D(1)
-            self.pts.append(rescale_pts(pt))
-            self.wts.append(rescale_wts(wt))
-            nquadptslist.append(1)
-        self.nquadpts = np.array(nquadptslist, dtype=np.int32)
-
-
 # ALL OF THESE QUADRATURE RULES ARE DEFINED ON THE INTERVAL -1,1
+
 
 def NewtonCotesOpen1D(n):
 

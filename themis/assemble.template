@@ -45,7 +45,7 @@ data_formvec_{{ ci }}[kk][jj][ii] += vals_{{ ci }} s1_{{ci}}_indices;
 //Actual kernel snippet
 		{{ kernelstr }}
 		
- {% if formdim == 2 %}
+{% if formdim == 2 %}
 PetscErrorCode assemble(DM da {{ submatlist }}  {{ s1dalist }}  {{ s2dalist }} {{ fieldargs }} {{ constantargs }})
 {% endif %}
  {% if formdim == 1 %}
@@ -71,7 +71,7 @@ PetscScalar assemble(DM da {{ fieldargs }} {{ constantargs }})
    PetscInt     rows_{{ ci1 }}[{{ nbasis1_x[ci1] }} * {{ nbasis1_y[ci1]  }} * {{ nbasis1_z[ci1]  }}];
  {% endfor %}
  {% endif %}
- 
+
  {% if formdim == 1 %}
  PetscScalar vals[{{ nbasis1_total }}] = {0.,};
  {% for ci1 in range(nci1) %}
@@ -87,6 +87,7 @@ PetscScalar assemble(DM da {{ fieldargs }} {{ constantargs }})
       {% endif %}
   {% endfor %}
  {% endif %}
+
  
  {% if formdim == 0 %}
  PetscScalar	vals[1] = {0.0,};
@@ -192,6 +193,7 @@ const   PetscInt {{field.name}}_{{k}}_offset_mult_z[{{ field.nblocks_z[k] }}][{{
     ierr = DMDAVecGetArray(s1da_{{ ci1 }},formvec_{{ ci1 }},&data_formvec_{{ ci1 }});CHKERRQ(ierr);
       {% endfor %}
     {% endif %}
+
 
 	//get DMDA ranges
    {% if formdim >= 1 %}
@@ -303,7 +305,7 @@ for (k=zs; k<zs+zm; k++) {
 		    {% if formdim == 0 %}
 		    vals[0] = 0.0;
 				{% endif %}
-				
+
 				{% if not kernelstr == '' %}
 		{{kernelname}}(vals
 				 {% for field in fieldplusconstantslist %}

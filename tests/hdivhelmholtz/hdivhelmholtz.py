@@ -6,6 +6,7 @@ from common import TestFunction, DirichletBC, pi, TestFunctions
 from common import QuadCoefficient, ThemisQuadratureNumerical
 from common import split, div, cos, as_vector, MixedFunctionSpace
 from common import create_mesh, create_elems
+from common import derivative
 
 OptDB = PETSc.Options()
 order = OptDB.getInt('order', 1)
@@ -119,14 +120,13 @@ Rlhs = (hhat * h + hhat * div(u) + inner(uhat, u) + div(uhat) * h) * dx
 Rrhs = inner(hhat, hrhs) * dx
 
 # create solvers
+J = derivative(Rlhs - Rrhs, x)
 if mgd_lowest:
-    import ufl_expr
     from mgd_helpers import lower_form_order
-    J = ufl_expr.derivative(Rlhs - Rrhs, x)
     Jp = lower_form_order(J)
-    problem = NonlinearVariationalProblem(Rlhs - Rrhs, x, bcs=fullbcs, Jp=Jp)
 else:
-    problem = NonlinearVariationalProblem(Rlhs - Rrhs, x, bcs=fullbcs)
+    Jp = J
+problem = NonlinearVariationalProblem(Rlhs - Rrhs, x, bcs=fullbcs, J=J, Jp=Jp)
 
 problem._constant_jacobian = True
 solver = NonlinearVariationalSolver(problem, options_prefix='linsys_', solver_parameters={'snes_type': 'ksponly'})

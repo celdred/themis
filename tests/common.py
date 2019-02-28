@@ -15,7 +15,7 @@ if backend == 'firedrake':
     from firedrake.petsc import PETSc
     from firedrake import FunctionSpace, MixedFunctionSpace
     from firedrake import Function
-    from firedrake import TestFunction, TrialFunction, TestFunctions, TrialFunctions
+    from firedrake import TestFunction, TrialFunction, TestFunctions, TrialFunctions, derivative
     from firedrake import errornorm
     from firedrake import NonlinearVariationalProblem, NonlinearVariationalSolver
     from firedrake import Projector
@@ -49,7 +49,7 @@ if backend == 'themis':
     from petscshim import PETSc
     from functionspace import FunctionSpace, MixedFunctionSpace
     from function import Function
-    from ufl_expr import TestFunction, TrialFunction, TestFunctions, TrialFunctions
+    from ufl_expr import TestFunction, TrialFunction, TestFunctions, TrialFunctions, derivative
     from norms import errornorm
     from solver import NonlinearVariationalProblem, NonlinearVariationalSolver
     from project import Projector
