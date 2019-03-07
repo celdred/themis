@@ -19,12 +19,7 @@ def a_to_cinit_string(x):
 # Needed for code generation, just holds field specific stuff like offsets, etc.
 
 
-class FieldObject():
-    def __init__(self):
-        pass
-
-
-class TabObject():
+class EmptyObject():
     def __init__(self):
         pass
 
@@ -34,6 +29,28 @@ interior_facet_types = ['interior_facet', 'interior_facet_vert', 'interior_facet
 
 template_path = "/home/celdred/Dropbox/Research/Code/postdoc/firedrake-themis/gitrepo/themis"
 
+def create_spaceobj(space):
+    
+    elem = space.themis_element()
+    nbasis_x,nbasis_y,nbasis_z,nbasis,nbasis_total = elem.get_nbasis_info()
+    cellx,celly,cellz,location,dofnum = elem.get_offset_info()
+
+    spaceobj = EmptyObject()
+    spaceobj.nbasis_x = a_to_cinit_string(nbasis_x)
+    spaceobj.nbasis_y = a_to_cinit_string(nbasis_y)
+    spaceobj.nbasis_z = a_to_cinit_string(nbasis_z)
+    spaceobj.nbasis = a_to_cinit_string(nbasis)
+    spaceobj.nbasis_total = nbasis_total
+    spaceobj.cellx = a_to_cinit_string(cellx)
+    spaceobj.celly = a_to_cinit_string(celly)
+    spaceobj.cellz = a_to_cinit_string(cellz)
+    spaceobj.location = location
+    spaceobj.dofnum = dofnum
+    spaceobj.ncomp = elem.ncomp
+    spaceobj.ndofs = elem.ndofs()
+    
+    # ADD BLOCKS STUFF
+    # ADD BASIS FUNCTIONS (NEEDED FOR EVALUATE)
 
 def generate_assembly_routine(mesh, space1, space2, kernel):
     # load templates
@@ -64,106 +81,11 @@ def generate_assembly_routine(mesh, space1, space2, kernel):
 
     # Load element specific information- offsets/offset mult
 
-    # THIS LOGIC CAN MAYBE MOVE TO FE?
-    # IE AN ELEMENT INFO-TYPE THING?
-
     if not (space1 is None):
-        space1size = space1.ncomp
-        offsets1_x = []
-        offsets1_y = []
-        offsets1_z = []
-        offset_mult1_x = []
-        offset_mult1_y = []
-        offset_mult1_z = []
-        nbasis1_x = []
-        nbasis1_y = []
-        nbasis1_z = []
-        nblocks1_x = []
-        nblocks1_y = []
-        nblocks1_z = []
-        s1dalist = ''
-
-        elem1 = space1.themis_element()
-        for ci1 in range(space1size):
-            s1dalist = s1dalist + ',' + 'DM s1da_' + str(ci1)
-
-            nb = elem1.get_nblocks(ci1, 0)
-            of, ofm = elem1.get_offsets(ci1, 0)
-            offsets1_x.append(a_to_cinit_string(of))
-            offset_mult1_x.append(a_to_cinit_string(ofm))
-            # offsets1_x.append(a_to_cinit_string(of[(nb-1)//2,:]))
-            # offset_mult1_x.append(a_to_cinit_string(ofm[(nb-1)//2,:]))
-            nblocks1_x.append(nb)
-            nbasis1_x.append(of.shape[1])  # assumption that each block has the same number of basis functions, which is fundamental
-
-            nb = elem1.get_nblocks(ci1, 1)
-            of, ofm = elem1.get_offsets(ci1, 1)
-            offsets1_y.append(a_to_cinit_string(of))
-            offset_mult1_y.append(a_to_cinit_string(ofm))
-            # offsets1_y.append(a_to_cinit_string(of[(nb-1)//2,:]))
-            # offset_mult1_y.append(a_to_cinit_string(ofm[(nb-1)//2,:]))
-            nblocks1_y.append(nb)
-            nbasis1_y.append(of.shape[1])  # assumption that each block has the same number of basis functions, which is fundamental
-
-            nb = elem1.get_nblocks(ci1, 2)
-            of, ofm = elem1.get_offsets(ci1, 2)
-            offsets1_z.append(a_to_cinit_string(of))
-            offset_mult1_z.append(a_to_cinit_string(ofm))
-            # offsets1_z.append(a_to_cinit_string(of[(nb-1)//2,:]))
-            # offset_mult1_z.append(a_to_cinit_string(ofm[(nb-1)//2,:]))
-            nblocks1_z.append(nb)
-            nbasis1_z.append(of.shape[1])  # assumption that each block has the same number of basis functions, which is fundamental
-
-        nbasis1_total = np.sum(np.array(nbasis1_x, dtype=np.int32) * np.array(nbasis1_y, dtype=np.int32) * np.array(nbasis1_z, dtype=np.int32))
+        space1obj = create_spaceobj(space1)
 
     if not (space2 is None):
-        space2size = space2.ncomp
-        offsets2_x = []
-        offsets2_y = []
-        offsets2_z = []
-        offset_mult2_x = []
-        offset_mult2_y = []
-        offset_mult2_z = []
-        nbasis2_x = []
-        nbasis2_y = []
-        nbasis2_z = []
-        nblocks2_x = []
-        nblocks2_y = []
-        nblocks2_z = []
-        s2dalist = ''
-
-        elem2 = space2.themis_element()
-        for ci2 in range(space2size):
-            s2dalist = s2dalist + ',' + 'DM s2da_' + str(ci2)
-
-            nb = elem2.get_nblocks(ci2, 0)
-            of, ofm = elem2.get_offsets(ci2, 0)
-            offsets2_x.append(a_to_cinit_string(of))
-            offset_mult2_x.append(a_to_cinit_string(ofm))
-            # offsets2_x.append(a_to_cinit_string(of[(nb-1)//2,:]))
-            # offset_mult2_x.append(a_to_cinit_string(ofm[(nb-1)//2,:]))
-            nblocks2_x.append(nb)
-            nbasis2_x.append(of.shape[1])  # assumption that each block has the same number of basis functions, which is fundamental
-
-            nb = elem2.get_nblocks(ci2, 1)
-            of, ofm = elem2.get_offsets(ci2, 1)
-            offsets2_y.append(a_to_cinit_string(of))
-            offset_mult2_y.append(a_to_cinit_string(ofm))
-            # offsets2_y.append(a_to_cinit_string(of[(nb-1)//2,:]))
-            # offset_mult2_y.append(a_to_cinit_string(ofm[(nb-1)//2,:]))
-            nblocks2_y.append(nb)
-            nbasis2_y.append(of.shape[1])  # assumption that each block has the same number of basis functions, which is fundamental
-
-            nb = elem2.get_nblocks(ci2, 2)
-            of, ofm = elem2.get_offsets(ci2, 2)
-            offsets2_z.append(a_to_cinit_string(of))
-            offset_mult2_z.append(a_to_cinit_string(ofm))
-            # offsets2_z.append(a_to_cinit_string(of[(nb-1)//2,:]))
-            # offset_mult2_z.append(a_to_cinit_string(ofm[(nb-1)//2,:]))
-            nblocks2_z.append(nb)
-            nbasis2_z.append(of.shape[1])  # assumption that each block has the same number of basis functions, which is fundamental
-
-        nbasis2_total = np.sum(np.array(nbasis2_x, dtype=np.int32) * np.array(nbasis2_y, dtype=np.int32) * np.array(nbasis2_z, dtype=np.int32))
+        space2obj = create_spaceobj(space2)
 
     # load fields info, including coordinates
     field_args_string = ''
@@ -193,58 +115,14 @@ def generate_assembly_routine(mesh, space1, space2, kernel):
     # print kernel.ast
 
     for field, si in fieldlist:
-        fspace = field.function_space().get_space(si)
-        fieldobj = FieldObject()
+        
+        fieldobj = create_spaceobj(field.function_space().get_space(si))
         fieldobj.name = field.name() + '_' + str(si)
-        fieldobj.nbasis_x = []
-        fieldobj.nbasis_y = []
-        fieldobj.nbasis_z = []
-        fieldobj.offsets_x = []
-        fieldobj.offsets_y = []
-        fieldobj.offsets_z = []
-        fieldobj.offset_mult_x = []
-        fieldobj.offset_mult_y = []
-        fieldobj.offset_mult_z = []
-        fieldobj.nblocks_x = []
-        fieldobj.nblocks_y = []
-        fieldobj.nblocks_z = []
-        fieldobj.ndofs = fspace.get_space(si).themis_element().ndofs()
-        for ci in range(fspace.get_space(si).ncomp):
-            elem = fspace.get_space(si).themis_element()
-
-            nb = elem.get_nblocks(ci, 0)
-            of, ofm = elem.get_offsets(ci, 0)
-            fieldobj.offsets_x.append(a_to_cinit_string(of))
-            fieldobj.offset_mult_x.append(a_to_cinit_string(ofm))
-            # fieldobj.offsets_x.append(a_to_cinit_string(of[(nb-1)//2,:]))
-            # fieldobj.offset_mult_x.append(a_to_cinit_string(ofm[(nb-1)//2,:]))
-            fieldobj.nblocks_x.append(nb)
-            fieldobj.nbasis_x.append(of.shape[1])  # assumption that each block has the same number of basis functions, which is fundamental
-
-            nb = elem.get_nblocks(ci, 1)
-            of, ofm = elem.get_offsets(ci, 1)
-            fieldobj.offsets_y.append(a_to_cinit_string(of))
-            fieldobj.offset_mult_y.append(a_to_cinit_string(ofm))
-            # fieldobj.offsets_y.append(a_to_cinit_string(of[(nb-1)//2,:]))
-            # fieldobj.offset_mult_y.append(a_to_cinit_string(ofm[(nb-1)//2,:]))
-            fieldobj.nblocks_y.append(nb)
-            fieldobj.nbasis_y.append(of.shape[1])  # assumption that each block has the same number of basis functions, which is fundamental
-
-            nb = elem.get_nblocks(ci, 2)
-            of, ofm = elem.get_offsets(ci, 2)
-            fieldobj.offsets_z.append(a_to_cinit_string(of))
-            fieldobj.offset_mult_z.append(a_to_cinit_string(ofm))
-            # fieldobj.offsets_z.append(a_to_cinit_string(of[(nb-1)//2,:]))
-            # fieldobj.offset_mult_z.append(a_to_cinit_string(ofm[(nb-1)//2,:]))
-            fieldobj.nblocks_z.append(nb)
-            fieldobj.nbasis_z.append(of.shape[1])  # assumption that each block has the same number of basis functions, which is fundamental
-
-            dmname = 'DM da_' + fieldobj.name + '_' + str(ci)
-            vecname = 'Vec ' + fieldobj.name + '_' + str(ci)
-            field_args_string = field_args_string + ', ' + dmname
-            field_args_string = field_args_string + ', ' + vecname
-        fieldobj.nbasis_total = np.sum(np.array(fieldobj.nbasis_x, dtype=np.int32) * np.array(fieldobj.nbasis_y, dtype=np.int32) * np.array(fieldobj.nbasis_z, dtype=np.int32))
-        fieldobj.ncomp = fspace.get_space(si).ncomp
+     
+        dmname = 'DM da_' + fieldobj.name 
+        vecname = 'Vec ' + fieldobj.name
+        field_args_string = field_args_string + ', ' + dmname
+        field_args_string = field_args_string + ', ' + vecname
 
         fieldobjs.append(fieldobj)
 
@@ -255,7 +133,7 @@ def generate_assembly_routine(mesh, space1, space2, kernel):
 
     for tabulation in kernel.tabulations:
 
-        tabobj = TabObject()
+        tabobj = EmptyObject()
         tabobj.name = tabulation['name']
 
         # get the quadrature points for the tabulation
@@ -375,16 +253,6 @@ def generate_assembly_routine(mesh, space1, space2, kernel):
     else:
         templateVars['extruded'] = 0
 
-    if kernel.formdim == 2:
-        matlist = ''
-        for ci1 in range(space1size):
-            for ci2 in range(space2size):
-                matlist = matlist + ',' + 'Mat formmat_' + str(ci1) + '_' + str(ci2)
-    if kernel.formdim == 1:
-        veclist = ''
-        for ci1 in range(space1size):
-            veclist = veclist + ',' + 'Vec formvec_' + str(ci1)
-
     # Specific the input variables for the template
     if kernel.zero:
         templateVars['kernelstr'] = ''
@@ -397,51 +265,13 @@ def generate_assembly_routine(mesh, space1, space2, kernel):
 
     templateVars['ndim'] = ndims
 
-    if kernel.formdim == 2:
-        templateVars['submatlist'] = matlist
-    if kernel.formdim == 1:
-        templateVars['subveclist'] = veclist
-
     # basis/derivs/etc.
     if not (space1 is None):
-        templateVars['nci1'] = space1size
-        templateVars['s1dalist'] = s1dalist
-        templateVars['nbasis1_total'] = nbasis1_total
+        templateVars['space1'] = space1obj
 
-        templateVars['offsets1_x'] = offsets1_x
-        templateVars['offset_mult1_x'] = offset_mult1_x
-        templateVars['nbasis1_x'] = nbasis1_x
-        templateVars['nblocks1_x'] = nblocks1_x
-
-        templateVars['offsets1_y'] = offsets1_y
-        templateVars['offset_mult1_y'] = offset_mult1_y
-        templateVars['nbasis1_y'] = nbasis1_y
-        templateVars['nblocks1_y'] = nblocks1_y
-
-        templateVars['offsets1_z'] = offsets1_z
-        templateVars['offset_mult1_z'] = offset_mult1_z
-        templateVars['nbasis1_z'] = nbasis1_z
-        templateVars['nblocks1_z'] = nblocks1_z
 
     if not (space2 is None):
-        templateVars['nci2'] = space2size
-        templateVars['s2dalist'] = s2dalist
-        templateVars['nbasis2_total'] = nbasis2_total
-
-        templateVars['offsets2_x'] = offsets2_x
-        templateVars['offset_mult2_x'] = offset_mult2_x
-        templateVars['nbasis2_x'] = nbasis2_x
-        templateVars['nblocks2_x'] = nblocks2_x
-
-        templateVars['offsets2_y'] = offsets2_y
-        templateVars['offset_mult2_y'] = offset_mult2_y
-        templateVars['nbasis2_y'] = nbasis2_y
-        templateVars['nblocks2_y'] = nblocks2_y
-
-        templateVars['offsets2_z'] = offsets2_z
-        templateVars['offset_mult2_z'] = offset_mult2_z
-        templateVars['nbasis2_z'] = nbasis2_z
-        templateVars['nblocks2_z'] = nblocks2_z
+        templateVars['space2'] = space2obj
 
     # fields
     templateVars['fieldlist'] = fieldobjs
@@ -495,71 +325,16 @@ def generate_evaluate_routine(mesh, kernel):
     pts = kernel.quad.get_pts()
 
     for field, si in fieldlist:
-        fspace = field.function_space().get_space(si)
-        fieldobj = FieldObject()
+
+        fieldobj = create_spaceobj(field.function_space().get_space(si))
         fieldobj.name = field.name() + '_' + str(si)
-        fieldobj.nbasis_x = []
-        fieldobj.nbasis_y = []
-        fieldobj.nbasis_z = []
-        fieldobj.offsets_x = []
-        fieldobj.offsets_y = []
-        fieldobj.offsets_z = []
-        fieldobj.offset_mult_x = []
-        fieldobj.offset_mult_y = []
-        fieldobj.offset_mult_z = []
-        fieldobj.basis_x = []
-        fieldobj.basis_y = []
-        fieldobj.basis_z = []
-        fieldobj.derivs_x = []
-        fieldobj.derivs_y = []
-        fieldobj.derivs_z = []
-        fieldobj.nblocks_x = []
-        fieldobj.nblocks_y = []
-        fieldobj.nblocks_z = []
-        fieldobj.ndofs = fspace.get_space(si).themis_element().ndofs()
-        for ci in range(fspace.get_space(si).ncomp):
-            elem = fspace.get_space(si).themis_element()
-
-            nb = elem.get_nblocks(ci, 0)
-            of, ofm = elem.get_offsets(ci, 0)
-            b = elem.get_basis(ci, 0, pts[0])
-            d = elem.get_derivs(ci, 0, pts[0])
-            fieldobj.basis_x.append(a_to_cinit_string(b))
-            fieldobj.derivs_x.append(a_to_cinit_string(d))
-            fieldobj.offsets_x.append(a_to_cinit_string(of))
-            fieldobj.offset_mult_x.append(a_to_cinit_string(ofm))
-            fieldobj.nblocks_x.append(nb)
-            fieldobj.nbasis_x.append(of.shape[1])  # assumption that each block has the same number of basis functions, which is fundamental
-
-            nb = elem.get_nblocks(ci, 1)
-            of, ofm = elem.get_offsets(ci, 1)
-            b = elem.get_basis(ci, 1, pts[1])
-            d = elem.get_derivs(ci, 1, pts[1])
-            fieldobj.basis_y.append(a_to_cinit_string(b))
-            fieldobj.derivs_y.append(a_to_cinit_string(d))
-            fieldobj.offsets_y.append(a_to_cinit_string(of))
-            fieldobj.offset_mult_y.append(a_to_cinit_string(ofm))
-            fieldobj.nblocks_y.append(nb)
-            fieldobj.nbasis_y.append(of.shape[1])  # assumption that each block has the same number of basis functions, which is fundamental
-
-            nb = elem.get_nblocks(ci, 2)
-            of, ofm = elem.get_offsets(ci, 2)
-            b = elem.get_basis(ci, 2, pts[2])
-            d = elem.get_derivs(ci, 2, pts[2])
-            fieldobj.basis_z.append(a_to_cinit_string(b))
-            fieldobj.derivs_z.append(a_to_cinit_string(d))
-            fieldobj.offsets_z.append(a_to_cinit_string(of))
-            fieldobj.offset_mult_z.append(a_to_cinit_string(ofm))
-            fieldobj.nblocks_z.append(nb)
-            fieldobj.nbasis_z.append(of.shape[1])  # assumption that each block has the same number of basis functions, which is fundamental
-
-            dmname = 'DM da_' + fieldobj.name + '_' + str(ci)
-            vecname = 'Vec ' + fieldobj.name + '_' + str(ci)
-            field_args_string = field_args_string + ', ' + dmname
-            field_args_string = field_args_string + ', ' + vecname
-        fieldobj.nbasis_total = np.sum(np.array(fieldobj.nbasis_x, dtype=np.int32) * np.array(fieldobj.nbasis_y, dtype=np.int32) * np.array(fieldobj.nbasis_z, dtype=np.int32))
-        fieldobj.ncomp = fspace.get_space(si).ncomp
         fieldobjs.append(fieldobj)
+       
+        dmname = 'DM da_' + fieldobj.name
+        vecname = 'Vec ' + fieldobj.name
+        field_args_string = field_args_string + ', ' + dmname
+        field_args_string = field_args_string + ', ' + vecname
+        
 
     vals_args_string = ''
     dmname = 'DM da_vals'

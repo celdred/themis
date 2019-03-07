@@ -165,11 +165,10 @@ def compile_functional(kernel, tspace, sspace, mesh):
             if isinstance(field, Function):
                 for si in range(field.function_space().nspaces):
                     fspace = field.function_space().get_space(si)
-                    for ci in range(fspace.ncomp):
-                        kernel.fieldargs_list.append(fspace.get_da(ci))
-                        kernel.fieldargs_list.append(field.get_lvec(si, ci))
-                        fieldargtypeslist.append(ctypes.c_voidp)  # DA
-                        fieldargtypeslist.append(ctypes.c_voidp)  # Vec
+                    kernel.fieldargs_list.append(fspace.get_da(ci))
+                    kernel.fieldargs_list.append(field.get_lvec(si))
+                    fieldargtypeslist.append(ctypes.c_voidp)  # DA
+                    fieldargtypeslist.append(ctypes.c_voidp)  # Vec
             if isinstance(field, Constant):
                 constantargtypeslist.append(ctypes.c_double)
 
@@ -178,20 +177,13 @@ def compile_functional(kernel, tspace, sspace, mesh):
     tensorlist = []
 
     if (tspace is not None) and (sspace is not None):  # 2-form
-        for ci1 in range(tspace.ncomp):  # Mat
-            for ci2 in range(sspace.ncomp):
-                tensorlist.append(ctypes.c_voidp)
-        for ci1 in range(tspace.ncomp):  # tda
-            tensorlist.append(ctypes.c_voidp)
-        for ci2 in range(sspace.ncomp):  # sda
-            tensorlist.append(ctypes.c_voidp)
+        tensorlist.append(ctypes.c_voidp) # Mat
+        tensorlist.append(ctypes.c_voidp) # tda
+        tensorlist.append(ctypes.c_voidp) # sda
 
     if (tspace is not None) and (sspace is None):  # 1-form
-
-        for ci1 in range(tspace.ncomp):  # Vec
-            tensorlist.append(ctypes.c_voidp)
-        for ci1 in range(tspace.ncomp):  # tda
-            tensorlist.append(ctypes.c_voidp)
+        tensorlist.append(ctypes.c_voidp) # Vec
+        tensorlist.append(ctypes.c_voidp) # tda
 
     if kernel.evaluate is True:
         tensorlist.append(ctypes.c_voidp)  # DM
@@ -264,40 +256,8 @@ def AssembleTwoForm(mat, tspace, sspace, kernel, zeroassembly=False):
         # assemble
         # time1 = time.time()
         with PETSc.Log.Event('assemble'):
-
-            # get the list of das
-            tdalist = []
-            for ci1 in range(tspace.ncomp):
-                tdalist.append(tspace.get_da(ci1))
-            sdalist = []
-            for ci2 in range(sspace.ncomp):
-                sdalist.append(sspace.get_da(ci2))
-
-            # get the block sub matrices
-            submatlist = []
-            for ci1 in range(tspace.ncomp):
-                for ci2 in range(sspace.ncomp):
-                    isrow_block = tspace.get_component_block_lis(ci1)
-                    iscol_block = sspace.get_component_block_lis(ci2)
-                    submatlist.append(mat.getLocalSubMatrix(isrow_block, iscol_block))
-
             for da, assemblefunc in zip(kernel.dalist, kernel.assemblyfunc_list):
-                # PETSc.Sys.Print('assembling 2-form',kernel.integral_type,da)
-                # PETSc.Sys.Print(submatlist)
-                # PETSc.Sys.Print(tdalist)
-                # PETSc.Sys.Print(sdalist)
-                # PETSc.Sys.Print(kernel.fieldargs_list)
-                # PETSc.Sys.Print(kernel.constantargs_list)
-                assemblefunc([da, ] + submatlist + tdalist + sdalist + kernel.fieldargs_list, kernel.constantargs_list)
-
-            # restore sub matrices
-            k = 0
-            for ci1 in range(tspace.ncomp):
-                for ci2 in range(sspace.ncomp):
-                    isrow_block = tspace.get_component_block_lis(ci1)
-                    iscol_block = sspace.get_component_block_lis(ci2)
-                    mat.restoreLocalSubMatrix(isrow_block, iscol_block, submatlist[k])
-                    k = k+1
+                assemblefunc([da, mat, tspace.get_da(), sspace.get_da()] + kernel.fieldargs_list, kernel.constantargs_list)
 
         if zeroassembly:
             kernel.zero = False
@@ -341,7 +301,7 @@ def AssembleZeroForm(mesh, kernellist):
     return value
 
 
-def AssembleOneForm(veclist, space, kernel):
+def AssembleOneForm(vec, space, kernel):
 
     # FIX THIS NAME
     name = 'test'
@@ -367,135 +327,9 @@ def AssembleOneForm(veclist, space, kernel):
         # assemble
         # time1 = time.time()
         with PETSc.Log.Event('assemble'):
-
-            # get the list of das
-            tdalist = []
-            for ci1 in range(space.ncomp):
-                tdalist.append(space.get_da(ci1))
-
             for da, assemblefunc in zip(kernel.dalist, kernel.assemblyfunc_list):
-                # PETSc.Sys.Print('assembling 1-form',kernel.integral_type,da)
-                # PETSc.Sys.Print(veclist)
-                # PETSc.Sys.Print(tdalist)
-                # PETSc.Sys.Print(kernel.fieldargs_list)
-                # PETSc.Sys.Print(kernel.constantargs_list)
-                # PETSc.Sys.Print(kernel.fieldargs_list[0].getGhostRanges())
-                assemblefunc([da, ] + veclist + tdalist + kernel.fieldargs_list, kernel.constantargs_list)
+                assemblefunc([da, vec, space.get_da()] + kernel.fieldargs_list, kernel.constantargs_list)
         # print('assembled-1',time.time()-time1)
-
-
-def compute_bi(i, xmax, M, NB):
-    if (i < M):
-        bi = i
-    if ((i >= M) and (i < xmax-M)):
-        bi = M
-    if (i >= xmax-M):
-        bi = NB - (xmax - i)
-    return bi
-
-
-def compute_1d_bounds(ci1, ci2, direc, elem1, elem2, ncell, ndofs, interior_facet, bc, ranges1, ranges2):
-    dnnz = np.zeros((ndofs), dtype=np.int32)
-    nnz = np.zeros((ndofs), dtype=np.int32)
-
-    # clip values to a range
-    py_clip = lambda x, l, u: l if x < l else u if x > u else x
-
-    icells = elem1.get_icells(ci1, direc, ncell, bc, interior_facet)
-    leftmost_offsets, leftmost_offsetmult = elem2.get_offsets(ci2, direc)
-    rightmost_offsets, rightmost_offsetmult = elem2.get_offsets(ci2, direc)
-
-    leftmostcells = icells[:, 0]
-    rightmostcells = icells[:, 1]
-
-    NB = elem2.get_nblocks(ci2, direc)
-    M = (NB-1)//2
-    # print(icells,direc,NB,M)
-    bileft = M
-    biright = M
-    for i in range(ranges1[0], ranges1[1]):
-        leftmostcell = leftmostcells[i]
-        rightmostcell = rightmostcells[i]
-        if bc == 'nonperiodic' and NB > 1:
-            bileft = compute_bi(leftmostcell, ncell, M, NB)
-            biright = compute_bi(rightmostcell, ncell, M, NB)
-        leftbound = leftmost_offsets[bileft][0] + leftmostcell * leftmost_offsetmult[bileft][0]
-        rightbound = rightmost_offsets[biright][-1] + rightmostcell * rightmost_offsetmult[biright][-1]
-        nnz[i-ranges1[0]] = rightbound - leftbound + 1  # this is the total size
-        dnnz[i-ranges1[0]] = py_clip(rightbound, ranges2[0], ranges2[1]-1) - py_clip(leftbound, ranges2[0], ranges2[1]-1) + 1
-    # PETSc.Sys.Print('nnz',bc,ncell,ndofs,nnz,dnnz)
-    return dnnz, nnz
-
-
-# This computes the preallocation between component ci1, block bi of space1 and component ci2, block bi of space2
-# Where space1 and space2 are FunctionSpace (or the enriched versions)
-# and interior_x, etc. indicate that an interior facet integral is happening (needed for facet integral preallocation)
-# This is perfect for non-facet integrals in all dimensions, and somewhat overestimates facet integrals for 2D or 3D
-
-# THIS IS BROKEN FOR VECTOR SPACES
-# NEED TO MULTIPLY BY NDOFS (maybe ndofs^ndim?) I THINK...
-# ALSO SIZING ON DNNZ AND NNZ ARRAYS IS BROKEN FOR VECTOR SPACES
-def two_form_preallocate_opt(mesh, space1, space2, ci1, ci2, interior_x, interior_y, interior_z):
-
-    elem1 = space1.themis_element()
-    elem2 = space2.themis_element()
-
-    space1_ranges = space1.get_xy(ci1)
-    space2_ranges = np.array(space2.get_xy(ci2), dtype=np.int32)
-    nx1s = space1.get_local_nxny(ci1)
-
-    # swidth = space2.get_da(ci2, bi).getStencilWidth()
-
-    # xyzmaxs_space2 = space2.get_nxny(ci2, bi)
-
-    # compute i bounds
-    dnnz_x, nnz_x = compute_1d_bounds(ci1, ci2, 0, elem1, elem2, mesh.nxs[0], nx1s[0], interior_x, mesh.bcs[0], space1_ranges[0], space2_ranges[0])
-
-    # compute j bounds
-    if mesh.ndim >= 2:
-        dnnz_y, nnz_y = compute_1d_bounds(ci1, ci2, 1, elem1, elem2, mesh.nxs[1], nx1s[1], interior_y, mesh.bcs[1], space1_ranges[1], space2_ranges[1])
-
-    # compute k bounds
-    if mesh.ndim == 3:
-        dnnz_z, nnz_z = compute_1d_bounds(ci1, ci2, 2, elem1, elem2, mesh.nxs[2], nx1s[2], interior_z, mesh.bcs[2], space1_ranges[2], space2_ranges[2])
-
-    # fix periodic boundaries when there is only 1 processor in that direction
-    nprocs = mesh._cell_da.getProcSizes()
-    # for bc,nproc in zip(mesh.bcs,nprocs):
-    if (mesh.bcs[0] == 'periodic') and (nprocs[0] == 1):
-        dnnz_x = nnz_x
-    if mesh.ndim >= 2:
-        if (mesh.bcs[1] == 'periodic') and (nprocs[1] == 1):
-            dnnz_y = nnz_y
-    if mesh.ndim == 3:
-        if (mesh.bcs[2] == 'periodic') and (nprocs[2] == 1):
-            dnnz_z = nnz_z
-    # PETSc.Sys.Print('nnz_x',mesh.bcs[0],mesh.nxs[0],nx1s[0],nnz_x,dnnz_x)
-    # PETSc.Sys.Print('nnz_y',mesh.bcs[1],mesh.nxs[1],nx1s[1],nnz_y,dnnz_y)
-    # PETSc.Sys.Print('nnz_z',mesh.bcs[2],mesh.nxs[2],nx1s[2],nnz_z,dnnz_z)
-
-    if mesh.ndim == 1:
-        dnnzarr = dnnz_x
-        nnzarr = nnz_x
-    if mesh.ndim == 2:
-        # dnnzarr = reduce(np.multiply, np.ix_(dnnz_y,dnnz_x)) #np.ravel(np.outer(nnz_x,nnz_y))
-        # nnzarr = reduce(np.multiply, np.ix_(nnz_y,nnz_x)) #np.ravel(np.outer(nnz_x,nnz_y))
-        dnnzarr = functools.reduce(np.multiply, np.ix_(dnnz_y, dnnz_x))  # np.ravel(np.outer(nnz_x,nnz_y))
-        nnzarr = functools.reduce(np.multiply, np.ix_(nnz_y, nnz_x))  # np.ravel(np.outer(nnz_x,nnz_y))
-    if mesh.ndim == 3:
-        # dnnzarr = reduce(np.multiply, np.ix_(dnnz_z,dnnz_y,dnnz_x))
-        # nnzarr = reduce(np.multiply, np.ix_(nnz_z,nnz_y,nnz_x))
-        dnnzarr = functools.reduce(np.multiply, np.ix_(dnnz_z, dnnz_y, dnnz_x))
-        nnzarr = functools.reduce(np.multiply, np.ix_(nnz_z, nnz_y, nnz_x))
-    onnzarr = nnzarr - dnnzarr
-
-    # see http://stackoverflow.com/questions/17138393/numpy-outer-product-of-n-vectors
-
-    # print(dnnzarr)
-    # print(onnzarr)
-
-    return dnnzarr, onnzarr
-
 
 # this is a helper function to create a TwoForm, given a UFL Form
 # Mostly intended for applications that want to use Themis/UFL to handle the creation and assembly of a PETSc matrix, and then do something with it

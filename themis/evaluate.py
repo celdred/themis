@@ -13,25 +13,27 @@ class QuadCoefficient():
 # NEED A GOOD DEFAULT NAME HERE!!!
         self._name = name
 
-        dm = mesh.get_cell_da()
+        dm = mesh.get_da()
         nquadlist = quad.get_nquad()
         nquad = np.prod(nquadlist)
-        localnxs = mesh.get_local_nxny()
         shape = list(localnxs)
         shape.append(nquadlist[0])
         shape.append(nquadlist[1])
         shape.append(nquadlist[2])
-
-        if ctype == 'scalar':
-            newdm = dm.duplicate(dof=nquad)
-        if ctype == 'vector':
-            newdm = dm.duplicate(dof=nquad*mesh.ndim)
+        if ctype == 'vector': 
             shape.append(mesh.ndim)
-        if ctype == 'tensor':
-            newdm = dm.duplicate(dof=nquad*mesh.ndims*mesh.ndim)
+        if ctype == 'tensor': 
             shape.append(mesh.ndim)
             shape.append(mesh.ndim)
 
+        if ctype == 'scalar': ndofs = nquad
+        if ctype == 'vector': ndofs = nquad * mesh.ndim
+        if ctype == 'tensor': ndofs = nquad * mesh.ndim * mesh.ndim
+        if mesh.ndim == 1: dof = (0,ndofs,0,0)
+        if mesh.ndim == 2: dof = (0,0,ndofs,0)
+        if mesh.ndim == 3: dof = (0,0,0,ndofs)
+        newdm = dm.createCompatibleDMStag(*dof)
+        
         self.dm = newdm
         self.shape = shape
         self.vec = newdm.createGlobalVector()

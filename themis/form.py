@@ -1,19 +1,19 @@
 
 from petscshim import PETSc
 import numpy as np
-from assembly import two_form_preallocate_opt, AssembleTwoForm, AssembleOneForm, AssembleZeroForm
+from assembly import AssembleTwoForm, AssembleOneForm, AssembleZeroForm
 from tsfc_interface import compile_form
 from function import Function
 from ufl_expr import adjoint
 import ufl
 
-# 3
-
 
 def create_matrix(form, mat_type, target, source, blocklist, kernellist):
+    
     # block matrix
     if mat_type == 'nest' and (target.nspaces > 1 or source.nspaces > 1):
-        # create matrix array
+
+        # create matrix array and do an empty assembly
         matrices = []
         for si1 in range(target.nspaces):
             matrices.append([])
@@ -24,34 +24,15 @@ def create_matrix(form, mat_type, target, source, blocklist, kernellist):
                 else:
                     mat = create_empty(target.get_space(si1), source.get_space(si2))
                 matrices[si1].append(mat)
-
-        # do an empty assembly
-        for si1 in range(target.nspaces):
-            for si2 in range(source.nspaces):
-                if ((si1, si2) in blocklist):
-                    bindex = blocklist.index((si1, si2))
-                    fill_mono(matrices[si1][si2], target.get_space(si1), source.get_space(si2), [(0, 0), ], [kernellist[bindex], ], zeroassembly=True)
-                    # this catches bugs in pre-allocation and the initial assembly by locking the non-zero structure
-                    matrices[si1][si2].setOption(PETSc.Mat.Option.NEW_NONZERO_LOCATION_ERR, False)
-                    matrices[si1][si2].setOption(PETSc.Mat.Option.UNUSED_NONZERO_LOCATION_ERR, False)
-                    matrices[si1][si2].setOption(PETSc.Mat.Option.NEW_NONZERO_ALLOCATION_ERR, False)
-
-                    # These are for zeroRows- the first keeps the non-zero structure when zeroing rows, the 2nd tells PETSc that the process only zeros owned rows
-                    matrices[si1][si2].setOption(PETSc.Mat.Option.KEEP_NONZERO_PATTERN, True)
-                    matrices[si1][si2].setOption(PETSc.Mat.Option.NO_OFF_PROC_ZERO_ROWS, False)
-
         # create nest
         # PETSc.Sys.Print(matrices)
         mat = PETSc.Mat().createNest(matrices, comm=PETSc.COMM_WORLD)
+        mat.assemble()
 
     # monolithic matrix
     if (mat_type == 'nest' and (target.nspaces == 1 and source.nspaces == 1)) or mat_type == 'aij':
-        # create matrix
         mat = create_mono(target, source, blocklist, kernellist)
-        # do an empty assembly
-        fill_mono(mat, target, source, blocklist, kernellist, zeroassembly=True)
 
-    mat.assemble()
 
     # this catches bugs in pre-allocation and the initial assembly by locking the non-zero structure
     mat.setOption(PETSc.Mat.Option.NEW_NONZERO_LOCATION_ERR, False)
@@ -72,17 +53,15 @@ def create_empty(target, source):
     nlist = []
     for si1 in range(target.nspaces):
         tspace = target.get_space(si1)
-        for ci1 in range(tspace.ncomp):
-            m = tspace.get_localndofs(ci1)
-            mlist.append(m)
+        m = tspace.get_localndofs()
+        mlist.append(m)
     for si2 in range(source.nspaces):
         sspace = source.get_space(si2)
-        for ci2 in range(sspace.ncomp):
-            n = sspace.get_localndofs(ci2)
-            nlist.append(n)
-
+        n = sspace.get_localndofs()
+        nlist.append(n)
     M = np.sum(np.array(mlist, dtype=np.int32))
     N = np.sum(np.array(nlist, dtype=np.int32))
+    
     mat = PETSc.Mat()
     mat.create(PETSc.COMM_WORLD)
     mat.setSizes(((M, None), (N, None)))
@@ -94,84 +73,67 @@ def create_empty(target, source):
 
     return mat
 
+def get_preallocation(PETSc.Mat preallocator, PetscInt nrow):
+    cdef:
+        _p_Mat *A = <_p_Mat *>(preallocator.mat)
+        Mat_Preallocator *p = <Mat_Preallocator *>(A.data)
 
+    if p.dnz != NULL:
+        dnz = <PetscInt[:nrow]>p.dnz
+        dnz = np.asarray(dnz).copy()
+    else:
+        dnz = np.zeros(0, dtype=IntType)
+    if p.onz != NULL:
+        onz = <PetscInt[:nrow]>p.onz
+        onz = np.asarray(onz).copy()
+    else:
+        onz = np.zeros(0, dtype=IntType)
+    return dnz, onz
+    
 def create_mono(target, source, blocklist, kernellist):
     # create matrix
     mlist = []
     nlist = []
     for si1 in range(target.nspaces):
         tspace = target.get_space(si1)
-        for ci1 in range(tspace.ncomp):
-            m = tspace.get_localndofs(ci1)
-            mlist.append(m)
+        m = tspace.get_localndofs()
+        mlist.append(m)
     for si2 in range(source.nspaces):
         sspace = source.get_space(si2)
-        for ci2 in range(sspace.ncomp):
-            n = sspace.get_localndofs(ci2)
-            nlist.append(n)
-
+        n = sspace.get_localndofs()
+        nlist.append(n)
     M = np.sum(np.array(mlist, dtype=np.int32))
     N = np.sum(np.array(nlist, dtype=np.int32))
+    
+    # preallocate matrix
+
+    preallocator = PETSc.Mat()
+    preallocator.create(PETSc.COMM_WORLD)
+    preallocator.setSizes(((M, None), (N, None)))
+    preallocator.setType(PETSc.Mat.Type.PREALLOCATOR)
+    preallocator.setLGMap(target.get_overall_lgmap(), cmap=source.get_overall_lgmap())
+    preallocator.setUp()
+    fill_mono(preallocator, target, source, blocklist, kernellist, zeroassembly=True)
+    preallocator.assemble()
+    
+    dnnzarr,onnzarr  = get_preallocation(preallocator, M)
+
+    #create actual matrix
     mat = PETSc.Mat()
     mat.create(PETSc.COMM_WORLD)
     mat.setSizes(((M, None), (N, None)))
     mat.setType('aij')
     mat.setLGMap(target.get_overall_lgmap(), cmap=source.get_overall_lgmap())
-
-    # preallocate matrix
-
-    # PRE-ALLOCATE IS NOT QUITE PERFECT FOR FACET INTEGRALS- IT WORKS BUT IS TOO MUCH!
-    mlist.insert(0, 0)
-    mlist_adj = np.cumsum(mlist)
-    dnnzarr = np.zeros(M, dtype=np.int32)
-    onnzarr = np.zeros(M, dtype=np.int32)
-    i = 0  # this tracks which row "block" are at
-    # This loop order ensures that we fill an entire row in the matrix first
-    # Assuming that fields are stored si,ci which they are!
-    for si1 in range(target.nspaces):
-        tspace = target.get_space(si1)
-        for ci1 in range(tspace.ncomp):
-            for si2 in range(source.nspaces):
-                sspace = source.get_space(si2)
-                for ci2 in range(sspace.ncomp):
-                    if ((si1, si2) in blocklist):
-                        bindex = blocklist.index((si1, si2))
-                        interior_x, interior_y, interior_z = get_interior_flags(tspace.mesh(), kernellist[bindex])
-                        dnnz, onnz = two_form_preallocate_opt(tspace.mesh(), tspace, sspace, ci1, ci2, interior_x, interior_y, interior_z)
-                        dnnz = np.ravel(dnnz)
-                        onnz = np.ravel(onnz)
-                        dnnzarr[mlist_adj[i]:mlist_adj[i+1]] = dnnzarr[mlist_adj[i]:mlist_adj[i+1]] + dnnz
-                        onnzarr[mlist_adj[i]:mlist_adj[i+1]] = onnzarr[mlist_adj[i]:mlist_adj[i+1]] + onnz
-            i = i + 1  # increment row block
     mat.setPreallocationNNZ((dnnzarr, onnzarr))
     mat.setOption(PETSc.Mat.Option.IGNORE_ZERO_ENTRIES, False)
     mat.setOption(PETSc.Mat.Option.NEW_NONZERO_ALLOCATION_ERR, False)
+    mat.setOption(PETSc.Mat.Option.UNUSED_NONZERO_LOCATION_ERR, False)
+    mat.setOption(PETSc.Mat.Option.KEEP_NONZERO_PATTERN, True)
+    mat.setOption(PETSc.Mat.Option.NO_OFF_PROC_ZERO_ROWS, False)
     mat.setUp()
     mat.zeroEntries()
-
+    mat.assemble()
     return mat
-
-
-def get_interior_flags(mesh, kernellist):
-    interior_x = False
-    interior_y = False
-    interior_z = False
-    for kernel in kernellist:
-        if kernel.integral_type == 'interior_facet':
-            interior_x = True
-            interior_y = True
-            interior_z = True
-        if kernel.integral_type == 'interior_facet_horiz':
-            interior_x = True
-            if mesh.extrusion_dim == 2:
-                interior_y = True
-            interior_z = False
-        if kernel.integral_type == 'interior_facet_vert':
-            if mesh.extrusion_dim == 1:
-                interior_y = True
-            if mesh.extrusion_dim == 2:
-                interior_z = True
-    return interior_x, interior_y, interior_z
 
 
 def fill_mono(mat, target, source, blocklist, kernellist, zeroassembly=False):
@@ -186,7 +148,6 @@ def fill_mono(mat, target, source, blocklist, kernellist, zeroassembly=False):
                 for kernel in kernellist[bindex]:
                     AssembleTwoForm(submat, target.get_space(si1), source.get_space(si2), kernel, zeroassembly=zeroassembly)
                 restore_block(isrow, iscol, mat, submat)
-
     mat.assemble()
 
 
@@ -223,8 +184,7 @@ class OneForm():
         self.vector.set(0.0)
         self.lvectors = []
         for si in range(self.space.nspaces):
-            for ci in range(self.space.get_space(si).ncomp):
-                self.lvectors.append(self.space.get_space(si).get_da(ci).createLocalVector())
+            self.lvectors.append(self.space.get_space(si).get_da().createLocalVector())
 
         # compile local assembly kernels
         idx_kernels = compile_form(F)
@@ -272,7 +232,7 @@ class OneForm():
             if (si1,) in blocklist:
                 bindex = blocklist.index((si1,))
                 for kernel in kernellist[bindex]:
-                    AssembleOneForm(self.lvectors[soff:soff+self.space.get_space(si1).ncomp], self.space.get_space(si1), kernel)
+                    AssembleOneForm(self.lvectors[soff], self.space.get_space(si1), kernel)
 
         self.space.get_composite_da().gather(vec, PETSc.InsertMode.ADD_VALUES, self.lvectors)
 
@@ -373,14 +333,12 @@ class ImplicitMatrix():
         nlist = []
         for si1 in range(target.nspaces):
             tspace = target.get_space(si1)
-            for ci1 in range(tspace.ncomp):
-                m = tspace.get_localndofs(ci1)
-                mlist.append(m)
+            m = tspace.get_localndofs()
+            mlist.append(m)
         for si2 in range(source.nspaces):
             sspace = source.get_space(si2)
-            for ci2 in range(sspace.ncomp):
-                n = sspace.get_localndofs(ci2)
-                nlist.append(n)
+            n = sspace.get_localndofs()
+            nlist.append(n)
 
         M = np.sum(np.array(mlist, dtype=np.int32))
         N = np.sum(np.array(nlist, dtype=np.int32))
@@ -421,7 +379,7 @@ class ImplicitMatrix():
             if (si1,) in blocklist:
                 bindex = blocklist.index((si1,))
                 for kernel in kernellist[bindex]:
-                    AssembleOneForm(self._y._lvectors[soff:soff+self._target.get_space(si1).ncomp], self._target.get_space(si1), kernel)
+                    AssembleOneForm(self._y._lvectors[soff], self._target.get_space(si1), kernel)
 
         self._target.get_composite_da().gather(y, PETSc.InsertMode.ADD_VALUES, self._y._lvectors)
 
@@ -462,7 +420,7 @@ class ImplicitMatrix():
             if (si1,) in blocklist:
                 bindex = blocklist.index((si1,))
                 for kernel in kernellist[bindex]:
-                    AssembleOneForm(self._x._lvectors[soff:soff+self._source.get_space(si1).ncomp], self._source.get_space(si1), kernel)
+                    AssembleOneForm(self._x._lvectors[soff], self._source.get_space(si1), kernel)
 
         self._source.get_composite_da().gather(x, PETSc.InsertMode.ADD_VALUES, self._x._lvectors)
 

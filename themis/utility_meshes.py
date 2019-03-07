@@ -12,7 +12,15 @@ def create_box_mesh(nxs, lxs, pxs, bcs):
     nxs = np.array(nxs, dtype=np.int32)
 
     mesh = SingleBlockMesh(nxs, bcs)
-    mesh.scale_coordinates(lxs, pxs - lxs / 2.)
+
+    xs = SpatialCoordinate(mesh)
+    newcoordvals = []
+    # xnew = lx * x + px - lx/2. (transforms [0,1] into [px - lx/2, px + lx/2.])
+    for i in range(len(nxs)):
+        newcoordvals.append(xs[i] * lx[i] + px[i] - lx[i]/2.)
+    newcoords = Function(mesh.coordinates.function_space())
+    newcoords.interpolate(newcoordvals)
+    mesh.coordinates.assign(newcoords)
 
     return mesh
 

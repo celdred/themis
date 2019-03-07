@@ -1,41 +1,27 @@
 
-
- {% if formdim >= 1 %}
- {% for ci in range(nci1) %}
-#define s1_{{ci}}_indices [lz + {{  nbasis1_z[ci]  }} * (ly + {{ nbasis1_y[ci]  }} * lx)]
-#define s1_{{ci}}_indices_n [nz + {{  nbasis1_z[ci]  }} * (ny + {{ nbasis1_y[ci]  }} * nx)]
-#define s1_{{ci}}_indices_noff [ci1off + nz + {{  nbasis1_z[ci]  }} * (ny + {{ nbasis1_y[ci]  }} * nx)]
- {% endfor %}
- {% endif %}
-  {% if formdim == 2 %}
- {% for ci in range(nci2) %}
-#define s2_{{ci}}_indices [lz + {{  nbasis2_z[ci]  }} * (ly + {{ nbasis2_y[ci]  }} * lx)]
-#define s2_{{ci}}_indices_m [mz + {{  nbasis2_z[ci]  }} * (my + {{ nbasis2_y[ci]  }} * mx)]
-#define s2_{{ci}}_indices_moff [ci2off + mz + {{  nbasis2_z[ci]  }} * (my + {{ nbasis2_y[ci]  }} * mx)]
- {% endfor %}
-{% endif %}
-
-
-{%macro SETVALS(ci) -%}
- #define kk (k * offset_mult1_z_{{ ci }}[bi_1_z_{{ci}}][lz] + offsets1_z_{{ ci }}[bi_1_z_{{ci}}][lz])
- #define jj (j * offset_mult1_y_{{ ci }}[bi_1_y_{{ci}}][ly] + offsets1_y_{{ ci }}[bi_1_y_{{ci}}][ly])
- #define ii (i * offset_mult1_x_{{ ci }}[bi_1_x_{{ci}}][lx] + offsets1_x_{{ ci }}[bi_1_x_{{ci}}][lx])
-for (lx=0;lx<{{ nbasis1_x[ci] }};lx++) {
-for (ly=0;ly<{{ nbasis1_y[ci] }};ly++) {
-for (lz=0;lz<{{ nbasis1_z[ci] }};lz++) {
+// IS THE INDEXING IN VALS CORRECT FOR VECTOR-VALUED?
+{%macro SETVALS() -%}
+{% for ci in range(space1.ncomp) %}
+compoffset = 0
+for (lx=0;lx<{{ space1.nbasis_x[ci] }};lx++) {
+for (ly=0;ly<{{ space1.nbasis_y[ci] }};ly++) {
+for (lz=0;lz<{{ space1.nbasis_z[ci] }};lz++) {
+for (d=0;d<{{ space1.ndofs }};d++){
+const PetscInt ii = i + cell1x_{{ci}}[lx];
+const PetscInt jj = j + cell1y_{{ci}}[ly];
+const PetscInt kk = k + cell1z_{{ci}}[lz];
 {% if ndim == 1 %}
-data_formvec_{{ ci }}[ii] += vals_{{ ci }} s1_{{ci}}_indices;
+data_formvec[ii][idx1_{{ ci }}[lx][ly][lz][d]] += vals [compoffset + lz + {{  space1.nbasis_z[ci]  }} * (ly + {{ space1.nbasis_y[ci]  }} * lx)][d];
 {% endif %}
 {% if ndim == 2 %}
-data_formvec_{{ ci }}[jj][ii] += vals_{{ ci }} s1_{{ci}}_indices;
+data_formvec[jj][ii][idx1_{{ ci }}[lx][ly][lz][d]] += vals [compoffset + lz + {{  space1.nbasis_z[ci]  }} * (ly + {{ space1.nbasis_y[ci]  }} * lx)][d];
 {% endif %}
 {% if ndim == 3 %}
-data_formvec_{{ ci }}[kk][jj][ii] += vals_{{ ci }} s1_{{ci}}_indices;
+data_formvec[kk][jj][ji][idx1_{{ ci }}[lx][ly][lz][d]] += vals [compoffset + lz + {{  space1.nbasis_z[ci]  }} * (ly + {{ space1.nbasis_y[ci]  }} * lx)][d];
 {% endif %}
-}}}
-#undef ii
-#undef jj
-#undef kk
+}}}}
+  compoffset = compoffset + {{ nbasis1[ci] }};
+  {% endfor %}
 {% endmacro %}
 
 #include <petsc.h>
@@ -43,13 +29,13 @@ data_formvec_{{ ci }}[kk][jj][ii] += vals_{{ ci }} s1_{{ci}}_indices;
 #include <stdio.h>
 
 //Actual kernel snippet
-		{{ kernelstr }}
-		
+{{ kernelstr }}
+
 {% if formdim == 2 %}
-PetscErrorCode assemble(DM da {{ submatlist }}  {{ s1dalist }}  {{ s2dalist }} {{ fieldargs }} {{ constantargs }})
+PetscErrorCode assemble(DM da, Mat formmat, DM s1da, DM s2da {{ fieldargs }} {{ constantargs }})
 {% endif %}
  {% if formdim == 1 %}
-PetscErrorCode assemble(DM da {{ subveclist }} {{ s1dalist }} {{ fieldargs }} {{ constantargs }}) 
+PetscErrorCode assemble(DM da, Vec formvec, DM s1da {{ fieldargs }} {{ constantargs }}) 
 {% endif %}
  {% if formdim == 0 %}
 PetscScalar assemble(DM da {{ fieldargs }} {{ constantargs }})
@@ -58,34 +44,21 @@ PetscScalar assemble(DM da {{ fieldargs }} {{ constantargs }})
 {
 
  {% if formdim == 2 %}
- PetscScalar vals[{{ nbasis1_total }}][{{ nbasis2_total }}] = { {0.,},};
- {% for ci1 in range(nci1) %}
- {% for ci2 in range(nci2) %}
-  PetscScalar	vals_{{ ci1 }}_{{ ci2 }}[{{ nbasis1_x[ci1] }} * {{ nbasis1_y[ci1] }} * {{ nbasis1_z[ci1] }}][{{ nbasis2_x[ci2] }} * {{ nbasis2_y[ci2] }} * {{ nbasis2_z[ci2] }}] = { {0.,},};
- {% endfor %}
- {% endfor %}
-  {% for ci2 in range(nci2) %}
-   PetscInt     cols_{{ ci2 }}[{{ nbasis2_x[ci2] }} * {{ nbasis2_y[ci2]  }} * {{ nbasis2_z[ci2]  }}];
-    {% endfor %}
-    {% for ci1 in range(nci1) %}
-   PetscInt     rows_{{ ci1 }}[{{ nbasis1_x[ci1] }} * {{ nbasis1_y[ci1]  }} * {{ nbasis1_z[ci1]  }}];
- {% endfor %}
+ PetscScalar vals[{{ space1.nbasis_total }} * {{ space1.ndofs }}][{{ space2.nbasis_total }} * {{ space2.ndofs }}] = { {0.,},};
+    PetscInt     cols[{{ space2.nbasis_total }} * {{ space2.ndofs }}];
+    PetscInt     rows[{{ space1.nbasis_total }} * {{ space1.ndofs }}];
  {% endif %}
-
  {% if formdim == 1 %}
- PetscScalar vals[{{ nbasis1_total }}] = {0.,};
- {% for ci1 in range(nci1) %}
- PetscScalar	vals_{{ ci1 }}[{{ nbasis1_x[ci1] }} * {{ nbasis1_y[ci1] }} * {{ nbasis1_z[ci1] }}]= {0.,};
+ PetscScalar vals[{{ space1.nbasis_total }} * {{ space1.ndofs }}] = {0.,};
  {% if ndim == 1 %}
- PetscScalar *data_formvec_{{ ci1 }};
+ PetscScalar **data_formvec;
       {% endif %}
  {% if ndim == 2 %}
- PetscScalar **data_formvec_{{ ci1 }};
+ PetscScalar ***data_formvec;
       {% endif %}
  {% if ndim == 3 %}
- PetscScalar ***data_formvec_{{ ci1 }};
+ PetscScalar ****data_formvec;
       {% endif %}
-  {% endfor %}
  {% endif %}
 
  
@@ -95,212 +68,292 @@ PetscScalar assemble(DM da {{ fieldargs }} {{ constantargs }})
  {% endif %}
 
   PetscErrorCode ierr;
-  PetscInt ci1off,ci2off,fieldoffset;
   PetscInt i,j,k; //spatial loop indices
    PetscInt lx,ly,lz; //rows/cols indices
-   PetscInt nx,ny,nz;
-   PetscInt mx,my,mz;
    PetscInt d; //dof index
-  PetscInt xs,xm,ys,ym,zs,zm,xmax,ymax,zmax;
-  PetscInt icoord,jcoord,kcoord;
-   {% if formdim >= 1 %}
-  {% for ci1 in range(nci1) %}
-  PetscInt x1s_{{ ci1 }},x1m_{{ ci1 }},y1s_{{ ci1 }},y1m_{{ ci1 }},z1s_{{ ci1 }},z1m_{{ ci1 }};
-    {% endfor %}
-   {% endif %}
- {% if formdim == 2 %}
-  {% for ci2 in range(nci2) %}
-  PetscInt x2s_{{ ci2 }},x2m_{{ ci2 }},y2s_{{ ci2 }},y2m_{{ ci2 }},z2s_{{ ci2 }},z2m_{{ ci2 }};
-   {% endfor %}
- {% endif %}
+  PetscInt xs,xm,ys,ym,zs,zm,xmax,ymax,zmax,extrax,extray,extraz;
+  PetscInt is,ie,js,je,ks,ke;
+   PetscInt compoffset;
 
  {% if formdim == 2 %}
-  {% for ci2 in range(nci2) %}
-const   PetscInt offsets2_x_{{ ci2 }}[{{ nblocks2_x[ci2] }}][{{ nbasis2_x[ci2] }}] = {{ offsets2_x[ci2] }};
-const   PetscInt offsets2_y_{{ ci2 }}[{{ nblocks2_y[ci2] }}][{{ nbasis2_y[ci2] }}] = {{ offsets2_y[ci2] }};
-const   PetscInt offsets2_z_{{ ci2 }}[{{ nblocks2_z[ci2] }}][{{ nbasis2_z[ci2] }}] = {{ offsets2_z[ci2] }};
-const   PetscInt offset_mult2_x_{{ ci2 }}[{{ nblocks2_x[ci2] }}][{{ nbasis2_x[ci2] }}] = {{ offset_mult2_x[ci2] }};
-const   PetscInt offset_mult2_y_{{ ci2 }}[{{ nblocks2_y[ci2] }}][{{ nbasis2_y[ci2] }}] = {{ offset_mult2_y[ci2] }};
-const   PetscInt offset_mult2_z_{{ ci2 }}[{{ nblocks2_z[ci2] }}][{{ nbasis2_z[ci2] }}] = {{ offset_mult2_z[ci2] }};
-   PetscInt bi_2_x_{{ ci2 }} = -1000;
-   PetscInt bi_2_y_{{ ci2 }} = -1000;
-   PetscInt bi_2_z_{{ ci2 }} = -1000;
+ PetscInt x2s,y2s,z2s;
+ PetscInt nGhost2x,nGhost2y,nGhost2z;
+ PetscInt epe1,epe2;
+ PetscInt nGhost1x,nGhost1y,nGhost1z;
+  {% for ci2 in range(space2.ncomp) %}
+  PetscInt idx2_{{ ci2 }}[{{ space2.nbasis_x[ci2] }}][{{ space2.nbasis_y[ci2] }}][{{ space2.nbasis_z[ci2] }}][{{ space2.ndofs }}];
   {% endfor %}
   {% endif %}
+  
  {% if formdim >= 1 %}
- {% for ci1 in range(nci1) %}
-const   PetscInt offsets1_x_{{ ci1 }}[{{ nblocks1_x[ci1] }}][{{ nbasis1_x[ci1] }}] = {{ offsets1_x[ci1] }};
-const   PetscInt offsets1_y_{{ ci1 }}[{{ nblocks1_y[ci1] }}][{{ nbasis1_y[ci1] }}] = {{ offsets1_y[ci1] }};
-const   PetscInt offsets1_z_{{ ci1 }}[{{ nblocks1_z[ci1] }}][{{ nbasis1_z[ci1] }}] = {{ offsets1_z[ci1] }};
-const   PetscInt offset_mult1_x_{{ ci1 }}[{{ nblocks1_x[ci1] }}][{{ nbasis1_x[ci1] }}] = {{ offset_mult1_x[ci1] }};
-const   PetscInt offset_mult1_y_{{ ci1 }}[{{ nblocks1_y[ci1] }}][{{ nbasis1_y[ci1] }}] = {{ offset_mult1_y[ci1] }};
-const   PetscInt offset_mult1_z_{{ ci1 }}[{{ nblocks1_z[ci1] }}][{{ nbasis1_z[ci1] }}] = {{ offset_mult1_z[ci1] }};
-   PetscInt bi_1_x_{{ ci1 }} = -1000;
-   PetscInt bi_1_y_{{ ci1 }} = -1000;
-   PetscInt bi_1_z_{{ ci1 }} = -1000;
+  PetscInt x1s,y1s,z1s;
+ {% for ci1 in range(space1.ncomp) %}
+  PetscInt idx1_{{ ci1 }}[{{ space1.nbasis_x[ci1] }}][{{ space1.nbasis_y[ci1] }}][{{ space1.nbasis_z[ci1] }}][{{ space1.ndofs }}];
   {% endfor %}
   {% endif %}
 
  {% for field in fieldlist %}
+ PetscInt {{field.name}}_offset;
+ // THIS SIZING IS WRONG - ie should be 1D with nbasis * ndofs...
  PetscScalar	{{field.name}}_vals[{{ field.nbasis_total }}][{{ field.ndofs }}] = { { 0.,},};
  {% for k in range(field.ncomp) %}
-const   PetscInt {{field.name}}_{{k}}_offsets_x[{{ field.nblocks_x[k] }}][{{ field.nbasis_x[k] }}] = {{ field.offsets_x[k] }};
-const   PetscInt {{field.name}}_{{k}}_offsets_y[{{ field.nblocks_y[k] }}][{{ field.nbasis_y[k] }}] = {{ field.offsets_y[k] }};
-const   PetscInt {{field.name}}_{{k}}_offsets_z[{{ field.nblocks_z[k] }}][{{ field.nbasis_z[k] }}] = {{ field.offsets_z[k] }};
-const   PetscInt {{field.name}}_{{k}}_offset_mult_x[{{ field.nblocks_x[k] }}][{{ field.nbasis_x[k] }}] = {{ field.offset_mult_x[k] }};
-const   PetscInt {{field.name}}_{{k}}_offset_mult_y[{{ field.nblocks_y[k] }}][{{ field.nbasis_y[k] }}] = {{ field.offset_mult_y[k] }};
-const   PetscInt {{field.name}}_{{k}}_offset_mult_z[{{ field.nblocks_z[k] }}][{{ field.nbasis_z[k] }}] = {{ field.offset_mult_z[k] }};
-   PetscInt bi_{{field.name}}_x_{{k}} = -1000;
-   PetscInt bi_{{field.name}}_y_{{k}} = -1000;
-   PetscInt bi_{{field.name}}_z_{{k}} = -1000;
-
-#define {{field.name}}_{{k}}_indices [fieldoffset + lz + {{  field.nbasis_z[k]  }} * (ly + {{ field.nbasis_y[k]  }} * lx)][d]
+ PetscInt {{field.name}}_idx_{{k}}[{{ field.nbasis_x[k] }}][{{ field.nbasis_y[k] }}][{{ field.nbasis_z[k] }}][{{ field.ndofs }}];
+    {% endfor %}
 
  {% if ndim == 1 %}
-  PetscScalar **data_{{field.name}}_{{k}};
+  PetscScalar **data_{{field.name}};
       {% endif %}
  {% if ndim == 2 %}
-  PetscScalar ***data_{{field.name}}_{{k}};
+  PetscScalar ***data_{{field.name}};
       {% endif %}
  {% if ndim == 3 %}
-  PetscScalar ****data_{{field.name}}_{{k}};
+  PetscScalar ****data_{{field.name}};
       {% endif %}
-    {% endfor %}
   {% endfor %}
- 
- {% for tabulation in tabulations %}
- const   PetscScalar {{ tabulation.name }}[{{ tabulation.nblocks }}][{{ tabulation.npts }}][{{ tabulation.nbasis }}] = {{ tabulation.values }};
- {% if tabulation.shiftaxis == 0 %}
- PetscInt bi_{{ tabulation.name }}_x_0 = -1000;
-     {% endif %}
- {% if tabulation.shiftaxis == 1 %}
- PetscInt bi_{{ tabulation.name }}_y_0 = -1000;
-     {% endif %}
-      {% if tabulation.shiftaxis == 2 %}
- PetscInt bi_{{ tabulation.name }}_z_0 = -1000;
-     {% endif %}
- {% endfor %}
 
  {% for field in fieldlist %}
-      {% for k in range(field.ncomp) %}
-  ierr = DMDAVecGetArrayDOFRead(da_{{field.name}}_{{k}},{{field.name}}_{{k}},&data_{{field.name}}_{{k}});CHKERRQ(ierr);
-      {% endfor %}
+  ierr = DMStagVecGetArrayDOFRead(da_{{field.name}},{{field.name}},&data_{{field.name}});CHKERRQ(ierr);
   {% endfor %}
   
   //Get the data out of Vec formvec
     {% if formdim == 1 %}
-     {% for ci1 in range(nci1) %}
-    ierr = DMDAVecGetArray(s1da_{{ ci1 }},formvec_{{ ci1 }},&data_formvec_{{ ci1 }});CHKERRQ(ierr);
-      {% endfor %}
+    ierr = DMStagVecGetArrayDOF(s1da,formvec,&data_formvec);CHKERRQ(ierr);
     {% endif %}
 
 
-	//get DMDA ranges
-   {% if formdim >= 1 %}
-       {% for ci1 in range(nci1) %}
-  ierr = DMDAGetGhostCorners(s1da_{{ ci1 }},&x1s_{{ ci1 }},&y1s_{{ ci1 }},&z1s_{{ ci1 }},&x1m_{{ ci1 }},&y1m_{{ ci1 }},&z1m_{{ ci1 }});CHKERRQ(ierr);
-      {% endfor %}
-    {% endif %}
-    {% if formdim >= 2 %}   
-         {% for ci2 in range(nci2) %}
-  ierr = DMDAGetGhostCorners(s2da_{{ ci2 }},&x2s_{{ ci2 }},&y2s_{{ ci2 }},&z2s_{{ ci2 }},&x2m_{{ ci2 }},&y2m_{{ ci2 }},&z2m_{{ ci2 }});CHKERRQ(ierr);
-       {% endfor %}
+	//get DMStag ranges
+  ierr = DMStagGetCorners(da,&xs,&ys,&zs,&xm,&ym,&zm,&extrax,&extray,&extraz);CHKERRQ(ierr);
+   ierr = DMStagGetGlobalSizes(da,&xmax,&ymax,&zmax);CHKERRQ(ierr);
+      {% if formdim >= 1 %}
+ ierr = DMStagGetGhostCorners(s1da,&x1s,&y1s,&z1s,&nGhost1x,&nGhost1y,&nGhost1z);CHKERRQ(ierr);
       {% endif %}
-  ierr = DMDAGetCorners(da,&xs,&ys,&zs,&xm,&ym,&zm);CHKERRQ(ierr);
-   ierr = DMDAGetInfo(da,0,&xmax,&ymax,&zmax,0,0,0,0,0,0,0,0,0);CHKERRQ(ierr);
+      {% if formdim == 2 %}
+ ierr = DMStagGetGhostCorners(s2da,&x2s,&y2s,&z2s,&nGhost2x,&nGhost2y,&nGhost2z);CHKERRQ(ierr);
+      {% endif %}
 
- {% from 'setblocks.template' import SET_PERIODIC_OTHER with context %}
- {% from 'setblocks.template' import SET_NONPERIODIC_X_OTHER with context %}
- {% from 'setblocks.template' import SET_NONPERIODIC_Y_OTHER with context %}
- {% from 'setblocks.template' import SET_NONPERIODIC_Z_OTHER with context %}
- {% from 'setblocks.template' import SET_PERIODIC_FIELDS with context %}
- {% from 'setblocks.template' import SET_NONPERIODIC_X_FIELDS with context %}
- {% from 'setblocks.template' import SET_NONPERIODIC_Y_FIELDS with context %}
- {% from 'setblocks.template' import SET_NONPERIODIC_Z_FIELDS with context %}
 
-{{ SET_PERIODIC_OTHER() }}
-{{ SET_PERIODIC_FIELDS() }}
-for (k=zs; k<zs+zm; k++) {
-{{ SET_NONPERIODIC_Z_OTHER() }}
-{{ SET_NONPERIODIC_Z_FIELDS() }}
-   for (j=ys; j<ys+ym; j++) {
-     {{ SET_NONPERIODIC_Y_OTHER() }}
-     {{ SET_NONPERIODIC_Y_FIELDS() }}
-      for (i=xs; i<xs+xm; i++) {
-	      {{ SET_NONPERIODIC_X_OTHER() }}
-	      {{ SET_NONPERIODIC_X_FIELDS() }}
+// get epe, epr and epl as needed
+      {% if formdim == 2 %}
+ierr = DMStagGetEntriesPerElement(s1da,&epe1);CHKERRQ(ierr);
+ierr = DMStagGetEntriesPerElement(s2da,&epe2);CHKERRQ(ierr);
+     {% if ndim == 2 %}
+    const PetscInt epr1 = nGhost1x;
+    const PetscInt epr2 = nGhost2x;
+        {% endif %}
+         {% if ndim == 3 %}
+   const PetscInt epr1 = nGhost1x;
+   const PetscInt epl1 = nGhost1x*nGhost1y;
+   const PetscInt epr2 = nGhost2x;
+   const PetscInt epl2 = nGhost2x*nGhost2y;
+           {% endif %}
+      {% endif %}
+
+// ADD A BLOCKS LOOP HERE
+// based on maxnblocks AND periodicity, divide i,j,k into iteration sets
+// each set has idx values (offsets) and tabulations
+
+// FIX THIS STUFF!
+// BLOCK INDICES!
+  ks = zs;
+  ke = zs+zm;
+  
+  js = ys;
+  je = ys+ym;
+  
+  is = xs;
+  ie = xs+xm;
+  
+  // BLOCK INDICES!
+ {% if formdim >= 1 %}
+  {% for ci1 in range(space1.ncomp) %}
+  const PetscInt cell1x_{{ ci1 }}[{{ space1.nbasis_x[ci1] }}] = {{ space1.cellx[ci1] }};
+  const PetscInt cell1y_{{ ci1 }}[{{ space1.nbasis_y[ci1] }}] = {{ space1.celly[ci1] }};
+  const PetscInt cell1z_{{ ci1 }}[{{ space1.nbasis_z[ci1] }}] = {{ space1.cellz[ci1] }};
+  
+ {% for lx in range(space1.nbasis_x[ci1]) %}
+ {% for ly in range(space1.nbasis_y[ci1]) %}
+ {% for lz in range(space1.nbasis_z[ci1]) %}
+  {% for d in range(space1.ndofs) %}
+  // DOFNUM HERE NEEDS SOME THOUGHT...
+  DMStagGetLocationSlot(da, {{ space1.location[ci1][lx][ly][lz] }}, {{ space1.dofnum[ci1][lx][ly][lz][d] }}, &idx1_{{ ci1 }} [{{lx}}][{{ly}}][{{lz}}][{{d}}]);
+    {% endfor %}
+    {% endfor %}
+    {% endfor %}
+    {% endif %}
+
+  // BLOCK INDICES!
+ {% if formdim == 2 %}
+  {% for ci2 in range(space2.ncomp) %}
+  const PetscInt cell2x_{{ ci2 }}[{{ space2.nbasis_x[ci2] }}] = {{ space2.cellx[ci2] }};
+  const PetscInt cell2y_{{ ci2 }}[{{ space2.nbasis_x[ci2] }}] = {{ space2.celly[ci2] }};
+  const PetscInt cell2z_{{ ci2 }}[{{ space2.nbasis_x[ci2] }}] = {{ space2.cellz[ci2] }};
+ {% for lx in range(space2.nbasis_x[ci2]) %}
+ {% for ly in range(space2.nbasis_y[ci2]) %}
+ {% for lz in range(space2.nbasis_z[ci2]) %}
+  {% for d in range(space2.ndofs) %}
+  // DOFNUM HERE NEEDS SOME THOUGHT...
+  DMStagGetLocationSlot(da, {{ space2.location[ci2][lx][ly][lz] }}, {{ space2.dofnum[ci2][lx][ly][lz][d] }}, &idx2_{{ ci2 }} [{{lx}}][{{ly}}][{{lz}}][{{d}}]);
+    {% endfor %}
+    {% endfor %}
+    {% endfor %}
+    {% endif %}
+
+  // BLOCK INDICES!
+ {% for field in fieldlist %}
+  {% for k in range(field.ncomp) %}  
+ const PetscInt {{field.name}}_cellx_{{k}}[{{ field.nbasis_x[k] }}] = {{ field.cellx[k] }};
+ const PetscInt {{field.name}}_celly_{{k}}[{{ field.nbasis_y[k] }}] = {{ field.celly[k] }};
+ const PetscInt {{field.name}}_cellz_{{k}}[{{ field.nbasis_z[k] }}] = {{ field.cellz[k] }};
+  
+ {% for lx in range(field.nbasis_x[k]) %}
+ {% for ly in range(field.nbasis_y[k]) %}
+ {% for lz in range(field.nbasis_z[k]) %}
+ {% for d in range(field.ndofs) %}
+  // DOFNUM HERE NEEDS SOME THOUGHT...
+  DMStagGetLocationSlot(da, {{ field.location[k][lx][ly][lz] }}, {{ field.dofnum[k][lx][ly][lz][d] }} , &{{field.name}}_idx_{{k}} [{{lx}}][{{ly}}][{{lz}}][{{d}}]);
+    {% endfor %}
+    {% endfor %}
+    {% endfor %}
+        {% endfor %}
+    {% endfor %}
+    {% endfor %}    
+
+ {% for tabulation in tabulations %}
+  // BLOCK INDICES!
+  // SHOULD TAKE INTO ACCOUNT SHIFT AXIS...
+ const   PetscScalar {{ tabulation.name }}[{{ tabulation.npts }}][{{ tabulation.nbasis }}] = {{ tabulation.values }};
+ {% endfor %}
+ 
+for (k=ks; k<ke; k++) {
+   for (j=js; j<je; j++) {
+      for (i=is; i<ie; i++) {
+
 	    
 		//printf("start %i %i %i: %i %i %i\n",i,j,k,xs,xm,xmax);
+	      //4:   if (dim == 1) {
+//135:     for (idx=0; idx<n; ++idx) {
+//136:       const PetscInt eLocal = pos[idx].i - startGhost[0]; /* Local element number */
+//137:       ix[idx] = eLocal * epe + stag->locationOffsets[pos[idx].loc] + pos[idx].c;
+//138:     }
+//139:   } else if (dim == 2) {
+//140:     const PetscInt epr = stag->nGhost[0];
+//141:     DMStagGetGhostCorners(dm,&startGhost[0],&startGhost[1],NULL,NULL,NULL,NULL);
+//142:     for (idx=0; idx<n; ++idx) {
+//143:       const PetscInt eLocalx = pos[idx].i - startGhost[0];
+//144:       const PetscInt eLocaly = pos[idx].j - startGhost[1];
+//145:       const PetscInt eLocal = eLocalx + epr*eLocaly;
+//146:       ix[idx] = eLocal * epe + stag->locationOffsets[pos[idx].loc] + pos[idx].c;
+//147:     }
+//148:   } else if (dim == 3) {
+//149:     const PetscInt epr = stag->nGhost[0];
+//150:     const PetscInt epl = stag->nGhost[0]*stag->nGhost[1];
+//151:     DMStagGetGhostCorners(dm,&startGhost[0],&startGhost[1],&startGhost[2],NULL,NULL,NULL);
+//152:     for (idx=0; idx<n; ++idx) {
+//153:       const PetscInt eLocalx = pos[idx].i - startGhost[0];
+//154:       const PetscInt eLocaly = pos[idx].j - startGhost[1];
+//155:       const PetscInt eLocalz = pos[idx].k - startGhost[2];
+//156:       const PetscInt eLocal  = epl*eLocalz + epr*eLocaly + eLocalx;
+//157:       ix[idx] = eLocal * epe + stag->locationOffsets[pos[idx].loc] + pos[idx].c;
+//158:     }
+
 	      
+
+
+  // FIX ROWS/COLS TO BE REPLACED WITH SETTINGS ROWS/COLS FOR IS,JS,KS and A constant offset
 		 {% if formdim == 2 %}
-       {% for ci1 in range(nci1) %}
-		for (lx=0;lx<{{ nbasis1_x[ci1] }};lx++) {
-		for (ly=0;ly<{{ nbasis1_y[ci1] }};ly++) {
-		for (lz=0;lz<{{ nbasis1_z[ci1] }};lz++) {
-			icoord = i * offset_mult1_x_{{ ci1 }}[bi_1_x_{{ci1}}][lx] + offsets1_x_{{ ci1 }}[bi_1_x_{{ci1}}][lx] - x1s_{{ ci1 }};
-			jcoord = j * offset_mult1_y_{{ ci1 }}[bi_1_y_{{ci1}}][ly] + offsets1_y_{{ ci1 }}[bi_1_y_{{ci1}}][ly] - y1s_{{ ci1 }};
-			kcoord = k * offset_mult1_z_{{ ci1 }}[bi_1_z_{{ci1}}][lz] + offsets1_z_{{ ci1 }}[bi_1_z_{{ci1}}][lz] - z1s_{{ ci1 }};
-			rows_{{ ci1 }} s1_{{ci1}}_indices =  icoord + x1m_{{ ci1 }}*(jcoord + y1m_{{ ci1 }}*kcoord);
-			//printf("ci1: %i %i %i : %i %i\n",i,j,k,lx,icoord);
+       {% for ci1 in range(space1.ncomp) %}
+       compoffset = 0;
+		for (lx=0;lx<{{ space1.nbasis_x[ci1] }};lx++) {
+		for (ly=0;ly<{{ space1.nbasis_y[ci1] }};ly++) {
+		for (lz=0;lz<{{ space1.nbasis_z[ci1] }};lz++) {
+		  for (d=0;d<{{ space1.ndofs }};d++){
+		  const PetscInt ii = i + cell1x_{{ci1}}[lx]- x1s;
+		  const PetscInt jj = j + cell1y_{{ci1}}[ly]- y1s;
+		  const PetscInt kk = k + cell1z_{{ci1}}[lz]- z1s;
+		{% if ndim == 1 %}
+		const PetscInt eLocal = ii * epe1;
+		// THIS INDEXING FOR VECTOR-VALUED MIGHT BE WRONG...
+		rows [compoffset + lz + {{  space1.nbasis_z[ci1]  }} * (ly + {{ space1.nbasis_y[ci1]  }} * lx)][d] =  eLocal + idx1_{{ ci1 }} [lx][ly][lz][d];
+		{% endif %}
+		{% if ndim == 2 %}
+		const PetscInt eLocal = (ii + jj*epr1) * epe1;
+		rows [compoffset + lz + {{  space1.nbasis_z[ci1]  }} * (ly + {{ space1.nbasis_y[ci1]  }} * lx)][d] =  eLocal + idx1_{{ ci1 }} [lx][ly][lz][d];
+		{% endif %}
+		{% if ndim == 3 %}
+		const PetscInt eLocal = (ii + jj*epr1 + kk*epl1) * epe1;
+		rows [compoffset + lz + {{  space1.nbasis_z[ci1]  }} * (ly + {{ space1.nbasis_y[ci1]  }} * lx)][d] =  eLocal + idx1_{{ ci1 }} [lx][ly][lz][d];
+		{% endif %}
 		}}}
+		compoffset = compoffset + {{  space1.nbasis[ci1]  }};
       {% endfor %}
 
 
-       {% for ci2 in range(nci2) %}
-		for (lx=0;lx<{{ nbasis2_x[ci2] }};lx++) {
-		for (ly=0;ly<{{ nbasis2_y[ci2] }};ly++) {
-		for (lz=0;lz<{{ nbasis2_z[ci2] }};lz++) {
-			icoord = i * offset_mult2_x_{{ ci2 }}[bi_2_x_{{ci2}}][lx] + offsets2_x_{{ ci2 }}[bi_2_x_{{ci2}}][lx] - x2s_{{ ci2 }};
-			jcoord = j * offset_mult2_y_{{ ci2 }}[bi_2_y_{{ci2}}][ly] + offsets2_y_{{ ci2 }}[bi_2_y_{{ci2}}][ly] - y2s_{{ ci2 }};
-			kcoord = k * offset_mult2_z_{{ ci2 }}[bi_2_z_{{ci2}}][lz] + offsets2_z_{{ ci2 }}[bi_2_z_{{ci2}}][lz] - z2s_{{ ci2 }};
-			cols_{{ ci2 }} s2_{{ci2}}_indices =  icoord + x2m_{{ ci2 }}*(jcoord + y2m_{{ ci2 }}*kcoord);
-			//printf("ci2: %i %i %i : %i %i\n",i,j,k,lx,icoord);
-		}}}
-	 {% endfor %}
-		{% endif %}
-		
-		//printf("rows/cols\n");
-
-		//extract element dofs from local dofs
-		 {% for field in fieldlist %}
-		 		fieldoffset = 0;
-		{% for k in range(field.ncomp) %}
-		{%set offset_mult = field.name~'_'~k ~'_offset_mult' %}
-		{%set offset = field.name~'_'~k ~'_offsets' %}
-		#define ii (i*{{ offset_mult }}_x[bi_{{field.name}}_x_{{k}}][lx] + {{ offset }}_x[bi_{{field.name}}_x_{{k}}][lx]) 
-		#define jj (j*{{ offset_mult }}_y[bi_{{field.name}}_y_{{k}}][ly] + {{ offset }}_y[bi_{{field.name}}_y_{{k}}][ly]) 
-		#define kk (k*{{ offset_mult }}_z[bi_{{field.name}}_z_{{k}}][lz] + {{ offset }}_z[bi_{{field.name}}_z_{{k}}][lz]) 
-		for (lx=0;lx<{{ field.nbasis_x[k] }};lx++){
-		for (ly=0;ly<{{ field.nbasis_y[k] }};ly++){
-		for (lz=0;lz<{{ field.nbasis_z[k] }};lz++){
-		for (d=0;d<{{ field.ndofs }};d++){
+       {% for ci2 in range(space2.ncomp) %}
+       compoffset = 0;
+		for (lx=0;lx<{{ space2.nbasis_x[ci2] }};lx++) {
+		for (ly=0;ly<{{ space2.nbasis_y[ci2] }};ly++) {
+		for (lz=0;lz<{{ space2.nbasis_z[ci2] }};lz++) {
+		  for (d=0;d<{{ space2.ndofs }};d++){
+		  const PetscInt ii = i + cell2x_{{ci2}}[lx]- x2s;
+		  const PetscInt jj = j + cell2y_{{ci2}}[ly]- y2s;
+		  const PetscInt kk = k + cell2z_{{ci2}}[lz]- z2s;
 		{% if ndim == 1 %}
-		{{field.name}}_vals {{field.name}}_{{k}}_indices = data_{{field.name}}_{{k}} [ii][d];
+		// THIS INDEXING FOR VECTOR-VALUED MIGHT BE WRONG...
+		const PetscInt eLocal = ii * epe2;
+		cols [compoffset + lz + {{  space2.nbasis_z[ci2]  }} * (ly + {{ space2.nbasis_y[ci2]  }} * lx)][d] =  eLocal + idx2_{{ ci2 }} [lx][ly][lz][d];
 		{% endif %}
 		{% if ndim == 2 %}
-		{{field.name}}_vals {{field.name}}_{{k}}_indices = data_{{field.name}}_{{k}} [jj][ii][d];
+		const PetscInt eLocal = (ii + jj*epr2) * epe2;
+		cols [compoffset + lz + {{  space2.nbasis_z[ci2]  }} * (ly + {{ space2.nbasis_y[ci2]  }} * lx)][d] =  eLocal + idx2_{{ ci2 }} [lx][ly][lz][d];
 		{% endif %}
 		{% if ndim == 3 %}
-		{{field.name}}_vals {{field.name}}_{{k}}_indices = data_{{field.name}}_{{k}} [kk][jj][ii][d];
+		const PetscInt eLocal = (ii + jj*epr2 + kk*epl2) * epe2;
+		cols [compoffset + lz + {{  space2.nbasis_z[ci2]  }} * (ly + {{ space2.nbasis_y[ci2]  }} * lx)][d] =  eLocal + idx2_{{ ci2 }} [lx][ly][lz][d];
 		{% endif %}
-		//printf("{{field.name}} {{k}} : %i %i %i : %i %i\n",i,j,k,lx,ii);
-		}}}}
-		#undef ii
-		#undef jj
-		#undef kk
-		fieldoffset = fieldoffset + {{ field.nbasis_x[k] }} * {{ field.nbasis_y[k] }} * {{ field.nbasis_z[k] }};
-		{% endfor %}
-		{% endfor %}
+		}}}
+		compoffset = compoffset + {{  space2.nbasis[ci2]  }};
+      {% endfor %}
+		{% endif %}
+		
+		
+//extract element dofs from local dofs
+// SHOULD FIX VALS HERE SO 1D ARRAY
+
+{% for field in fieldlist %}
+{{field.name}}_offset = 0;
+{% for k in range(field.ncomp) %}
+for (lx=0;lx<{{ field.nbasis_x[k] }};lx++){
+for (ly=0;ly<{{ field.nbasis_y[k] }};ly++){
+for (lz=0;lz<{{ field.nbasis_z[k] }};lz++){
+for (d=0;d<{{ field.ndofs }};d++){
+  const PetscInt ii = i + {{field.name}}_cellx_{{k}}[lx][d];
+  const PetscInt jj = j + {{field.name}}_celly_{{k}}[ly][d];
+  const PetscInt kk = k + {{field.name}}_cellz_{{k}}[lz][d];
+  // THIS INDEXING FOR VECTOR-VALUED MIGHT BE WRONG...
+{% if ndim == 1 %}
+{{field.name}}_vals [fieldoffset + lz + {{  field.nbasis_z[k]  }} * (ly + {{ field.nbasis_y[k]  }} * lx)][d] = data_{{field.name}} [ii][{{field.name}}_idx_{{k}}[lx][ly][lz][d]];
+{% endif %}
+{% if ndim == 2 %}
+{{field.name}}_vals [fieldoffset + lz + {{  field.nbasis_z[k]  }} * (ly + {{ field.nbasis_y[k]  }} * lx)][d] = data_{{field.name}} [jj][ii][{{field.name}}_idx_{{k}}[lx][ly][lz][d]];
+{% endif %}
+{% if ndim == 3 %}
+{{field.name}}_vals [fieldoffset + lz + {{  field.nbasis_z[k]  }} * (ly + {{ field.nbasis_y[k]  }} * lx)][d] = data_{{field.name}} [kk][jj][ii][{{field.name}}_idx_{{k}}[lx][ly][lz][d]];
+{% endif %}
+//printf("{{field.name}} {{k}} : %i %i %i : %i %i\n",i,j,k,lx,ii);
+}}}}
+fieldoffset = fieldoffset + {{ field.nbasis[k] }};
+{% endfor %}
+{% endfor %}
 		
 				//printf("fields\n");
 
 		//compute the element tensor
 		
 		    {% if formdim == 2 %}
-	ierr = PetscMemzero(vals,sizeof(PetscScalar[{{ nbasis1_total }}][{{ nbasis2_total }}])); CHKERRQ(ierr);
+	ierr = PetscMemzero(vals,sizeof(PetscScalar[{{ space1.nbasis_total }} * {{ space1.ndofs }}][{{ space2.nbasis_total }} * {{ space2.ndofs }}])); CHKERRQ(ierr);
 				{% endif %}
 		    {% if formdim == 1 %}
-	ierr = PetscMemzero(vals,sizeof(PetscScalar[{{ nbasis1_total }}])); CHKERRQ(ierr);
+	ierr = PetscMemzero(vals,sizeof(PetscScalar[{{ space1.nbasis_total }} * {{ space1.ndofs }}])); CHKERRQ(ierr);
 				{% endif %}
 		    {% if formdim == 0 %}
 		    vals[0] = 0.0;
@@ -312,72 +365,22 @@ for (k=zs; k<zs+zm; k++) {
 				 ,{{field}}
 				{% endfor %}
 				 {% for tabulation in tabulations %}
-				  {% if tabulation.shiftaxis == 0 %}
-				 ,{{tabulation.name}}[bi_{{ tabulation.name }}_x_0]
-			      	{% endif %}
-				  {% if tabulation.shiftaxis == 1 %}
-				 ,{{tabulation.name}}[bi_{{ tabulation.name }}_y_0]
-			      	{% endif %}
-				  {% if tabulation.shiftaxis == 2 %}
-				 ,{{tabulation.name}}[bi_{{ tabulation.name }}_z_0]
-			      	{% endif %}
+				 ,{{tabulation.name}}
 				{% endfor %}
 			);
 			  				{% endif %}
 
 			//unsplat vals
 		
-	 {% if formdim == 2 %}
-	   ci1off = 0;
-       {% for ci1 in range(nci1) %}
-       ci2off = 0;
-       {% for ci2 in range(nci2) %}
-        for (nx=0;nx<{{ nbasis1_x[ci1] }};nx++) {
-		for (ny=0;ny<{{ nbasis1_y[ci1] }};ny++) {
-		for (nz=0;nz<{{ nbasis1_z[ci1] }};nz++) {		
-		for (mx=0;mx<{{ nbasis2_x[ci2] }};mx++) {
-		for (my=0;my<{{ nbasis2_y[ci2] }};my++) {
-		for (mz=0;mz<{{ nbasis2_z[ci2] }};mz++) {
-       vals_{{ ci1 }}_{{ ci2 }} s1_{{ci1}}_indices_n s2_{{ci2}}_indices_m = vals s1_{{ci1}}_indices_noff s2_{{ci2}}_indices_moff;
-       		//printf("%i %i: %i %i %i : %12.12f\n", nx,mx,rows_{{ci1}} [nx], cols_{{ci2}} [mx], {{ nbasis1_x[ci1] }} * {{ nbasis1_y[ci1] }} * {{ nbasis1_z[ci1] }}, vals_{{ ci1 }}_{{ ci2 }} s1_{{ci1}}_indices_n s2_{{ci2}}_indices_m );
-   }}}}}}
-   ci2off = ci2off + {{ nbasis2_x[ci2] }} * {{ nbasis2_y[ci2] }} * {{ nbasis2_z[ci2] }};
-				{% endfor %}
-			ci1off = ci1off + {{ nbasis1_x[ci1] }} * {{ nbasis1_y[ci1] }} * {{ nbasis1_z[ci1] }};
-				{% endfor %}
-				{% endif %}
-				
-					    {% if formdim == 1 %}
-					    ci1off = 0;
-		       {% for ci1 in range(nci1) %}
-        for (nx=0;nx<{{ nbasis1_x[ci1] }};nx++) {
-		for (ny=0;ny<{{ nbasis1_y[ci1] }};ny++) {
-		for (nz=0;nz<{{ nbasis1_z[ci1] }};nz++) {
-			vals_{{ ci1 }} s1_{{ci1}}_indices_n = vals s1_{{ci1}}_indices_noff;
-		}}}
-						ci1off = ci1off + {{ nbasis1_x[ci1] }} * {{ nbasis1_y[ci1] }} * {{ nbasis1_z[ci1] }};
-				{% endfor %}
-				{% endif %}
 
 		
-						//printf("computed tensor\n");
-
 		//Put the element tensor into the local tensor
 		{% if formdim == 2 %}
-		       {% for ci1 in range(nci1) %}
-       {% for ci2 in range(nci2) %}
-								
-        ierr = MatSetValuesLocal(formmat_{{ ci1 }}_{{ ci2 }},{{ nbasis1_x[ci1] }} * {{ nbasis1_y[ci1] }} * {{ nbasis1_z[ci1] }},rows_{{ ci1 }},{{ nbasis2_x[ci2] }} * {{ nbasis2_y[ci2] }} * {{ nbasis2_z[ci2] }},cols_{{ ci2 }},*vals_{{ ci1 }}_{{ ci2 }},ADD_VALUES);CHKERRQ(ierr);
-			 								
-
-			 {% endfor %}
-	 {% endfor %}
+        ierr = MatSetValuesLocal(formmat,{{ space1.nbasis_total }} * {{ space1.ndofs }},rows,{{ space2.nbasis_total }} * {{ space2.ndofs }},cols,*vals,ADD_VALUES);CHKERRQ(ierr);
 		{% endif %}
 		
 		{% if formdim == 1 %}
-		 {% for ci1 in range(nci1) %}
-		{{ SETVALS(ci1) }}
-		{% endfor %}
+		{{ SETVALS() }}
 		{% endif %}
 		
 		{% if formdim == 0 %}
@@ -392,16 +395,12 @@ for (k=zs; k<zs+zm; k++) {
 
 //restore fields arrays and data
  {% for field in fieldlist %}
-      {% for k in range(field.ncomp) %}
-    ierr = DMDAVecRestoreArrayDOFRead(da_{{field.name}}_{{k}},{{field.name}}_{{k}},&data_{{field.name}}_{{k}});CHKERRQ(ierr);
-      {% endfor %}
+    ierr = DMStagVecRestoreArrayDOFRead(da_{{field.name}},{{field.name}},&data_{{field.name}});CHKERRQ(ierr);
    {% endfor %}
   
  {% if formdim == 1 %}
 //restore data in Vec v
-		 {% for ci1 in range(nci1) %}
-    ierr = DMDAVecRestoreArray(s1da_{{ ci1 }},formvec_{{ ci1 }},&data_formvec_{{ ci1 }});CHKERRQ(ierr);
-    		{% endfor %}
+    ierr = DMStagVecRestoreArray(s1da,formvec,&data_formvec);CHKERRQ(ierr);
 {% endif %}
  
   {% if formdim == 0 %}

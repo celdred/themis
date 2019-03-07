@@ -80,15 +80,12 @@ class Checkpoint():
         with fspace.get_composite_da().getAccess(field._vector) as splitglobalvec:
             for si in silist:
                 soff = fspace.get_space_offset(si)
-                for ci in range(fspace.get_space(si).ncomp):
-                    coff = fspace.get_space(si).get_component_offset(ci)
-                    # PETSc.Sys.Print(name,si,soff,ci,coff)
-                    if isinstance(field, SplitFunction):
-                        sii = 0
-                    if isinstance(field, Function):
-                        sii = si
-                    splitglobalvec[soff+coff].setName(name + '_' + str(sii) + '_' + str(ci))
-                    self.viewer.view(obj=splitglobalvec[soff+coff])
+                if isinstance(field, SplitFunction):
+                sii = 0
+                if isinstance(field, Function):
+                sii = si
+                splitglobalvec[soff].setName(name + '_' + str(sii))
+                self.viewer.view(obj=splitglobalvec[soff])
         self.viewer.popGroup()
 
     def load(self, field, name=None):
@@ -109,14 +106,12 @@ class Checkpoint():
         with fspace.get_composite_da().getAccess(field._vector) as splitglobalvec:
             for si in silist:
                 soff = fspace.get_space_offset(si)
-                for ci in range(fspace.get_space(si).ncomp):
-                    coff = fspace.get_space(si).get_component_offset(ci)
-                    if isinstance(field, SplitFunction):
-                        sii = 0
-                    if isinstance(field, Function):
-                        sii = si
-                    splitglobalvec[soff+coff].setName(name + '_' + str(sii) + '_' + str(ci))
-                    splitglobalvec[soff+coff].load(self.viewer)
+                if isinstance(field, SplitFunction):
+                sii = 0
+                if isinstance(field, Function):
+                sii = si
+                splitglobalvec[soff].setName(name + '_' + str(sii))
+                splitglobalvec[soff].load(self.viewer)
         self.viewer.popGroup()
 
     def destroy(self):

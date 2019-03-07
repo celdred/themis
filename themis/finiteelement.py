@@ -17,6 +17,7 @@ variant_to_elemname['mgdH1'] = 'GD'
 variant_to_elemname['mgdL2'] = 'DGD'
 
 
+
 def extract_element_info(elem):
     degree = elem.degree()
     variant = elem.variant()
@@ -35,9 +36,11 @@ def extract_element_info(elem):
         if elem.family() == 'Discontinuous Lagrange':
             elemnamelist.append([variant_to_elemname[variant + 'L2'], ])
             contlist.append(['L2', ])
+            dofmap = (0,degree+1)
         elif elem.family() == 'Lagrange':
             elemnamelist.append([variant_to_elemname[variant + 'H1'], ])
             contlist.append(['H1', ])
+            dofmap = (1,degree-1)
         else:
             raise ValueError('themis supports only CG/DG on intervals')
 
@@ -48,9 +51,11 @@ def extract_element_info(elem):
             if elem.family() == 'DQ':
                 elemnamelist.append([variant_to_elemname[variant + 'L2'], variant_to_elemname[variant + 'L2']])
                 contlist.append(['L2', 'L2', ])
+                dofmap = (0,0,(degree+1)*(degree+1))
             if elem.family() == 'Q':
                 elemnamelist.append([variant_to_elemname[variant + 'H1'], variant_to_elemname[variant + 'H1']])
                 contlist.append(['H1', 'H1', ])
+                dofmap = ()
             ncomp = 1
         elif elem.family() == 'RTCF':
             variantlist.append([variant, variant])
@@ -117,49 +122,50 @@ def extract_element_info(elem):
         else:
             raise ValueError('themis supports only Q/DQ/NCF/NCE on hexahedrons')
     else:
-        raise ValueError('Themis does not support this cell type')
+        raise ValueError('Themis does not support cell type %s',elem.cell())
 
-    return ncomp, variantlist, degreelist, elemnamelist, contlist
+    return ncomp, variantlist, degreelist, elemnamelist, contlist, dofmap
 
-
+# ADD CORRECT DOFMAP STUFF
 def flatten_tp_element(elem1, elem2):
-    ncomp1, variantlist1, degreelist1, elemnamelist1, contlist1 = extract_element_info(elem1)
-    ncomp2, variantlist2, degreelist2, elemnamelist2, contlist2 = extract_element_info(elem2)
+    ncomp1, variantlist1, degreelist1, elemnamelist1, contlist1, dofmap1 = extract_element_info(elem1)
+    ncomp2, variantlist2, degreelist2, elemnamelist2, contlist2, dofmap2 = extract_element_info(elem2)
+    dofmap = dofmap1 + dofmap2 # THIS IS WRONG!
     for c1 in range(ncomp1):
         variantlist1[c1].append(variantlist2[0][0])
         degreelist1[c1].append(degreelist2[0][0])
         elemnamelist1[c1].append(elemnamelist2[0][0])
         contlist1[c1].append(contlist2[0][0])
-    return ncomp1, variantlist1, degreelist1, elemnamelist1, contlist1
+    return ncomp1, variantlist1, degreelist1, elemnamelist1, contlist1, dofmap
 
-
+# ADD CORRECT DOFMAP STUFF
 def merge_enriched_element(elem1, elem2):
     if isinstance(elem1, FiniteElement):
-        ncomp1, variantlist1, degreelist1, elemnamelist1, contlist1 = extract_element_info(elem1)
+        ncomp1, variantlist1, degreelist1, elemnamelist1, contlist1, dofmap1 = extract_element_info(elem1)
     elif isinstance(elem1, TensorProductElement):
         subelem1, subelem2 = elem1.sub_elements()
-        ncomp1, variantlist1, degreelist1, elemnamelist1, contlist1 = flatten_tp_element(subelem1, subelem2)
+        ncomp1, variantlist1, degreelist1, elemnamelist1, contlist1, dofmap1 = flatten_tp_element(subelem1, subelem2)
 
     if isinstance(elem2, FiniteElement):
-        ncomp2, variantlist2, degreelist2, elemnamelist2, contlist2 = extract_element_info(elem2)
+        ncomp2, variantlist2, degreelist2, elemnamelist2, contlist2, dofmap2 = extract_element_info(elem2)
     elif isinstance(elem2, TensorProductElement):
         subelem1, subelem2 = elem2.sub_elements()
-        ncomp2, variantlist2, degreelist2, elemnamelist2, contlist2 = flatten_tp_element(subelem1, subelem2)
-
+        ncomp2, variantlist2, degreelist2, elemnamelist2, contlist2, dofmap2 = flatten_tp_element(subelem1, subelem2)
+    
+    dofmap = dofmap1 + dofmap2 # THIS IS WRONG!
     ncomp = ncomp1 + ncomp2
     variantlist = variantlist1 + variantlist2
     degreelist = degreelist1 + degreelist2
     elemnamelist = elemnamelist1 + elemnamelist2
     contlist = contlist1 + contlist2
-    return ncomp, variantlist, degreelist, elemnamelist, contlist
+    return ncomp, variantlist, degreelist, elemnamelist, contlist, dofmap
 
 
 class ThemisElement():
-    # THESE SPTS SHOULD REALLY BE DIFFERENT VARIANTS I THINK...
-    # THIS IS USEFUL MOSTLY FOR DISPERSION STUFF
-    # BUT I THINK REALLY IMPLEMENTING A BUNCH OF VARIANTS IS THE BEST APPROACH
     def __init__(self, elem, sptsh1=None, sptsl2=None):
 
+        # This all maybe becomes an extract element info function?
+        
         # ADD SUPPORT FOR TENSOR ELEMENTS
         if isinstance(elem, VectorElement):
             self._ndofs = elem.value_size()  # do this BEFORE extracting baseelem
@@ -188,8 +194,12 @@ class ThemisElement():
             ncomp, variantlist, degreelist, elemnamelist, contlist = extract_element_info(elem)
         else:
             raise ValueError('Themis supports only FiniteElemet, EnrichedElement and TensorProductElement')
-
+    
+# CHECK THIS...
         self._cont = elem.sobolev_space()
+# THIS NEEDS TO DETERMINE IF BASIS IS INTERPOLATORY AS WELL!
+        self._interpolatory = False
+# BASICALLY ONLY IF ALL COMPONENTS AND SUBELEMENTS ARE INTERPOLATORY AS WELL!
 
         self._ncomp = ncomp
         self._elemnamelist = elemnamelist
@@ -199,38 +209,35 @@ class ThemisElement():
 
         self._nbasis = []
         self._nblocks = []
-        self._ndofs_per_element = []
-        self._offsets = []
-        self._offset_mult = []
         self._basis = []
         self._derivs = []
         self._derivs2 = []
         self._spts = []
 
+# FIX THIS
+        self._location =
+        self._dofnums =
+        self._cell =
+
         for ci in range(self._ncomp):
 
             self._nbasis.append([])
             self._nblocks.append([])
-            self._ndofs_per_element.append([])
-            self._offsets.append([])
-            self._offset_mult.append([])
             self._basis.append([])
             self._derivs.append([])
             self._derivs2.append([])
             self._spts.append([])
+            # ADD LOCATION
+            # ADD DOFNUMS
+            # ADD CELLX/CELLY/ETC.
             for elemname, degree, variant in zip(self._elemnamelist[ci], self._degreelist[ci], self._variantlist[ci]):
 
                 sptsL2 = sptsl2 or ThemisQuadratureNumerical('gll', [degree+1]).get_pts()[0]  # this works because degree has already been adjusted!
                 sptsH1 = sptsh1 or ThemisQuadratureNumerical('gll', [degree+1]).get_pts()[0]
-                # compute number of shape functions in each direction (=nbasis); and number of degrees of freedom per element
+                
+                # compute number of shape functions in each direction (=nbasis)
                 self._nbasis[ci].append(degree + 1)
-                if elemname in ['CG', 'CQB', 'CMSE']:
-                    self._ndofs_per_element[ci].append(degree)
-                if elemname in ['DG', 'DQB', 'DMSE']:
-                    self._ndofs_per_element[ci].append(degree + 1)
-                if elemname in ['GD', 'DGD']:
-                    self._ndofs_per_element[ci].append(1)
-
+ 
                 # set the number of blocks
                 if elemname in ['CG', 'CQB', 'CMSE', 'DG', 'DQB', 'DMSE']:
                     self._nblocks[ci].append(1)
@@ -238,18 +245,6 @@ class ThemisElement():
                     self._nblocks[ci].append(degree)
                 if elemname == 'DGD':
                     self._nblocks[ci].append(degree+1)
-
-                # compute offsets and offset mults
-                if elemname in ['CG', 'CQB', 'CMSE']:
-                    of, om = _CG_offset_info(degree)
-                if elemname in ['DG', 'DQB', 'DMSE']:
-                    of, om = _DG_offset_info(degree)
-                if elemname == 'GD':
-                    of, om = _GD_offset_info(degree)
-                if elemname == 'DGD':
-                    of, om = _DGD_offset_info(degree)
-                self._offsets[ci].append(of)
-                self._offset_mult[ci].append(om)
 
                 # compute basis and deriv functions
                 if elemname == 'CG':
@@ -275,10 +270,7 @@ class ThemisElement():
 
             # add EmptyElements in
             while len(self._basis[ci]) < 3:
-                of, om = _DG_offset_info(0)
                 b, d, d2, s = _DG_basis(0, [0.5, ])
-                self._offsets[ci].append(of)
-                self._offset_mult[ci].append(om)
                 self._basis[ci].append(b)
                 self._derivs[ci].append(d)
                 self._derivs2[ci].append(d2)
@@ -287,41 +279,15 @@ class ThemisElement():
 
     def get_continuity(self, ci, direc):
         return self._contlist[ci][direc]
-
-    def get_nx(self, ci, direc, ncell, bc):
-        fam = self._elemnamelist[ci][direc]
-        if fam in ['CG', 'CQB', 'CMSE']:
-            nx = self._degreelist[ci][direc] * ncell
-            if (bc == 'nonperiodic'):
-                nx = nx + 1
-        if fam in ['DG', 'DQB', 'DMSE']:
-            nx = (self._degreelist[ci][direc]+1) * ncell
-        if fam == 'GD':
-            nx = ncell
-            if (bc == 'nonperiodic'):
-                nx = nx + 1
-        if fam == 'DGD':
-            nx = ncell
-        return nx
-
+    
+    def dofmap(self):
+        return FIXME
+        
     def ndofs(self):
         return self._ndofs
 
     def get_nbasis(self, ci, direc):
         return self._nbasis[ci][direc]
-
-    def get_ndofs_per_element(self, ci, direc):
-        return self._ndofs_per_element[ci][direc]
-
-    def get_local_size(self):
-        bprod = np.prod(self._nbasis)
-        return [bprod, self._ndofs]
-
-# Offsets are returned as nblock-nbasis
-# Basis/Derivs are returned as nblock-nquad-nbasis (tabulated) or nblock-nbasis (symbolic)
-
-    def get_offsets(self, ci, direc):
-        return self._offsets[ci][direc], self._offset_mult[ci][direc]
 
     def get_sym_basis(self, ci, direc, newsymb):
         xsymb = sympy.var('x')
@@ -449,30 +415,15 @@ class ThemisElement():
                     basis_derivs2[bi, :, i] = np.squeeze(deriv2(x))
         return basis_derivs2
 
-    def get_icells(self, ci, direc, ncell, bc, interior_facet):
-        elemname = self._elemnamelist[ci][direc]
-        degree = self._degreelist[ci][direc]
-        if elemname in ['CG', 'CQB', 'CMSE']:
-            return _CG_interaction_cells(ncell, bc, interior_facet, degree)
-        if elemname in ['DG', 'DQB', 'DMSE']:
-            return _DG_interaction_cells(ncell, bc, interior_facet, degree)
-        if elemname == 'GD':
-            return _GD_interaction_cells(ncell, bc, interior_facet, degree)
-        if elemname == 'DGD':
-            return _DGD_interaction_cells(ncell, bc, interior_facet, degree)
-
+# THIS IS NOW WRONG FOR FEEC TYPE ELEMENTS SINCE WE ARE NOT LYING ABOUT ELEMENTS ANYMORE
     def swidth(self):
         maxnbasis = max(max(self._nbasis))
         return maxnbasis
 
-    def get_info(self, ci, direc, x):
-        b = self.get_basis(ci, direc, x)
-        d = self.get_derivs(ci, direc, x)
-        return b, d, self._offsets[ci][direc], self._offset_mult[ci][direc]
-
     def get_ncomp(self):
         return self._ncomp
-
+    
+# THIS IS REALLY A CONSTANT, EXCEPT FOR TP ELEMENTS...
     def get_nblocks(self, ci, direc):
         return self._nblocks[ci][direc]
 
@@ -507,65 +458,6 @@ def _DG_basis(order, spts, symb=None):
         derivs.append(sympy.Rational(1, 1) * 0)
         derivs2.append(sympy.Rational(1, 1) * 0)
     return [symbas, ], [derivs, ], [derivs2, ], spts
-
-
-def _CG_offset_info(order):
-    offsets = np.arange(0, order+1, dtype=np.int32)
-    offset_multiplier = order * np.ones(offsets.shape, dtype=np.int32)
-    # 'p*i','p*i+1'...'p*i+p'
-    return np.expand_dims(offsets, axis=0), np.expand_dims(offset_multiplier, axis=0)
-
-
-def _DG_offset_info(order):
-    offsets = np.arange(0, order+1, dtype=np.int32)
-    offset_multiplier = (order+1) * np.ones(offsets.shape, dtype=np.int32)
-    # 'p*i','p*i+1'...'p*i+p'
-    return np.expand_dims(offsets, axis=0), np.expand_dims(offset_multiplier, axis=0)
-
-
-def _CG_interaction_cells(ncell, bc, interior_facet, order):
-    if bc == 'periodic':
-        off = 0
-    else:
-        off = 1
-    interaction_cells = np.zeros((ncell*order + off, 2), dtype=np.int32)
-    ilist = np.arange(0, interaction_cells.shape[0])
-    rightmost_bound = np.floor_divide(ilist, order)   # floor(n/p)
-    leftmost_bound = np.floor_divide(ilist-1, order)  # floor((n-1)/p)
-    # no circular wrapping since we need the actual value in order to get differences in pre-alloc correct ie 2 - (-1) = 3
-    if not interior_facet:
-        interaction_cells[:, 0] = leftmost_bound
-        interaction_cells[:, 1] = rightmost_bound
-        if bc == 'nonperiodic':
-            interaction_cells[0, 0] = interaction_cells[0, 1]
-            interaction_cells[-1, 1] = interaction_cells[-1, 0]
-    if interior_facet:
-        interaction_cells[:, 0] = leftmost_bound - 1
-        interaction_cells[:, 1] = rightmost_bound + 1
-        if bc == 'nonperiodic':
-            interaction_cells[0:order, 0] = interaction_cells[0:order, 0] + 1
-            interaction_cells[(ncell-1)*(order):ncell*(order), 1] = interaction_cells[(ncell-1)*(order):ncell*(order), 1] - 1
-    # print('cg',interaction_cells)
-    return interaction_cells
-
-
-def _DG_interaction_cells(ncell, bc, interior_facet, order):
-    interaction_cells = np.zeros((ncell*(order+1), 2), dtype=np.int32)
-    ilist = np.arange(0, interaction_cells.shape[0])
-    rightmost_bound = np.floor_divide(ilist, order+1)  # floor(n/p)
-    if not interior_facet:
-        interaction_cells[:, 0] = rightmost_bound
-        interaction_cells[:, 1] = rightmost_bound
-    if interior_facet:
-        interaction_cells[:, 0] = rightmost_bound - 1
-        interaction_cells[:, 1] = rightmost_bound + 1
-        if bc == 'nonperiodic':
-            interaction_cells[0:(order+1), 0] = interaction_cells[0:(order+1), 0] + 1
-            interaction_cells[(ncell-1)*(order+1):ncell*(order+1), 1] = interaction_cells[(ncell-1)*(order+1):ncell*(order+1), 1] - 1
-
-    # print('dg',interaction_cells)
-    return interaction_cells
-
 
 #  MGD ELEMENTS
 
@@ -673,113 +565,6 @@ def _DGD_basis(order, symb=None):
     return symbas, derivs, derivs2, spts
 
 
-def _GD_offset_info(order):
-    offsets = np.arange(-(order-1)//2, (order-1)//2+2, 1, dtype=np.int32)
-    offset_multiplier = np.ones(offsets.shape, dtype=np.int32)
-    expanded_offset_multiplier = np.reshape(np.tile(offset_multiplier, order), (order, offset_multiplier.shape[0]))
-    M = (order-1)//2  # nblocks = order
-    expanded_offsets = np.zeros((order, offsets.shape[0]), dtype=np.int32)
-    k = 0
-    for i in range(M, -(M+1), -1):
-        expanded_offsets[k, :] = offsets + i
-        k = k + 1
-    # print('GD',expanded_offsets)
-    return expanded_offsets, expanded_offset_multiplier
-
-
-def _DGD_offset_info(order):
-    offsets = np.arange(-(order)//2, (order)/2+1, 1, dtype=np.int32)
-    offset_multiplier = np.ones(offsets.shape, dtype=np.int32)
-    expanded_offset_multiplier = np.reshape(np.tile(offset_multiplier, order+1), (order+1, offset_multiplier.shape[0]))
-    M = order//2  # nblocks = order + 1
-    expanded_offsets = np.zeros((order+1, offsets.shape[0]), dtype=np.int32)
-    k = 0
-    for i in range(M, -(M+1), -1):
-        expanded_offsets[k, :] = offsets + i
-        k = k + 1
-    # print('DGD',expanded_offsets)
-    return expanded_offsets, expanded_offset_multiplier
-
-# CORRECT FACET INTEGRAL STUFF??
-
-
-def _GD_interaction_cells(ncell, bc, interior_facet, order):
-    if bc == 'periodic':
-        off = 0
-    else:
-        off = 1
-    interaction_cells = np.zeros((ncell+off, 2), dtype=np.int32)
-    ilist = np.arange(0, interaction_cells.shape[0])
-    if order == 3 and bc == 'nonperiodic':
-        if interior_facet:
-            interaction_cells[0, :] = np.array([0, 2], dtype=np.int32)
-            interaction_cells[1, :] = np.array([-1, 2], dtype=np.int32)
-            interaction_cells[2, :] = np.array([-2, 2], dtype=np.int32)
-            interaction_cells[3, :] = np.array([-3, 2], dtype=np.int32)
-            interaction_cells[4:ncell+off-4, :] = np.array([-3, 2], dtype=np.int32)
-            interaction_cells[ncell+off-4, :] = np.array([-3, 2], dtype=np.int32)
-            interaction_cells[ncell+off-3, :] = np.array([-3, 1], dtype=np.int32)
-            interaction_cells[ncell+off-2, :] = np.array([-3, 0], dtype=np.int32)
-            interaction_cells[ncell+off-1, :] = np.array([-3, -1], dtype=np.int32)
-        else:
-            interaction_cells[0, :] = np.array([0, 1], dtype=np.int32)
-            interaction_cells[1, :] = np.array([-1, 1], dtype=np.int32)
-            interaction_cells[2, :] = np.array([-2, 1], dtype=np.int32)
-            interaction_cells[3, :] = np.array([-3, 1], dtype=np.int32)
-            interaction_cells[4:ncell+off-4, :] = np.array([-2, 1], dtype=np.int32)
-            interaction_cells[ncell+off-4, :] = np.array([-2, 2], dtype=np.int32)
-            interaction_cells[ncell+off-3, :] = np.array([-2, 1], dtype=np.int32)
-            interaction_cells[ncell+off-2, :] = np.array([-2, 0], dtype=np.int32)
-            interaction_cells[ncell+off-1, :] = np.array([-2, -1], dtype=np.int32)
-        interaction_cells = interaction_cells + np.expand_dims(ilist, axis=1)
-    else:
-        leftmost = -(order-1)//2-1
-        rightmost = (order-1)//2
-        if interior_facet:
-            leftmost = leftmost - 1
-            rightmost = rightmost + 1
-        interaction_offsets = np.array([leftmost, rightmost], dtype=np.int32)
-        interaction_cells[:, :] = np.expand_dims(ilist, axis=1) + np.expand_dims(interaction_offsets, axis=0)
-        if order == 1 and bc == 'nonperiodic':
-            interaction_cells[0, 0] = 0
-            interaction_cells[-1, -1] = ncell-1
-    return interaction_cells
-
-
-def _DGD_interaction_cells(ncell, bc, interior_facet, order):
-    interaction_cells = np.zeros((ncell, 2), dtype=np.int32)
-    ilist = np.arange(0, interaction_cells.shape[0])
-    if order == 2 and bc == 'nonperiodic':
-        if interior_facet:
-            interaction_cells[0, :] = np.array([0, 2], dtype=np.int32)
-            interaction_cells[1, :] = np.array([-1, 2], dtype=np.int32)
-            interaction_cells[2, :] = np.array([-2, 2], dtype=np.int32)
-            interaction_cells[3:ncell-3, :] = np.array([-2, 2], dtype=np.int32)
-            interaction_cells[ncell-3, :] = np.array([-2, 2], dtype=np.int32)
-            interaction_cells[ncell-2, :] = np.array([-2, 1], dtype=np.int32)
-            interaction_cells[ncell-1, :] = np.array([-2, 0], dtype=np.int32)
-        else:
-            interaction_cells[0, :] = np.array([0, 1], dtype=np.int32)
-            interaction_cells[1, :] = np.array([-1, 1], dtype=np.int32)
-            interaction_cells[2, :] = np.array([-2, 1], dtype=np.int32)
-            interaction_cells[3:ncell-3, :] = np.array([-1, 1], dtype=np.int32)
-            interaction_cells[ncell-3, :] = np.array([-1, 2], dtype=np.int32)
-            interaction_cells[ncell-2, :] = np.array([-1, 1], dtype=np.int32)
-            interaction_cells[ncell-1, :] = np.array([-1, 0], dtype=np.int32)
-        interaction_cells = interaction_cells + np.expand_dims(ilist, axis=1)
-
-        # ADD THIS
-    else:
-        leftmost = -(order-1)//2
-        rightmost = (order-1)//2+1
-        if interior_facet:  # is this correct?
-            leftmost = leftmost - 1
-            rightmost = rightmost + 1
-        interaction_offsets = np.array([leftmost, rightmost], dtype=np.int32)
-        interaction_cells[:, :] = np.expand_dims(ilist, axis=1) + np.expand_dims(interaction_offsets, axis=0)
-        # print('dgd',interaction_cells)
-    return interaction_cells
-
 
 # QB ELEMENTS
 
@@ -802,7 +587,6 @@ def bernstein_polys(n, var):
 # HOW SHOULD SPTS BE HANDLED HERE?
 # NOT EVEN REALLY SURE IT MAKES SENSE...
 
-
 def _CQB_basis(order, symb=None):
     xsymb = symb or sympy.var('x')
     symbas = bernstein_polys(order, xsymb)
@@ -816,7 +600,6 @@ def _CQB_basis(order, symb=None):
 
 def _DQB_basis(order, symb=None):
     xsymb = symb or sympy.var('x')
-    spts = None
     if order >= 1:
         cg_symbas, _, _, _ = _CQB_basis(order+1, symb=xsymb)
         symbas, derivs, derivs2 = create_compatible_basis(cg_symbas)
@@ -824,14 +607,13 @@ def _DQB_basis(order, symb=None):
         symbas = [[sympy.Rational(1, 1), ], ]
         derivs = [[sympy.Rational(1, 1) * 0, ], ]
         derivs2 = [[sympy.Rational(1, 1) * 0, ], ]
-    return symbas, derivs, derivs2, spts
+    return symbas, derivs, derivs2, None
 
 
 # MSE ELEMENTS
 _CMSE_basis = _CG_basis
 
 # Careful here, spts argument is actually those used for the CG space!
-
 
 def _DMSE_basis(order, spts, symb=None):
     xsymb = symb or sympy.var('x')

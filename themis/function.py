@@ -1,5 +1,6 @@
 from ufl import Coefficient
 from petscshim import PETSc
+from interpolation import interpolation
 
 
 class SplitFunction():
@@ -92,18 +93,16 @@ class Function(Coefficient):
                 # create local vectors- one for EACH component on each PATCH
                 self._lvectors = []
                 for si in range(self.space.nspaces):
-                    for ci in range(self.space.get_space(si).ncomp):
-                        self._lvectors.append(self.space.get_space(si).get_da(ci).createLocalVector())
+                    self._lvectors.append(self.space.get_space(si).get_da().createLocalVector())
 
             if self.space.nspaces > 1:
                 self._split = tuple(SplitFunction(self.space.get_space(i), name="%s_%d" % (self.name(), i), gvec=self._vector, si=i, parentspace=self.space, parentfunction=self) for i in range(self.space.nspaces))
             else:
                 self._split = (self,)
 
-    def get_lvec(self, si, ci):
+    def get_lvec(self, si):
         soff = self.space.get_space_offset(si)
-        coff = self.space.get_space(si).get_component_offset(ci)
-        return self._lvectors[coff+soff]
+        return self._lvectors[soff]
 
     def name(self):
         return self._name
@@ -114,3 +113,6 @@ class Function(Coefficient):
         """Extract any sub :class:`Function`\s defined on the component spaces
         of this this :class:`Function`'s :class:`.FunctionSpace`."""
         return self._split
+
+    def interpolate(self, expression):
+        return interpolation.interpolate(expression, self)
