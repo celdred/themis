@@ -25,7 +25,7 @@ def compile_form(form):
         # compiler) to the global coefficient numbers
         number_map = dict((n, coefficient_numbers[c]) for (n, c) in enumerate(f.coefficients()))
 
-        tsfc_kernels = tsfc.compile_form(f, interface=themis_interface)
+        tsfc_kernels = tsfc.compile_form(f, interface=themis_interface.KernelBuilder)
 
         kernels = []
         for kernel in tsfc_kernels:
