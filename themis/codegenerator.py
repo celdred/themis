@@ -2,7 +2,7 @@ import jinja2
 import numpy as np
 
 from ufl import FiniteElement, interval
-from finiteelement import ThemisElement
+from themiselement import ThemisElement
 from finat.point_set import TensorPointSet
 from function import Function, SplitFunction
 from constant import Constant

@@ -1,6 +1,6 @@
 from ufl import Coefficient
 from petscshim import PETSc
-from interpolation import interpolation
+#from interpolation import interpolation
 
 
 class SplitFunction():

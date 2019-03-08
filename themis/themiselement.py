@@ -229,8 +229,8 @@ class ThemisElement():
                 for ly in range(self.nbasis[ci][1]):
                     for lz in range(self.nbasis[ci][2]):
                         loc = locdict[(locx[lx],locy[ly],locz[lz])]
-                        location[lx][ly][lz] = loc
-                        dofnum[[lx][ly][lz] = dofdict[loc]
+                        location[lx,ly,lz] = loc
+                        dofnum[lx,ly,lz] = dofdict[loc]
                         dofdict[loc] = dofdict[loc] + 1
 # THIS IS STILL BROKEN FOR NDOFS > 1
 # SHOULD INTERFACE WITH HOW ASSEMBLE.TEMPLATE DOES LOOPS WITH D...

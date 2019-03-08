@@ -8,7 +8,7 @@ from bcs import DirichletBC
 from solver import NonlinearVariationalProblem, NonlinearVariationalSolver
 from ufl import inner, dx
 from ufl_expr import TestFunction
-from finiteelement import ThemisElement
+from themiselement import ThemisElement
 from ufl import Mesh, FiniteElement, interval, VectorElement, quadrilateral, TensorProductElement, hexahedron
 
 class SingleBlockMesh(Mesh):
@@ -20,8 +20,7 @@ class SingleBlockMesh(Mesh):
         dofmap = elem.dofmap
         ndofs = elem.ndofs
         
-        da = PETSc.DMStag.create(self, dim=self.ndim, dof=dofmap*ndofs, sizes=self.nxs, boundary_type=self._blist, 
-        stencil_type=PETSc.DMStag.StencilType.BOX, stencil_width=swidth, setup=True)
+        da = PETSc.DMStag.create(self, self.ndim, dofmap*ndofs, self.nxs, self._blist, PETSc.DMStag.StencilType.BOX, swidth)
         
         return da
 
@@ -63,8 +62,7 @@ class SingleBlockMesh(Mesh):
         if self.ndim == 1: dof = (0,1)
         if self.ndim == 2: dof = (0,0,1)
         if self.ndim == 3: dof = (0,0,0,1)
-        self.da = PETSc.DMStag.create(self, dim=self.ndim, dof=dof, sizes=nxs, boundary_type=self._blist, 
-        stencil_type=PETSc.DMStag.StencilType.BOX, stencil_width=0, setup=True)
+        self.da = PETSc.DMStag.create(self, self.ndim, dof, nxs, self._blist, PETSc.DMStag.StencilType.NONE, 0)
 
         # set initial (=uniform) coordinates
         if len(nxs) == 1:

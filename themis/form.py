@@ -73,22 +73,22 @@ def create_empty(target, source):
 
     return mat
 
-def get_preallocation(PETSc.Mat preallocator, PetscInt nrow):
-    cdef:
-        _p_Mat *A = <_p_Mat *>(preallocator.mat)
-        Mat_Preallocator *p = <Mat_Preallocator *>(A.data)
+# def get_preallocation(PETSc.Mat preallocator, PetscInt nrow):
+    # cdef:
+        # _p_Mat *A = <_p_Mat *>(preallocator.mat)
+        # Mat_Preallocator *p = <Mat_Preallocator *>(A.data)
 
-    if p.dnz != NULL:
-        dnz = <PetscInt[:nrow]>p.dnz
-        dnz = np.asarray(dnz).copy()
-    else:
-        dnz = np.zeros(0, dtype=IntType)
-    if p.onz != NULL:
-        onz = <PetscInt[:nrow]>p.onz
-        onz = np.asarray(onz).copy()
-    else:
-        onz = np.zeros(0, dtype=IntType)
-    return dnz, onz
+    # if p.dnz != NULL:
+        # dnz = <PetscInt[:nrow]>p.dnz
+        # dnz = np.asarray(dnz).copy()
+    # else:
+        # dnz = np.zeros(0, dtype=IntType)
+    # if p.onz != NULL:
+        # onz = <PetscInt[:nrow]>p.onz
+        # onz = np.asarray(onz).copy()
+    # else:
+        # onz = np.zeros(0, dtype=IntType)
+    # return dnz, onz
     
 def create_mono(target, source, blocklist, kernellist):
     # create matrix
