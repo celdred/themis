@@ -170,25 +170,10 @@ class SingleBlockMesh(Mesh):
                 self.bdirecs.append(direc+'+')
 
         # generate mesh
-        cell_da = PETSc.DMDA().create()
-        # THIS SHOULD REALLY BE AN OPTIONS PREFIX THING TO MESH...
-        # MAIN THING IS THE ABILITY TO CONTROL DECOMPOSITION AT COMMAND LINE
-        # BUT WE WANT TO BE ABLE TO IGNORE DECOMPOSITION WHEN RUNNING WITH A SINGLE PROCESSOR
-        # WHICH ALLOWS THE SAME OPTIONS LIST TO BE USED TO RUN SOMETHING IN PARALLEL, AND THEN DO PLOTTING IN SERIAL!
-        if PETSc.COMM_WORLD.size > 1:  # this allows the same options list to be used to run something in parallel, but then plot it in serial!
-            cell_da.setOptionsPrefix(self._name + '0_')
-            cell_da.setFromOptions()
-        #############
-
-        cell_da.setDim(self.ndim)
-        cell_da.setDof(1)
-        cell_da.setSizes(nxs)
-        cell_da.setBoundaryType(self._blist)
-        cell_da.setStencil(PETSc.DMDA.StencilType.BOX, 1)
         if not (procsizes is None):
-            cell_da.setProcSizes(procsizes)
-        cell_da.setUp()
-        self._cell_da = cell_da
+            self._cell_da = PETSc.DMDA().create(dim=self.ndim, dof=1, sizes=nxs, boundary_type=self._blist, stencil_type=PETSc.DMDA.StencilType.BOX, stencil_width=1, proc_sizes=procsizes)
+        else:
+            self._cell_da = PETSc.DMDA().create(dim=self.ndim, dof=1, sizes=nxs, boundary_type=self._blist, stencil_type=PETSc.DMDA.StencilType.BOX, stencil_width=1)
 
         if (coordelem is None):
             if len(nxs) == 1:
@@ -221,7 +206,7 @@ class SingleBlockMesh(Mesh):
         self.coordinates = Function(coordsspace, name='coords')
         coordsdm = coordsspace.get_da(0)
         coordsarr = coordsdm.getVecArray(self.coordinates._vector)[:]
-        newcoords = create_reference_domain_coordinates(cell_da, celem)
+        newcoords = create_reference_domain_coordinates(self._cell_da, celem)
         if len(nxs) == 1:
             coordsarr[:] = np.squeeze(newcoords[:])
         else:

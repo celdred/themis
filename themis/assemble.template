@@ -209,25 +209,33 @@ const   PetscInt {{field.name}}_{{k}}_offset_mult_z[{{ field.nblocks_z[k] }}][{{
   ierr = DMDAGetCorners(da,&xs,&ys,&zs,&xm,&ym,&zm);CHKERRQ(ierr);
    ierr = DMDAGetInfo(da,0,&xmax,&ymax,&zmax,0,0,0,0,0,0,0,0,0);CHKERRQ(ierr);
 
- {% from 'setblocks.template' import SET_PERIODIC_OTHER with context %}
- {% from 'setblocks.template' import SET_NONPERIODIC_X_OTHER with context %}
- {% from 'setblocks.template' import SET_NONPERIODIC_Y_OTHER with context %}
- {% from 'setblocks.template' import SET_NONPERIODIC_Z_OTHER with context %}
+ {% from 'setblocks.template' import SET_PERIODIC_TABULATIONS with context %}
+ {% from 'setblocks.template' import SET_NONPERIODIC_X_TABULATIONS with context %}
+ {% from 'setblocks.template' import SET_NONPERIODIC_Y_TABULATIONS with context %}
+ {% from 'setblocks.template' import SET_NONPERIODIC_Z_TABULATIONS with context %}
+ {% from 'setblocks.template' import SET_PERIODIC_SPACES with context %}
+ {% from 'setblocks.template' import SET_NONPERIODIC_X_SPACES with context %}
+ {% from 'setblocks.template' import SET_NONPERIODIC_Y_SPACES with context %}
+ {% from 'setblocks.template' import SET_NONPERIODIC_Z_SPACES with context %}
  {% from 'setblocks.template' import SET_PERIODIC_FIELDS with context %}
  {% from 'setblocks.template' import SET_NONPERIODIC_X_FIELDS with context %}
  {% from 'setblocks.template' import SET_NONPERIODIC_Y_FIELDS with context %}
  {% from 'setblocks.template' import SET_NONPERIODIC_Z_FIELDS with context %}
 
-{{ SET_PERIODIC_OTHER() }}
+{{ SET_PERIODIC_TABULATIONS() }}
+{{ SET_PERIODIC_SPACES() }}
 {{ SET_PERIODIC_FIELDS() }}
 for (k=zs; k<zs+zm; k++) {
-{{ SET_NONPERIODIC_Z_OTHER() }}
+{{ SET_NONPERIODIC_Z_TABULATIONS() }}
+{{ SET_NONPERIODIC_Z_SPACES() }}
 {{ SET_NONPERIODIC_Z_FIELDS() }}
    for (j=ys; j<ys+ym; j++) {
-     {{ SET_NONPERIODIC_Y_OTHER() }}
+     {{ SET_NONPERIODIC_Y_TABULATIONS() }}
+     {{ SET_NONPERIODIC_Y_SPACES() }}
      {{ SET_NONPERIODIC_Y_FIELDS() }}
       for (i=xs; i<xs+xm; i++) {
-	      {{ SET_NONPERIODIC_X_OTHER() }}
+	      {{ SET_NONPERIODIC_X_TABULATIONS() }}
+	      {{ SET_NONPERIODIC_X_SPACES() }}
 	      {{ SET_NONPERIODIC_X_FIELDS() }}
 	    
 		//printf("start %i %i %i: %i %i %i\n",i,j,k,xs,xm,xmax);

@@ -1,5 +1,8 @@
 from mesh import SingleBlockMesh, SingleBlockExtrudedMesh
 import numpy as np
+from ufl import SpatialCoordinate, as_vector
+from function import Function
+from constant import Constant
 
 
 def create_box_mesh(nxs, lxs, pxs, bcs):
@@ -12,7 +15,14 @@ def create_box_mesh(nxs, lxs, pxs, bcs):
     nxs = np.array(nxs, dtype=np.int32)
 
     mesh = SingleBlockMesh(nxs, bcs)
-    mesh.scale_coordinates(lxs, pxs - lxs / 2.)
+
+    xs = SpatialCoordinate(mesh)
+    newcoords = Function(mesh.coordinates.function_space(), name='newcoords')
+    xlist = []
+    for i in range(len(pxs)):
+        xlist.append(xs[i] * Constant(lxs[i]) + Constant(pxs[i]) - Constant(lxs[i])/2.)
+    newcoords.interpolate(as_vector(xlist))
+    mesh.coordinates.assign(newcoords)
 
     return mesh
 

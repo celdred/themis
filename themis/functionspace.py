@@ -8,6 +8,9 @@ import ufl
 
 class FunctionSpace(UFLFunctionSpace):
 
+    def __iter__(self):
+        return iter([self, ])
+
     # returns the offset into a list of components for component ci
     # useful primarily for VectorSpaces, since they have multiple components
     def get_component_offset(self, ci):
@@ -255,6 +258,12 @@ class MixedFunctionSpace(UFLMixedFunctionSpace):
         """Return the number of :class:`FunctionSpace` of which this
         :class:`MixedFunctionSpace` is composed."""
         return self.nspaces
+
+    def __iter__(self):
+        return iter(self._spaces)
+
+    def __getitem__(self, i):
+        return self._spaces[i]
 
     def sub(self, i):
         return self._spaces[i]

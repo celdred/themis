@@ -60,6 +60,7 @@ class EvalKernel():
         self.zero = False
         self.assemblycompiled = False
         self.evaluate = True
+        self.interpolate = False
 
         self.ctype = ctype
         self.etype = etype
