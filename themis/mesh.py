@@ -169,12 +169,12 @@ class SingleBlockMesh(Mesh):
                 self.bdirecs.append(direc+'-')
                 self.bdirecs.append(direc+'+')
 
-        # generate mesh        
+        # generate mesh
         if not (procsizes is None):
-            self._cell_da = PETSc.DMDA().create(dim=self.ndim,dof=1,sizes=nxs,boundary_type = self._blist,stencil_type=PETSc.DMDA.StencilType.BOX,stencil_width=1,proc_sizes=procsizes)
+            self._cell_da = PETSc.DMDA().create(dim=self.ndim, dof=1, sizes=nxs, boundary_type=self._blist, stencil_type=PETSc.DMDA.StencilType.BOX, stencil_width=1, proc_sizes=procsizes)
         else:
-            self._cell_da = PETSc.DMDA().create(dim=self.ndim,dof=1,sizes=nxs,boundary_type = self._blist,stencil_type=PETSc.DMDA.StencilType.BOX,stencil_width=1)
-            
+            self._cell_da = PETSc.DMDA().create(dim=self.ndim, dof=1, sizes=nxs, boundary_type=self._blist, stencil_type=PETSc.DMDA.StencilType.BOX, stencil_width=1)
+
         if (coordelem is None):
             if len(nxs) == 1:
                 if bcs[0] == 'nonperiodic':

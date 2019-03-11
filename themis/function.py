@@ -1,5 +1,6 @@
 from ufl import Coefficient
 from petscshim import PETSc
+import interpolator
 
 
 class SplitFunction():
@@ -114,3 +115,6 @@ class Function(Coefficient):
         """Extract any sub :class:`Function`\s defined on the component spaces
         of this this :class:`Function`'s :class:`.FunctionSpace`."""
         return self._split
+
+    def interpolate(self, expression):
+        return interpolator.interpolate(expression, self)

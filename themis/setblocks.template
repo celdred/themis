@@ -17,7 +17,7 @@ bi_{{field.name}}_z_{{k}} = ({{ field.nblocks_z[k] }} - 1) / 2;
 {% endfor %}
 {% endmacro %}
 
-{%macro SET_PERIODIC_OTHER() -%}
+{%macro SET_PERIODIC_SPACES() -%}
 
 {% if formdim >= 1 %}
 {% for ci1 in range(nci1) %}
@@ -48,6 +48,9 @@ bi_2_z_{{  ci2 }}  = ({{ nblocks2_z[ci2] }} - 1) / 2;
 {% endfor %}
 {% endif %}
 
+{% endmacro %}
+
+{%macro SET_PERIODIC_TABULATIONS() -%}
 
 {% for tabulation in tabulations %}
 {% if (tabulation.nblocks == 1 or bcs[0] == 'periodic') and tabulation.shiftaxis == 0 %}
@@ -107,7 +110,7 @@ if (k >= (zmax - {{M}})) bi_{{name}}_z_{{ci}} = {{NB}} - (zmax - k);
 {% endfor %}
 {% endmacro %}
 
-{%macro SET_NONPERIODIC_X_OTHER() -%}
+{%macro SET_NONPERIODIC_X_SPACES() -%}
 {% if formdim >= 1 %}
 {% for ci1 in range(nci1) %}
 {% if (bcs[0] == 'nonperiodic') and (nblocks1_x[ci1] > 1) %}
@@ -123,6 +126,9 @@ if (k >= (zmax - {{M}})) bi_{{name}}_z_{{ci}} = {{NB}} - (zmax - k);
 {% endif %}
 {% endfor %}
 {% endif %}
+{% endmacro %}
+
+{%macro SET_NONPERIODIC_X_TABULATIONS() -%}
 
 {% for tabulation in tabulations %}
 {% if (tabulation.nblocks > 1) and (bcs[0] == 'nonperiodic' and tabulation.shiftaxis == 0) %}
@@ -149,7 +155,7 @@ if (k >= (zmax - {{M}})) bi_{{name}}_z_{{ci}} = {{NB}} - (zmax - k);
 {% endfor %}
 {% endmacro %}
 
-{%macro SET_NONPERIODIC_Y_OTHER() -%}
+{%macro SET_NONPERIODIC_Y_SPACES() -%}
 {% if formdim >= 1 %}
 {% for ci1 in range(nci1) %}
 {% if (bcs[1] == 'nonperiodic') and (nblocks1_y[ci1] > 1) %}
@@ -165,6 +171,9 @@ if (k >= (zmax - {{M}})) bi_{{name}}_z_{{ci}} = {{NB}} - (zmax - k);
 {% endif %}
 {% endfor %}
 {% endif %}
+{% endmacro %}
+
+{%macro SET_NONPERIODIC_Y_TABULATIONS() -%}
 
 {% for tabulation in tabulations %}
 {% if (tabulation.nblocks > 1) and (bcs[1] == 'nonperiodic' and tabulation.shiftaxis == 1) %}
@@ -188,7 +197,7 @@ if (k >= (zmax - {{M}})) bi_{{name}}_z_{{ci}} = {{NB}} - (zmax - k);
 {% endfor %}
 {% endmacro %}
 
-{%macro SET_NONPERIODIC_Z_OTHER() -%}
+{%macro SET_NONPERIODIC_Z_SPACES() -%}
 {% if formdim >= 1 %}
 {% for ci1 in range(nci1) %}
 {% if (bcs[2] == 'nonperiodic') and (nblocks1_z[ci1] > 1) %}
@@ -204,6 +213,9 @@ if (k >= (zmax - {{M}})) bi_{{name}}_z_{{ci}} = {{NB}} - (zmax - k);
 {% endif %}
 {% endfor %}
 {% endif %}
+{% endmacro %}
+
+{%macro SET_NONPERIODIC_Z_TABULATIONS() -%}
 
 {% for tabulation in tabulations %}
 {% if (tabulation.nblocks > 1) and (bcs[2] == 'nonperiodic' and tabulation.shiftaxis == 2) %}

@@ -1,11 +1,12 @@
 
 from petscshim import PETSc
 import numpy as np
-from assembly import two_form_preallocate_opt, AssembleTwoForm, AssembleOneForm, AssembleZeroForm
+from assembly import AssembleTwoForm, AssembleOneForm, AssembleZeroForm
 from tsfc_interface import compile_form
 from function import Function
 from ufl_expr import adjoint
 import ufl
+from pyop2.sparsity import get_preallocation
 
 # 3
 
@@ -112,43 +113,31 @@ def create_mono(target, source, blocklist, kernellist):
 
     M = np.sum(np.array(mlist, dtype=np.int32))
     N = np.sum(np.array(nlist, dtype=np.int32))
+
+    # Use Preallocation matrix class
+    preallocator = PETSc.Mat()
+    preallocator.create(PETSc.COMM_WORLD)
+    preallocator.setSizes(((M, None), (N, None)))
+    preallocator.setType(PETSc.Mat.Type.PREALLOCATOR)
+    preallocator.setLGMap(target.get_overall_lgmap(), cmap=source.get_overall_lgmap())
+    preallocator.setUp()
+    fill_mono(preallocator, target, source, blocklist, kernellist, zeroassembly=True)
+    preallocator.assemble()
+    dnnzarr, onnzarr = get_preallocation(preallocator, M)
+
+    # preallocate matrix
     mat = PETSc.Mat()
     mat.create(PETSc.COMM_WORLD)
     mat.setSizes(((M, None), (N, None)))
     mat.setType('aij')
     mat.setLGMap(target.get_overall_lgmap(), cmap=source.get_overall_lgmap())
-
-    # preallocate matrix
-
-    # PRE-ALLOCATE IS NOT QUITE PERFECT FOR FACET INTEGRALS- IT WORKS BUT IS TOO MUCH!
-    mlist.insert(0, 0)
-    mlist_adj = np.cumsum(mlist)
-    dnnzarr = np.zeros(M, dtype=np.int32)
-    onnzarr = np.zeros(M, dtype=np.int32)
-    i = 0  # this tracks which row "block" are at
-    # This loop order ensures that we fill an entire row in the matrix first
-    # Assuming that fields are stored si,ci which they are!
-    for si1 in range(target.nspaces):
-        tspace = target.get_space(si1)
-        for ci1 in range(tspace.ncomp):
-            for si2 in range(source.nspaces):
-                sspace = source.get_space(si2)
-                for ci2 in range(sspace.ncomp):
-                    if ((si1, si2) in blocklist):
-                        bindex = blocklist.index((si1, si2))
-                        interior_x, interior_y, interior_z = get_interior_flags(tspace.mesh(), kernellist[bindex])
-                        dnnz, onnz = two_form_preallocate_opt(tspace.mesh(), tspace, sspace, ci1, ci2, interior_x, interior_y, interior_z)
-                        dnnz = np.ravel(dnnz)
-                        onnz = np.ravel(onnz)
-                        dnnzarr[mlist_adj[i]:mlist_adj[i+1]] = dnnzarr[mlist_adj[i]:mlist_adj[i+1]] + dnnz
-                        onnzarr[mlist_adj[i]:mlist_adj[i+1]] = onnzarr[mlist_adj[i]:mlist_adj[i+1]] + onnz
-            i = i + 1  # increment row block
     mat.setPreallocationNNZ((dnnzarr, onnzarr))
     mat.setOption(PETSc.Mat.Option.IGNORE_ZERO_ENTRIES, False)
     mat.setOption(PETSc.Mat.Option.NEW_NONZERO_ALLOCATION_ERR, False)
     mat.setUp()
     mat.zeroEntries()
 
+    preallocator.destroy()
     return mat
 
 
@@ -439,14 +428,14 @@ class ImplicitMatrix():
         # "copy" y (petsc Vec) into "active" field
         self._y._activevector = y
 
-        # save ybcs
-        if len(self._colbcs) > 0:
-            y.copy(result=self._ybcs._activevector)
-
         # zero out local x
         x.set(0.0)
         for lvec in self._x._lvectors:
             lvec.set(0.0)
+
+        # save ybcs
+        if len(self._colbcs) > 0:
+            y.copy(result=self._ybcs._activevector)
 
         # apply zero bcs to y
         # sets y = [ yint   0  ]

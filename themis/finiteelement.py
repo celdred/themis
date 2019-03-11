@@ -206,6 +206,8 @@ class ThemisElement():
         self._derivs = []
         self._derivs2 = []
         self._spts = []
+        self._entries_of = []
+        self._entries_om = []
 
         for ci in range(self._ncomp):
 
@@ -218,6 +220,8 @@ class ThemisElement():
             self._derivs.append([])
             self._derivs2.append([])
             self._spts.append([])
+            self._entries_of.append([])
+            self._entries_om.append([])
             for elemname, degree, variant in zip(self._elemnamelist[ci], self._degreelist[ci], self._variantlist[ci]):
 
                 sptsL2 = sptsl2 or ThemisQuadratureNumerical('gll', [degree+1]).get_pts()[0]  # this works because degree has already been adjusted!
@@ -251,6 +255,18 @@ class ThemisElement():
                 self._offsets[ci].append(of)
                 self._offset_mult[ci].append(om)
 
+                # compute entries
+                if elemname in ['CG', 'CQB', 'CMSE']:
+                    of, om = _CG_entries_info(degree)
+                if elemname in ['DG', 'DQB', 'DMSE']:
+                    of, om = _DG_entries_info(degree)
+                if elemname == 'GD':
+                    of, om = _GD_entries_info(degree)
+                if elemname == 'DGD':
+                    of, om = _DGD_entries_info(degree)
+                self._entries_of[ci].append(of)
+                self._entries_om[ci].append(om)
+
                 # compute basis and deriv functions
                 if elemname == 'CG':
                     b, d, d2, s = _CG_basis(degree, sptsH1)
@@ -276,6 +292,7 @@ class ThemisElement():
             # add EmptyElements in
             while len(self._basis[ci]) < 3:
                 of, om = _DG_offset_info(0)
+                ofe, ome = _DG_entries_info(0)
                 b, d, d2, s = _DG_basis(0, [0.5, ])
                 self._offsets[ci].append(of)
                 self._offset_mult[ci].append(om)
@@ -284,6 +301,9 @@ class ThemisElement():
                 self._derivs2[ci].append(d2)
                 self._spts[ci].append(s)
                 self._nblocks[ci].append(1)
+                self._entries_of[ci].append(ofe)
+                self._entries_om[ci].append(ome)
+                self._contlist[ci].append('L2')
 
     def get_continuity(self, ci, direc):
         return self._contlist[ci][direc]
@@ -316,6 +336,9 @@ class ThemisElement():
     def get_local_size(self):
         bprod = np.prod(self._nbasis)
         return [bprod, self._ndofs]
+
+    def get_entries(self, ci, direc):
+        return self._entries_of[ci][direc], self._entries_om[ci][direc]
 
 # Offsets are returned as nblock-nbasis
 # Basis/Derivs are returned as nblock-nquad-nbasis (tabulated) or nblock-nbasis (symbolic)
@@ -476,6 +499,9 @@ class ThemisElement():
     def get_nblocks(self, ci, direc):
         return self._nblocks[ci][direc]
 
+    def get_spts(self, ci, direc):
+        return self._spts[ci][direc]
+
 
 # Lagrange Elements
 
@@ -516,11 +542,21 @@ def _CG_offset_info(order):
     return np.expand_dims(offsets, axis=0), np.expand_dims(offset_multiplier, axis=0)
 
 
+def _CG_entries_info(order):
+    of, om = _CG_offset_info(order)
+    return of[0], om[0]
+
+
 def _DG_offset_info(order):
     offsets = np.arange(0, order+1, dtype=np.int32)
     offset_multiplier = (order+1) * np.ones(offsets.shape, dtype=np.int32)
     # 'p*i','p*i+1'...'p*i+p'
     return np.expand_dims(offsets, axis=0), np.expand_dims(offset_multiplier, axis=0)
+
+
+def _DG_entries_info(order):
+    of, om = _DG_offset_info(order)
+    return of[0], om[0]
 
 
 def _CG_interaction_cells(ncell, bc, interior_facet, order):
@@ -687,6 +723,10 @@ def _GD_offset_info(order):
     return expanded_offsets, expanded_offset_multiplier
 
 
+def _GD_entries_info(order):
+    return np.array([0, 1], dtype=np.int32), np.array([1, 1], dtype=np.int32)
+
+
 def _DGD_offset_info(order):
     offsets = np.arange(-(order)//2, (order)/2+1, 1, dtype=np.int32)
     offset_multiplier = np.ones(offsets.shape, dtype=np.int32)
@@ -701,6 +741,10 @@ def _DGD_offset_info(order):
     return expanded_offsets, expanded_offset_multiplier
 
 # CORRECT FACET INTEGRAL STUFF??
+
+
+def _DGD_entries_info(order):
+    return np.array([0, ], dtype=np.int32), np.array([1, ], dtype=np.int32)
 
 
 def _GD_interaction_cells(ncell, bc, interior_facet, order):

@@ -10,8 +10,9 @@ class ThemisKernel():
         self.ast = kernel.ast
         self.integral_type = kernel.integral_type
         self.coefficient_numbers = kernel.coefficient_numbers
-        self.evaluate = 0
+        self.evaluate = False
         self.zero = False
+        self.interpolate = False
 
 
 def compile_form(form):

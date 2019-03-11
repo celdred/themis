@@ -4,8 +4,8 @@ import numpy as np
 from ufl import FiniteElement, interval
 from finiteelement import ThemisElement
 from finat.point_set import TensorPointSet
-from function import Function, SplitFunction
 from constant import Constant
+import function
 
 
 def a_to_cinit_string(x):
@@ -180,7 +180,7 @@ def generate_assembly_routine(mesh, space1, space2, kernel):
         fieldplusconstantslist.append(mesh.coordinates.name() + '_' + str(0) + '_vals')
         for fieldindex in kernel.coefficient_map:
             field = kernel.coefficients[fieldindex]
-            if isinstance(field, Function):
+            if isinstance(field, function.Function):
                 for si in range(field.function_space().nspaces):
                     fieldlist.append((field, si))
                     fieldplusconstantslist.append(field.name() + '_' + str(si) + '_vals')
@@ -480,14 +480,14 @@ def generate_evaluate_routine(mesh, kernel):
 
     field = kernel.field
 # EVALUATION ON AN UNSPLIT MIXED FIELD SHOULD FAIL!
-    if isinstance(field, Function):
+    if isinstance(field, function.Function):
         if field.name() == mesh.coordinates.name():
             evalfieldindex = 0
         else:
             for si in range(field.function_space().nspaces):
                 fieldlist.append((field, si))
             evalfieldindex = 1
-    if isinstance(field, SplitFunction):
+    if isinstance(field, function.SplitFunction):
         for si in range(field._parentfunction.function_space().nspaces):
             fieldlist.append((field._parentfunction, si))
         evalfieldindex = field._si + 1
@@ -584,6 +584,204 @@ def generate_evaluate_routine(mesh, kernel):
     templateVars['valstype'] = kernel.ctype
     templateVars['evaltype'] = kernel.etype
     templateVars['evalfield'] = fieldobjs[evalfieldindex]
+
+    # Process template to produce source code
+    outputText = template.render(templateVars)
+
+    return outputText
+
+
+def generate_interpolation_routine(mesh, kernel):
+    # load templates
+    templateLoader = jinja2.FileSystemLoader(searchpath=template_path)
+
+    # create environment
+    templateEnv = jinja2.Environment(loader=templateLoader, trim_blocks=True)
+    templateVars = {}
+
+    ndims = mesh.ndim
+
+    # read the template
+    template = templateEnv.get_template('interpolation.template')
+
+    templateVars['bcs'] = mesh.bcs
+
+    # Load element specific information- offsets/offset mult
+
+    elem = kernel.elem
+
+    of, ofm = elem.get_entries(0, 0)
+    offsets_x = a_to_cinit_string(of)
+    offset_mult_x = a_to_cinit_string(ofm)
+    nentries_x = of.shape[0]
+
+    of, ofm = elem.get_entries(0, 1)
+    offsets_y = a_to_cinit_string(of)
+    offset_mult_y = a_to_cinit_string(ofm)
+    nentries_y = of.shape[0]
+
+    of, ofm = elem.get_entries(0, 2)
+    offsets_z = a_to_cinit_string(of)
+    offset_mult_z = a_to_cinit_string(ofm)
+    nentries_z = of.shape[0]
+
+    nentries_total = nentries_x * nentries_y * nentries_z
+    ndofs = elem._ndofs
+
+    # load fields info, including coordinates
+    field_args_string = ''
+    constant_args_string = ''
+    fieldobjs = []
+    # fielddict = {}
+    fieldplusconstantslist = []
+
+    # get the list of fields and constants
+    fieldlist = []
+    constantlist = []
+    for fieldindex in kernel.coefficient_map:
+        field = kernel.coefficients[fieldindex]
+        if isinstance(field, function.Function):
+            for si in range(field.function_space().nspaces):
+                fieldlist.append((field, si))
+                fieldplusconstantslist.append(field.name() + '_' + str(si) + '_vals')
+        if isinstance(field, Constant):
+            constantlist.append(field)
+            fieldplusconstantslist.append('&' + field.name())
+            # fieldplusconstantslist.append(field.name())
+            # BROKEN FOR VECTOR/TENSOR CONSTANTS
+    # print fieldplusconstantslist
+    # print kernel.ast
+
+    for field, si in fieldlist:
+        fspace = field.function_space().get_space(si)
+        fieldobj = FieldObject()
+        fieldobj.name = field.name() + '_' + str(si)
+        fieldobj.nbasis_x = []
+        fieldobj.nbasis_y = []
+        fieldobj.nbasis_z = []
+        fieldobj.offsets_x = []
+        fieldobj.offsets_y = []
+        fieldobj.offsets_z = []
+        fieldobj.offset_mult_x = []
+        fieldobj.offset_mult_y = []
+        fieldobj.offset_mult_z = []
+        fieldobj.nblocks_x = []
+        fieldobj.nblocks_y = []
+        fieldobj.nblocks_z = []
+        fieldobj.ndofs = fspace.get_space(si).themis_element().ndofs()
+        for ci in range(fspace.get_space(si).ncomp):
+            elem = fspace.get_space(si).themis_element()
+
+            nb = elem.get_nblocks(ci, 0)
+            of, ofm = elem.get_offsets(ci, 0)
+            fieldobj.offsets_x.append(a_to_cinit_string(of))
+            fieldobj.offset_mult_x.append(a_to_cinit_string(ofm))
+            # fieldobj.offsets_x.append(a_to_cinit_string(of[(nb-1)//2,:]))
+            # fieldobj.offset_mult_x.append(a_to_cinit_string(ofm[(nb-1)//2,:]))
+            fieldobj.nblocks_x.append(nb)
+            fieldobj.nbasis_x.append(of.shape[1])  # assumption that each block has the same number of basis functions, which is fundamental
+
+            nb = elem.get_nblocks(ci, 1)
+            of, ofm = elem.get_offsets(ci, 1)
+            fieldobj.offsets_y.append(a_to_cinit_string(of))
+            fieldobj.offset_mult_y.append(a_to_cinit_string(ofm))
+            # fieldobj.offsets_y.append(a_to_cinit_string(of[(nb-1)//2,:]))
+            # fieldobj.offset_mult_y.append(a_to_cinit_string(ofm[(nb-1)//2,:]))
+            fieldobj.nblocks_y.append(nb)
+            fieldobj.nbasis_y.append(of.shape[1])  # assumption that each block has the same number of basis functions, which is fundamental
+
+            nb = elem.get_nblocks(ci, 2)
+            of, ofm = elem.get_offsets(ci, 2)
+            fieldobj.offsets_z.append(a_to_cinit_string(of))
+            fieldobj.offset_mult_z.append(a_to_cinit_string(ofm))
+            # fieldobj.offsets_z.append(a_to_cinit_string(of[(nb-1)//2,:]))
+            # fieldobj.offset_mult_z.append(a_to_cinit_string(ofm[(nb-1)//2,:]))
+            fieldobj.nblocks_z.append(nb)
+            fieldobj.nbasis_z.append(of.shape[1])  # assumption that each block has the same number of basis functions, which is fundamental
+
+            dmname = 'DM da_' + fieldobj.name + '_' + str(ci)
+            vecname = 'Vec ' + fieldobj.name + '_' + str(ci)
+            field_args_string = field_args_string + ', ' + dmname
+            field_args_string = field_args_string + ', ' + vecname
+        fieldobj.nbasis_total = np.sum(np.array(fieldobj.nbasis_x, dtype=np.int32) * np.array(fieldobj.nbasis_y, dtype=np.int32) * np.array(fieldobj.nbasis_z, dtype=np.int32))
+        fieldobj.ncomp = fspace.get_space(si).ncomp
+
+        fieldobjs.append(fieldobj)
+
+    for constant in constantlist:
+        constant_args_string = constant_args_string + ',' + 'double ' + constant.name()
+
+    tabulations = []
+    arrpts = np.array(kernel.pts)
+    for tabulation in kernel.tabulations:
+
+        tabobj = TabObject()
+        tabobj.name = tabulation['name']
+
+        if tabulation['discont'] is False:
+            uflelem = FiniteElement("CG", interval, tabulation['order'], variant=tabulation['variant'])
+        if tabulation['discont'] is True:
+            uflelem = FiniteElement("DG", interval, tabulation['order'], variant=tabulation['variant'])
+        tabelem = ThemisElement(uflelem)
+        pts = arrpts[:, tabulation['shiftaxis']]
+
+        if tabulation['derivorder'] == 0:
+            vals = tabelem.get_basis(0, 0, pts)
+        if tabulation['derivorder'] == 1:
+            vals = tabelem.get_derivs(0, 0, pts)
+        if tabulation['derivorder'] == 2:
+            vals = tabelem.get_derivs2(0, 0, pts)
+
+        tabobj.values = a_to_cinit_string(vals)
+        tabobj.npts = vals.shape[1]
+        tabobj.nbasis = vals.shape[2]
+        tabobj.nblocks = vals.shape[0]
+        tabobj.shiftaxis = tabulation['shiftaxis']
+
+        tabobj.cell = 'bad'
+
+        # sanity checks
+        assert(tabulation['shape'] == vals.shape[1:])
+        assert(tabelem.get_nblocks(0, 0) == vals.shape[0])
+
+        tabulations.append(tabobj)
+
+        # construct element (or get it from the list of fields/space1/space2/coords)?
+        # add tabulations to templateVars
+    templateVars['tabulations'] = tabulations
+
+    # Specify the input variables for the template
+    templateVars['kernelstr'] = kernel.ast
+    templateVars['kernelname'] = kernel.name
+
+    templateVars['ndim'] = ndims
+
+    templateVars['nentries_total'] = nentries_total
+    templateVars['ndofs'] = ndofs
+
+    templateVars['offsets_x'] = offsets_x
+    templateVars['offset_mult_x'] = offset_mult_x
+    templateVars['nentries_x'] = nentries_x
+
+    templateVars['offsets_y'] = offsets_y
+    templateVars['offset_mult_y'] = offset_mult_y
+    templateVars['nentries_y'] = nentries_y
+
+    templateVars['offsets_z'] = offsets_z
+    templateVars['offset_mult_z'] = offset_mult_z
+    templateVars['nentries_z'] = nentries_z
+
+    templateVars['contx'] = elem.get_continuity(0, 0)
+    templateVars['conty'] = elem.get_continuity(0, 1)
+    templateVars['contz'] = elem.get_continuity(0, 2)
+
+    # fields
+    templateVars['fieldlist'] = fieldobjs
+    templateVars['fieldargs'] = field_args_string
+
+    # constants
+    templateVars['fieldplusconstantslist'] = fieldplusconstantslist
+    templateVars['constantargs'] = constant_args_string
 
     # Process template to produce source code
     outputText = template.render(templateVars)
