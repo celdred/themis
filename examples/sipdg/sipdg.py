@@ -1,4 +1,4 @@
-from common import PETSc, norm, dx, DumbCheckpoint, sin, inner, grad, avg, jump, ds, dS, FacetNormal, action, exp, cos
+from common import PETSc, norm, dx, DumbCheckpoint, sin, inner, grad, avg, jump, ds, dS, FacetNormal, action
 from common import FunctionSpace, SpatialCoordinate, Function, Projector, NonlinearVariationalProblem, NonlinearVariationalSolver
 from common import TestFunction, pi, TrialFunction
 from common import QuadCoefficient, ThemisQuadratureNumerical, ds_v, ds_t, ds_b, dS_h, dS_v
@@ -102,7 +102,7 @@ solver.solve()
 
 # compute norms
 l2err = norm(x - soln, norm_type='L2')
-l2directerr = norm(x- solnexpr, norm_type='L2')
+l2directerr = norm(x - solnexpr, norm_type='L2')
 PETSc.Sys.Print(l2err, l2directerr)
 
 # output
@@ -147,13 +147,10 @@ if plot:
     checkpoint.store_quad(directdiffquad)
     checkpoint.store_quad(coordsquad)
 
-
-
     from common import plot_function
     plot_function(x, xquad, coordsquad, 'x')
     plot_function(soln, solnquad, coordsquad, 'soln')
     plot_function(diff, diffquad, coordsquad, 'diff')
     plot_function(directdiff, directdiffquad, coordsquad, 'directdiff')
-    
-checkpoint.close()
 
+checkpoint.close()

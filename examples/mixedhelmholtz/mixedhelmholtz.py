@@ -1,6 +1,6 @@
 
 
-from common import PETSc, norm, dx, DumbCheckpoint, sin, inner, FILE_CREATE, exp, cos
+from common import PETSc, norm, dx, DumbCheckpoint, sin, inner, FILE_CREATE
 from common import FunctionSpace, SpatialCoordinate, Function, Projector, NonlinearVariationalProblem, NonlinearVariationalSolver
 from common import TestFunction, DirichletBC, pi, TestFunctions
 from common import QuadCoefficient, ThemisQuadratureNumerical
@@ -87,21 +87,27 @@ if ndims >= 3 and xbcs[2] == 'nonperiodic':
     ddfz = -36. / a / a * cos(6. * xs[2] / a)
 
 if ndims == 1:
-    if poisson: hrhsexpr = c * ddfx
-    else: hrhsexpr = c * (ddfx + fx)
+    if poisson:
+        hrhsexpr = c * ddfx
+    else:
+        hrhsexpr = c * (ddfx + fx)
     hsolnexpr = c * fx
     usolnexpr = c * dfx
     vecsolnexpr = as_vector((usolnexpr,))
 if ndims == 2:
-    if poisson: hrhsexpr = c * (ddfx * fy + fx * ddfy)
-    else: hrhsexpr = c * (ddfx * fy + fx * ddfy + fx * fy)
+    if poisson:
+        hrhsexpr = c * (ddfx * fy + fx * ddfy)
+    else:
+        hrhsexpr = c * (ddfx * fy + fx * ddfy + fx * fy)
     hsolnexpr = c * fx * fy
     usolnexpr = c * dfx * fy
     vsolnexpr = c * fx * dfy
     vecsolnexpr = as_vector((usolnexpr, vsolnexpr))
 if ndims == 3:
-    if poisson: hrhsexpr = c * (ddfx * fy * fz + fx * ddfy * fz + fx * fy * ddfz + fx * fy * fz)
-    else: hrhsexpr = c * (ddfx * fy * fz + fx * ddfy * fz + fx * fy * ddfz)
+    if poisson:
+        hrhsexpr = c * (ddfx * fy * fz + fx * ddfy * fz + fx * fy * ddfz + fx * fy * fz)
+    else:
+        hrhsexpr = c * (ddfx * fy * fz + fx * ddfy * fz + fx * fy * ddfz)
     hsolnexpr = c * fx * fy * fz
     usolnexpr = c * dfx * fy * fz
     vsolnexpr = c * fx * dfy * fz
@@ -227,7 +233,5 @@ if plot:
     plot_function(usoln, usolnquad, coordsquad, 'usoln')
     plot_function(udiff, udiffquad, coordsquad, 'udiff')
     plot_function(udirectdiff, udirectdiffquad, coordsquad, 'udirectdiff')
-    
+
 checkpoint.close()
-
-

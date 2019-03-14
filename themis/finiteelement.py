@@ -224,10 +224,10 @@ class ThemisElement():
             self._entries_om.append([])
             for elemname, degree, variant in zip(self._elemnamelist[ci], self._degreelist[ci], self._variantlist[ci]):
 
-                if elemname == 'DMSE': # this accounts for the fact that DMSE is built using CMSE basis from complex, which counts from 1!
+                if elemname == 'DMSE':  # this accounts for the fact that DMSE is built using CMSE basis from complex, which counts from 1!
                     sptsL2 = sptsl2 or ThemisQuadratureNumerical('gll', [degree+2]).get_pts()[0]
                 else:
-                    sptsL2 = sptsl2 or ThemisQuadratureNumerical('gll', [degree+1]).get_pts()[0] # count starts at 0
+                    sptsL2 = sptsl2 or ThemisQuadratureNumerical('gll', [degree+1]).get_pts()[0]  # count starts at 0
                 sptsH1 = sptsh1 or ThemisQuadratureNumerical('gll', [degree+1]).get_pts()[0]
                 # compute number of shape functions in each direction (=nbasis); and number of degrees of freedom per element
                 self._nbasis[ci].append(degree + 1)
