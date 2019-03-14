@@ -1,6 +1,6 @@
 
 
-from common import PETSc, errornorm, dx, DumbCheckpoint, sin, inner, FILE_CREATE
+from common import PETSc, norm, dx, DumbCheckpoint, sin, inner, FILE_CREATE, exp, cos
 from common import FunctionSpace, SpatialCoordinate, Function, Projector, NonlinearVariationalProblem, NonlinearVariationalSolver
 from common import TestFunction, DirichletBC, pi, TestFunctions
 from common import QuadCoefficient, ThemisQuadratureNumerical
@@ -10,6 +10,7 @@ from common import derivative
 
 OptDB = PETSc.Options()
 order = OptDB.getInt('order', 1)
+coordorder = OptDB.getInt('coordorder', 1)
 simname = OptDB.getString('simname', 'test')
 variant = OptDB.getString('variant', 'feec')
 xbc = OptDB.getString('xbc', 'nonperiodic')  # periodic nonperiodic
@@ -22,6 +23,8 @@ ndims = OptDB.getInt('ndims', 2)
 cell = OptDB.getString('cell', 'quad')
 plot = OptDB.getBool('plot', True)  # periodic nonperiodic
 mgd_lowest = OptDB.getBool('mgd_lowest', False)
+poisson = OptDB.getBool('poisson', False)
+c = OptDB.getScalar('c', 0.0)
 
 nquadplot_default = order
 if variant == 'mgd' and order > 1:
@@ -29,10 +32,10 @@ if variant == 'mgd' and order > 1:
 nquadplot = OptDB.getInt('nquadplot', nquadplot_default)
 xbcs = [xbc, ybc, zbc]
 
-PETSc.Sys.Print(variant, order, cell, ndims, xbc, ybc, zbc, nx, ny, nz)
+PETSc.Sys.Print(variant, order, cell, coordorder, xbc, ybc, zbc, nx, ny, nz)
 
 # create mesh and spaces
-mesh = create_mesh(nx, ny, nz, ndims, cell, xbcs)
+mesh = create_mesh(nx, ny, nz, ndims, cell, xbcs, c, coordorder)
 h1elem, l2elem, hdivelem, hcurlelem = create_elems(ndims, cell, variant, order)
 
 l2 = FunctionSpace(mesh, l2elem)
@@ -84,23 +87,26 @@ if ndims >= 3 and xbcs[2] == 'nonperiodic':
     ddfz = -36. / a / a * cos(6. * xs[2] / a)
 
 if ndims == 1:
-    hrhsexpr = c * (ddfx + fx)
+    if poisson: hrhsexpr = c * ddfx
+    else: hrhsexpr = c * (ddfx + fx)
     hsolnexpr = c * fx
     usolnexpr = c * dfx
-    vecsolnexpr = as_vector((1,)) * usolnexpr
+    vecsolnexpr = as_vector((usolnexpr,))
 if ndims == 2:
-    hrhsexpr = c * (ddfx * fy + fx * ddfy + fx * fy)
+    if poisson: hrhsexpr = c * (ddfx * fy + fx * ddfy)
+    else: hrhsexpr = c * (ddfx * fy + fx * ddfy + fx * fy)
     hsolnexpr = c * fx * fy
     usolnexpr = c * dfx * fy
     vsolnexpr = c * fx * dfy
-    vecsolnexpr = as_vector((1, 0)) * usolnexpr + as_vector((0, 1)) * vsolnexpr
+    vecsolnexpr = as_vector((usolnexpr, vsolnexpr))
 if ndims == 3:
-    hrhsexpr = c * (ddfx * fy * fz + fx * ddfy * fz + fx * fy * ddfz + fx * fy * fz)
+    if poisson: hrhsexpr = c * (ddfx * fy * fz + fx * ddfy * fz + fx * fy * ddfz + fx * fy * fz)
+    else: hrhsexpr = c * (ddfx * fy * fz + fx * ddfy * fz + fx * fy * ddfz)
     hsolnexpr = c * fx * fy * fz
     usolnexpr = c * dfx * fy * fz
     vsolnexpr = c * fx * dfy * fz
     wsolnexpr = c * fx * fy * dfz
-    vecsolnexpr = as_vector((1, 0, 0)) * usolnexpr + as_vector((0, 1, 0)) * vsolnexpr + as_vector((0, 0, 1)) * wsolnexpr
+    vecsolnexpr = as_vector((usolnexpr, vsolnexpr, wsolnexpr))
 
 # create soln and rhs
 hsoln = Function(l2, name='hsoln')
@@ -116,7 +122,10 @@ hrhsproj.project()
 
 
 # Create forms and problem
-Rlhs = (hhat * h + hhat * div(u) + inner(uhat, u) + div(uhat) * h) * dx
+if poisson:
+    Rlhs = (hhat * div(u) + inner(uhat, u) + div(uhat) * h) * dx
+else:
+    Rlhs = (hhat * h + hhat * div(u) + inner(uhat, u) + div(uhat) * h) * dx
 Rrhs = inner(hhat, hrhs) * dx
 
 # create solvers
@@ -135,10 +144,13 @@ solver = NonlinearVariationalSolver(problem, options_prefix='linsys_', solver_pa
 solver.solve()
 
 # compute norms
-hl2err = errornorm(h, hsoln, norm_type='L2')
-ul2err = errornorm(u, usoln, norm_type='L2')
-uhdiverr = errornorm(u, usoln, norm_type='Hdiv')
-PETSc.Sys.Print(hl2err, ul2err, uhdiverr)
+hl2err = norm(h - hsoln, norm_type='L2')
+ul2err = norm(u - usoln, norm_type='L2')
+uhdiverr = norm(u - usoln, norm_type='Hdiv')
+hl2directerr = norm(h - hsolnexpr, norm_type='L2')
+ul2directerr = norm(u - vecsolnexpr, norm_type='L2')
+uhdivdirecterr = norm(u - vecsolnexpr, norm_type='Hdiv')
+PETSc.Sys.Print(hl2err, ul2err, uhdiverr, hl2directerr, ul2directerr, uhdivdirecterr)
 
 # output
 checkpoint = DumbCheckpoint(simname, mode=FILE_CREATE)
@@ -156,43 +168,66 @@ udiffproj = Projector(u-usoln, udiff)  # options_prefix= 'masssys_'
 udiffproj.project()
 checkpoint.store(udiff)
 
+hdirectdiff = Function(l2, name='hdirectdiff')
+hdirectdiffproj = Projector(h-hsolnexpr, hdirectdiff)  # options_prefix= 'masssys_'
+hdirectdiffproj.project()
+checkpoint.store(hdirectdiff)
+udirectdiff = Function(hdiv, name='udirectdiff')
+udirectdiffproj = Projector(u-vecsolnexpr, udirectdiff)  # options_prefix= 'masssys_'
+udirectdiffproj.project()
+checkpoint.store(udirectdiff)
+
 checkpoint.write_attribute('fields/', 'hl2err', hl2err)
 checkpoint.write_attribute('fields/', 'ul2err', ul2err)
 checkpoint.write_attribute('fields/', 'uhdiverr', uhdiverr)
-
-# evaluate
-hsplit, usplit = x.split()
-evalquad = ThemisQuadratureNumerical('pascal', [nquadplot, ]*ndims)
-# THESE SHOULD BE L2 WHEN TSFC/UFL SUPPORTS IT PROPERLY...
-hquad = QuadCoefficient(mesh, 'scalar', 'h1', hsplit, evalquad, name='h_quad')
-hsolnquad = QuadCoefficient(mesh, 'scalar', 'h1', hsoln, evalquad, name='hsoln_quad')
-hdiffquad = QuadCoefficient(mesh, 'scalar', 'h1', hdiff, evalquad, name='hdiff_quad')
-uquad = QuadCoefficient(mesh, 'vector', 'hdiv', usplit, evalquad, name='u_quad')
-usolnquad = QuadCoefficient(mesh, 'vector', 'hdiv', usoln, evalquad, name='usoln_quad')
-udiffquad = QuadCoefficient(mesh, 'vector', 'hdiv', udiff, evalquad, name='udiff_quad')
-coordsquad = QuadCoefficient(mesh, 'vector', 'h1', mesh.coordinates, evalquad, name='coords_quad')
-hquad.evaluate()
-hsolnquad.evaluate()
-hdiffquad.evaluate()
-uquad.evaluate()
-usolnquad.evaluate()
-udiffquad.evaluate()
-coordsquad.evaluate()
-checkpoint.store_quad(hquad)
-checkpoint.store_quad(hsolnquad)
-checkpoint.store_quad(hdiffquad)
-checkpoint.store_quad(uquad)
-checkpoint.store_quad(usolnquad)
-checkpoint.store_quad(udiffquad)
-checkpoint.store_quad(coordsquad)
-
-checkpoint.close()
+checkpoint.write_attribute('fields/', 'hl2directerr', hl2directerr)
+checkpoint.write_attribute('fields/', 'ul2directerr', ul2directerr)
+checkpoint.write_attribute('fields/', 'uhdivdirecterr', uhdivdirecterr)
 
 if plot:
+
+    # evaluate
+    hsplit, usplit = x.split()
+    evalquad = ThemisQuadratureNumerical('pascal', [nquadplot, ]*ndims)
+    # THESE SHOULD BE L2 WHEN TSFC/UFL SUPPORTS IT PROPERLY...
+    hquad = QuadCoefficient(mesh, 'scalar', 'h1', hsplit, evalquad, name='h_quad')
+    hsolnquad = QuadCoefficient(mesh, 'scalar', 'h1', hsoln, evalquad, name='hsoln_quad')
+    hdiffquad = QuadCoefficient(mesh, 'scalar', 'h1', hdiff, evalquad, name='hdiff_quad')
+    hdirectdiffquad = QuadCoefficient(mesh, 'scalar', 'h1', hdirectdiff, evalquad, name='hdirectdiff_quad')
+    uquad = QuadCoefficient(mesh, 'vector', 'hdiv', usplit, evalquad, name='u_quad')
+    usolnquad = QuadCoefficient(mesh, 'vector', 'hdiv', usoln, evalquad, name='usoln_quad')
+    udiffquad = QuadCoefficient(mesh, 'vector', 'hdiv', udiff, evalquad, name='udiff_quad')
+    udirectdiffquad = QuadCoefficient(mesh, 'vector', 'hdiv', udirectdiff, evalquad, name='udirectdiff_quad')
+    coordsquad = QuadCoefficient(mesh, 'vector', 'h1', mesh.coordinates, evalquad, name='coords_quad')
+    hquad.evaluate()
+    hsolnquad.evaluate()
+    hdiffquad.evaluate()
+    hdirectdiffquad.evaluate()
+    uquad.evaluate()
+    usolnquad.evaluate()
+    udiffquad.evaluate()
+    udirectdiffquad.evaluate()
+    coordsquad.evaluate()
+    checkpoint.store_quad(hquad)
+    checkpoint.store_quad(hsolnquad)
+    checkpoint.store_quad(hdiffquad)
+    checkpoint.store_quad(hdirectdiffquad)
+    checkpoint.store_quad(uquad)
+    checkpoint.store_quad(usolnquad)
+    checkpoint.store_quad(udiffquad)
+    checkpoint.store_quad(udirectdiffquad)
+    checkpoint.store_quad(coordsquad)
+
     from common import plot_function
     plot_function(hsplit, hquad, coordsquad, 'h')
     plot_function(hsoln, hsolnquad, coordsquad, 'hsoln')
     plot_function(hdiff, hdiffquad, coordsquad, 'hdiff')
+    plot_function(hdirectdiff, hdirectdiffquad, coordsquad, 'hddirectiff')
     plot_function(usplit, uquad, coordsquad, 'u')
     plot_function(usoln, usolnquad, coordsquad, 'usoln')
     plot_function(udiff, udiffquad, coordsquad, 'udiff')
+    plot_function(udirectdiff, udirectdiffquad, coordsquad, 'udirectdiff')
+    
+checkpoint.close()
+
+

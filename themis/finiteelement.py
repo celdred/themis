@@ -224,7 +224,10 @@ class ThemisElement():
             self._entries_om.append([])
             for elemname, degree, variant in zip(self._elemnamelist[ci], self._degreelist[ci], self._variantlist[ci]):
 
-                sptsL2 = sptsl2 or ThemisQuadratureNumerical('gll', [degree+1]).get_pts()[0]  # this works because degree has already been adjusted!
+                if elemname == 'DMSE': # this accounts for the fact that DMSE is built using CMSE basis from complex, which counts from 1!
+                    sptsL2 = sptsl2 or ThemisQuadratureNumerical('gll', [degree+2]).get_pts()[0]
+                else:
+                    sptsL2 = sptsl2 or ThemisQuadratureNumerical('gll', [degree+1]).get_pts()[0] # count starts at 0
                 sptsH1 = sptsh1 or ThemisQuadratureNumerical('gll', [degree+1]).get_pts()[0]
                 # compute number of shape functions in each direction (=nbasis); and number of degrees of freedom per element
                 self._nbasis[ci].append(degree + 1)
@@ -283,7 +286,7 @@ class ThemisElement():
                 if elemname == 'CMSE':
                     b, d, d2, s = _CMSE_basis(degree, sptsH1)
                 if elemname == 'DMSE':
-                    b, d, d2, s = _DMSE_basis(degree, sptsH1)  # Note use of sptsH1 here, since DMSE basis is built from CMSE basis!
+                    b, d, d2, s = _DMSE_basis(degree, sptsL2)  # Note that sptsL2 here is actually the H1 spts from the compelx partner
                 self._basis[ci].append(b)
                 self._derivs[ci].append(d)
                 self._derivs2[ci].append(d2)

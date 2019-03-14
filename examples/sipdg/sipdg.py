@@ -1,4 +1,4 @@
-from common import PETSc, errornorm, dx, DumbCheckpoint, sin, inner, grad, avg, jump, ds, dS, FacetNormal, action
+from common import PETSc, norm, dx, DumbCheckpoint, sin, inner, grad, avg, jump, ds, dS, FacetNormal, action, exp, cos
 from common import FunctionSpace, SpatialCoordinate, Function, Projector, NonlinearVariationalProblem, NonlinearVariationalSolver
 from common import TestFunction, pi, TrialFunction
 from common import QuadCoefficient, ThemisQuadratureNumerical, ds_v, ds_t, ds_b, dS_h, dS_v
@@ -18,6 +18,8 @@ nz = OptDB.getInt('nz', 16)
 ndims = OptDB.getInt('ndims', 2)
 cell = OptDB.getString('cell', 'quad')
 plot = OptDB.getBool('plot', True)  # periodic nonperiodic
+c = OptDB.getScalar('c', 0.0)
+coordorder = OptDB.getInt('coordorder', 1)
 
 PETSc.Sys.Print(variant, order, cell, ndims, xbc, ybc, zbc, nx, ny, nz)
 
@@ -29,7 +31,7 @@ xbcs = [xbc, ybc, zbc]
 
 
 # create mesh and spaces
-mesh = create_mesh(nx, ny, nz, ndims, cell, xbcs)
+mesh = create_mesh(nx, ny, nz, ndims, cell, xbcs, c, coordorder)
 h1elem, l2elem, hdivelem, hcurlelem = create_elems(ndims, cell, variant, order+1)  # must use order + 1 here since this returns FEEC complex compatible L2
 
 l2 = FunctionSpace(mesh, l2elem)
@@ -40,8 +42,8 @@ xs = SpatialCoordinate(mesh)
 a = 1. / pi
 if ndims == 1:
     x = xs[0]
-    rhsexpr = (64. / a / a) * sin(4. * x / a)
-    solnexpr = 4. * sin(4. * x / a)
+    rhsexpr = (144. / a / a) * sin(6. * x / a)
+    solnexpr = 4. * sin(6. * x / a)
 if ndims == 2:
     x = xs[0]
     y = xs[1]
@@ -99,43 +101,59 @@ solver = NonlinearVariationalSolver(problem, options_prefix='linsys_', solver_pa
 solver.solve()
 
 # compute norms
-l2err = errornorm(x, soln, norm_type='L2')
-PETSc.Sys.Print(l2err)
+l2err = norm(x - soln, norm_type='L2')
+l2directerr = norm(x- solnexpr, norm_type='L2')
+PETSc.Sys.Print(l2err, l2directerr)
 
 # output
 checkpoint = DumbCheckpoint(simname)
 checkpoint.store(x)
 checkpoint.store(soln)
 checkpoint.store(mesh.coordinates)
+
+
 diff = Function(l2, name='diff')
 diffproj = Projector(x-soln, diff)  # options_prefix= 'masssys_'
 diffproj.project()
 checkpoint.store(diff)
 
+directdiff = Function(l2, name='directdiff')
+directdiffproj = Projector(x-solnexpr, directdiff)  # options_prefix= 'masssys_'
+directdiffproj.project()
+checkpoint.store(directdiff)
+
 checkpoint.write_attribute('fields/', 'l2err', l2err)
+checkpoint.write_attribute('fields/', 'l2directerr', l2directerr)
 
-
-# evaluate
-evalquad = ThemisQuadratureNumerical('pascal', [nquadplot, ])
-# SWAP TO L2 ONCE TSFC/UFL SUPPORT IT...
-xquad = QuadCoefficient(mesh, 'scalar', 'h1', x, evalquad, name='x_quad')
-solnquad = QuadCoefficient(mesh, 'scalar', 'h1', soln, evalquad, name='soln_quad')
-diffquad = QuadCoefficient(mesh, 'scalar', 'h1', diff, evalquad, name='diff_quad')
-coordsquad = QuadCoefficient(mesh, 'vector', 'h1', mesh.coordinates, evalquad, name='coords_quad')
-xquad.evaluate()
-solnquad.evaluate()
-diffquad.evaluate()
-coordsquad.evaluate()
-checkpoint.store_quad(xquad)
-checkpoint.store_quad(solnquad)
-checkpoint.store_quad(diffquad)
-checkpoint.store_quad(coordsquad)
-
-checkpoint.close()
 
 # plot
 if plot:
+    # evaluate
+    evalquad = ThemisQuadratureNumerical('pascal', [nquadplot, ])
+    # SWAP TO L2 ONCE TSFC/UFL SUPPORT IT...
+    xquad = QuadCoefficient(mesh, 'scalar', 'h1', x, evalquad, name='x_quad')
+    solnquad = QuadCoefficient(mesh, 'scalar', 'h1', soln, evalquad, name='soln_quad')
+    diffquad = QuadCoefficient(mesh, 'scalar', 'h1', diff, evalquad, name='diff_quad')
+    directdiffquad = QuadCoefficient(mesh, 'scalar', 'h1', directdiff, evalquad, name='directdiff_quad')
+    coordsquad = QuadCoefficient(mesh, 'vector', 'h1', mesh.coordinates, evalquad, name='coords_quad')
+    xquad.evaluate()
+    solnquad.evaluate()
+    diffquad.evaluate()
+    directdiffquad.evaluate()
+    coordsquad.evaluate()
+    checkpoint.store_quad(xquad)
+    checkpoint.store_quad(solnquad)
+    checkpoint.store_quad(diffquad)
+    checkpoint.store_quad(directdiffquad)
+    checkpoint.store_quad(coordsquad)
+
+
+
     from common import plot_function
     plot_function(x, xquad, coordsquad, 'x')
     plot_function(soln, solnquad, coordsquad, 'soln')
     plot_function(diff, diffquad, coordsquad, 'diff')
+    plot_function(directdiff, directdiffquad, coordsquad, 'directdiff')
+    
+checkpoint.close()
+

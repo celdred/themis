@@ -16,7 +16,7 @@ if backend == 'firedrake':
     from firedrake import FunctionSpace, MixedFunctionSpace
     from firedrake import Function
     from firedrake import TestFunction, TrialFunction, TestFunctions, TrialFunctions, derivative
-    from firedrake import errornorm
+    from firedrake import norm
     from firedrake import NonlinearVariationalProblem, NonlinearVariationalSolver
     from firedrake import Projector
     from firedrake import DumbCheckpoint
@@ -50,12 +50,13 @@ if backend == 'themis':
     from functionspace import FunctionSpace, MixedFunctionSpace
     from function import Function
     from ufl_expr import TestFunction, TrialFunction, TestFunctions, TrialFunctions, derivative
-    from norms import errornorm
+    from norms import norm
     from solver import NonlinearVariationalProblem, NonlinearVariationalSolver
     from project import Projector
     from checkpointer import Checkpoint as DumbCheckpoint
     from checkpointer import FILE_READ, FILE_UPDATE, FILE_CREATE
-
+    from mesh import SingleBlockMesh
+    
     from evaluate import QuadCoefficient
     from quadrature import ThemisQuadratureNumerical
 
@@ -141,7 +142,34 @@ if backend == 'themis':
         plt.close('all')
 
 
-def create_mesh(nx, ny, nz, ndims, cell, xbcs):
+def set_mesh_coordinate_order(mesh,bcs,ndims,coordorder):
+
+# THIS BREAKS HORRIBLY FOR EXTRUDED MESHES WITH TP COORDINATE ELEMENTS!
+    if ndims == 1:
+        if bcs[0] == 'nonperiodic':
+            celem = FiniteElement("CG", interval, coordorder, variant='feec')
+        else:
+            celem = FiniteElement("DG", interval, coordorder, variant='feec')
+    if ndims == 2:
+        if bcs[0] == 'nonperiodic' and bcs[1] == 'nonperiodic':
+            celem = FiniteElement("Q", quadrilateral, coordorder, variant='feec')
+        else:
+            celem = FiniteElement("DQ", quadrilateral, coordorder, variant='feec')
+    if ndims == 3:
+        if bcs[0] == 'nonperiodic' and bcs[1] == 'nonperiodic' and bcs[2] == 'nonperiodic':
+            celem = FiniteElement("Q", hexahedron, coordorder, variant='feec')
+        else:
+            celem = FiniteElement("DQ", hexahedron, coordorder, variant='feec')
+    if backend == 'themis':
+        return SingleBlockMesh(mesh.nxs, mesh.bcs,coordelem=celem)
+    if backend == 'firedrake':
+        vcelem = VectorElement(celem, dim=ndims)
+        coordspace = FunctionSpace(mesh, vcelem)
+        newcoords = Function(coordspace)
+        newcoords.interpolate(SpatialCoordinate(mesh))
+        return Mesh(newcoords)
+        
+def create_mesh(nx, ny, nz, ndims, cell, xbcs, c, coordorder):
     if cell in ['quad', 'tphex']:
         use_quad = True
     if cell in ['tri', 'tptri']:
@@ -152,6 +180,7 @@ def create_mesh(nx, ny, nz, ndims, cell, xbcs):
             mesh = IntervalMesh(nx, 1.0)
         if xbcs[0] == 'periodic':
             mesh = PeriodicIntervalMesh(nx, 1.0)
+    
     if ndims == 2 and cell in ['tri', 'quad']:
         if xbcs[0] == 'periodic' and xbcs[1] == 'periodic':
             mesh = PeriodicSquareMesh(nx, ny, 1.0, quadrilateral=use_quad)
@@ -184,7 +213,21 @@ def create_mesh(nx, ny, nz, ndims, cell, xbcs):
         if xbcs[0] == 'nonperiodic' and xbcs[1] == 'periodic':
             bmesh = PeriodicSquareMesh(nx, ny, 1.0, direction='y', quadrilateral=use_quad)
         mesh = ExtrudedMesh(bmesh, nz)
-    return mesh
+    
+    # Upgrade coordinate order if needed
+    if coordorder > 1: newmesh = set_mesh_coordinate_order(mesh,xbcs,ndims,coordorder)
+    else: newmesh = mesh
+    
+    # Distort coordinates
+    xs = SpatialCoordinate(newmesh)
+    newcoords = Function(newmesh.coordinates.function_space(), name='newcoords')
+    if ndims == 1: xlist = [xs[0] + c * sin(2*pi*xs[0]),]
+    if ndims == 2: xlist = [xs[0] + c * sin(2*pi*xs[0])*sin(2*pi*xs[1]),xs[1] + c * sin(2*pi*xs[0])*sin(2*pi*xs[1])]
+    if ndims == 3: xlist = [xs[0] + c * sin(2*pi*xs[0])*sin(2*pi*xs[1])*sin(2*pi*xs[2]),xs[1] + c * sin(2*pi*xs[0])*sin(2*pi*xs[1])*sin(2*pi*xs[2]),xs[2] + c * sin(2*pi*xs[0])*sin(2*pi*xs[1])*sin(2*pi*xs[2])]
+    newcoords.interpolate(as_vector(xlist))
+    newmesh.coordinates.assign(newcoords)
+    
+    return newmesh
 
 
 def create_elems(ndims, cell, variant, order):

@@ -22,20 +22,6 @@ def errornorm(u, uh, norm_type="L2"):
 
     if not isinstance(uh, Function):
         raise ValueError("uh should be a Function, is a %r", type(uh))
-    # ADD THIS BACK IN!
-    # if isinstance(u, Function):
-        # degree_u = u.function_space().ufl_element().degree()
-        # degree_uh = uh.function_space().ufl_element().degree()
-        # if degree_uh > degree_u:
-        # warning("Degree of exact solution less than approximation degree")
-
-    # UGLY HACK NEEDED SINCE DEGREE ESTIMATION IN FIAT IS BROKEN FOR TENSOR PRODUCTS WITH MORE THAN 2 COMPONENTS
-
-    # if isinstance(degree_u,int):
-        # maxdegree = max(degree_u,degree_uh)
-    # else:
-        # maxdegree =  max(max(degree_u),max(degree_uh))
-    # maxdegree = 3  # HACK
 
     return norm(u - uh, norm_type=norm_type)  # degree=maxdegree
 
