@@ -9,6 +9,7 @@ from common import derivative
 
 OptDB = PETSc.Options()
 order = OptDB.getInt('order', 1)
+coordorder = OptDB.getInt('coordorder', 1)
 simname = OptDB.getString('simname', 'test')
 variant = OptDB.getString('variant', 'feec')
 lambdaa = Constant(OptDB.getScalar('lambda', 5.0))
@@ -19,6 +20,7 @@ ndims = OptDB.getInt('ndims', 2)
 cell = OptDB.getString('cell', 'quad')
 plot = OptDB.getBool('plot', True)
 mgd_lowest = OptDB.getBool('mgd_lowest', False)
+c = OptDB.getScalar('c', 0.0)
 
 nquadplot_default = order
 if variant == 'mgd' and order > 1:
@@ -29,7 +31,7 @@ PETSc.Sys.Print(variant, order, cell, ndims, nx, ny, nz)
 
 # create mesh and spaces
 xbcs = ['nonperiodic', 'nonperiodic', 'nonperiodic']
-mesh = create_mesh(nx, ny, nz, ndims, cell, xbcs)
+mesh = create_mesh(nx, ny, nz, ndims, cell, xbcs, c, coordorder)
 h1elem, l2elem, hdivelem, hcurlelem = create_elems(ndims, cell, variant, order)
 
 h1 = FunctionSpace(mesh, h1elem)
@@ -68,17 +70,17 @@ checkpoint.store(x)
 checkpoint.store(mesh.coordinates)
 
 # evaluate
-evalquad = ThemisQuadratureNumerical('pascal', [nquadplot, ]*ndims)
-xquad = QuadCoefficient(mesh, 'scalar', 'h1', x, evalquad, name='x_quad')
-coordsquad = QuadCoefficient(mesh, 'vector', 'h1', mesh.coordinates, evalquad, name='coords_quad')
-xquad.evaluate()
-coordsquad.evaluate()
-checkpoint.store_quad(xquad)
-checkpoint.store_quad(coordsquad)
-
-checkpoint.close()
-
 # plot
 if plot:
+    evalquad = ThemisQuadratureNumerical('pascal', [nquadplot, ]*ndims)
+    xquad = QuadCoefficient(mesh, 'scalar', 'h1', x, evalquad, name='x_quad')
+    coordsquad = QuadCoefficient(mesh, 'vector', 'h1', mesh.coordinates, evalquad, name='coords_quad')
+    xquad.evaluate()
+    coordsquad.evaluate()
+    checkpoint.store_quad(xquad)
+    checkpoint.store_quad(coordsquad)
+
     from common import plot_function
     plot_function(x, xquad, coordsquad, 'x')
+
+checkpoint.close()
