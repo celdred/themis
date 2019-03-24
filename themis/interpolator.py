@@ -3,18 +3,18 @@ import numpy as np
 from tsfc import compile_expression_at_points as compile_ufl_kernel
 import ufl
 import function
-import tsfc.kernel_interface.themis as themis_interface
+import tsfc.kernel_interface.firedrake as kernel_interface
 from petscshim import PETSc
 from assembly import extract_fields, compile_functional
 
 
-def interpolate(expr, V):
-    return Interpolator(expr, V).interpolate()
+def interpolate(expr, V, overwrite_pts=None):
+    return Interpolator(expr, V, overwrite_pts=overwrite_pts).interpolate()
 
 
 class Interpolator():
 
-    def __init__(self, expr, V):
+    def __init__(self, expr, V, overwrite_pts=None):
         assert isinstance(expr, ufl.classes.Expr)
         if isinstance(V, function.Function):
             f = V
@@ -49,9 +49,12 @@ class Interpolator():
         mesh = V.ufl_domain()
         to_element = V.themis_element()
 
-        ptsx = np.array(to_element.get_spts(0, 0))
-        ptsy = np.array(to_element.get_spts(0, 1))
-        ptsz = np.array(to_element.get_spts(0, 2))
+        if overwrite_pts is None:
+            ptsx = np.array(to_element.sub_elements[0][0].spts)
+            ptsy = np.array(to_element.sub_elements[0][1].spts)
+            ptsz = np.array(to_element.sub_elements[0][2].spts)
+        else:
+            ptsx,ptsy,ptsz = overwrite_pts
         to_pts = []
         for lx in range(ptsx.shape[0]):
             for ly in range(ptsy.shape[0]):
@@ -64,7 +67,7 @@ class Interpolator():
                         loc = np.array([ptsx[lx], ptsy[ly], ptsz[lz]])
                     to_pts.append(loc)
 
-        ast, oriented, needs_cell_sizes, coefficients, tabulations = compile_ufl_kernel(expr, to_pts, mesh.coordinates, interface=themis_interface)
+        ast, oriented, needs_cell_sizes, coefficients, tabulations = compile_ufl_kernel(expr, to_pts, mesh.coordinates, interface=kernel_interface.ExpressionKernelBuilder)
 
         # process tabulations
         processed_tabulations = []
@@ -105,7 +108,6 @@ class InterpolationKernel():
         self.assemblycompiled = False
         self.interpolate = True
         self.zero = False
-        self.evaluate = False
 
         self.pts = pts
         self.elem = elem

@@ -1,30 +1,32 @@
 import numpy as np
-from ufl import VectorElement, TensorProductElement, EnrichedElement, HDivElement, HCurlElement, FiniteElement
+from ufl import VectorElement, TensorProductElement, EnrichedElement, HDivElement, HCurlElement, FiniteElement, TensorElement
 import sympy
-from lagrange import lagrange_poly_support  # gauss_lobatto,
-from quadrature import ThemisQuadratureNumerical
+from lagrange import lagrange_poly_support, gauss_lobatto
 
-# from petscshim import PETSc
-
-variant_to_elemname = {}
-variant_to_elemname['feecH1'] = 'CG'
-variant_to_elemname['feecL2'] = 'DG'
-variant_to_elemname['mseH1'] = 'CMSE'
-variant_to_elemname['mseL2'] = 'DMSE'
-variant_to_elemname['qbH1'] = 'CQB'
-variant_to_elemname['qbL2'] = 'DQB'
-variant_to_elemname['mgdH1'] = 'GD'
-variant_to_elemname['mgdL2'] = 'DGD'
-
+def GaussLobattoLegendre1D(n):
+    if n == 1:  # THIS IS USEFUL FOR DISPERSION STUFF (FOR GETTING SPTS CORRECT FOR DG0 SPACES) DESPITE NOT ACTUALLY EXISTING
+        pts = np.array([0., ], dtype=np.float64)
+    if n == 2:
+        pts = np.array([-1., 1.], dtype=np.float64)
+    if n >= 3:
+        pts = np.array(gauss_lobatto(n), dtype=np.float64)
+        x = sympy.var('x')
+        p = sympy.polys.orthopolys.legendre_poly(n-1, x)  # legendre_poly(n)
+        interior_pts = pts[1:-1]
+        p = sympy.polys.orthopolys.legendre_poly(n-1, x)  # legendre_poly(n)
+        pfunc = sympy.lambdify(x, p, "numpy")
+        pnum = pfunc(interior_pts)
+    return 0.5 * pts + 0.5 # scale pts to [0,1]
 
 def extract_element_info(elem):
     degree = elem.degree()
     variant = elem.variant()
     if variant is None:
-        variant = 'feec'
+        raise ValueError("Themis only supports elements with variant set")
+    if not variant in ['mgd', 'feec', 'mse', 'qb']:
+        raise ValueError('Themis doesnt know how to handle variant %s', variant)
 
     degreelist = []
-    elemnamelist = []
     variantlist = []
     contlist = []
 
@@ -33,10 +35,8 @@ def extract_element_info(elem):
         degreelist.append([degree, ])
         variantlist.append([variant, ])
         if elem.family() == 'Discontinuous Lagrange':
-            elemnamelist.append([variant_to_elemname[variant + 'L2'], ])
             contlist.append(['L2', ])
         elif elem.family() == 'Lagrange':
-            elemnamelist.append([variant_to_elemname[variant + 'H1'], ])
             contlist.append(['H1', ])
         else:
             raise ValueError('themis supports only CG/DG on intervals')
@@ -46,10 +46,8 @@ def extract_element_info(elem):
             variantlist.append([variant, variant])
             degreelist.append([degree, degree])
             if elem.family() == 'DQ':
-                elemnamelist.append([variant_to_elemname[variant + 'L2'], variant_to_elemname[variant + 'L2']])
                 contlist.append(['L2', 'L2', ])
             if elem.family() == 'Q':
-                elemnamelist.append([variant_to_elemname[variant + 'H1'], variant_to_elemname[variant + 'H1']])
                 contlist.append(['H1', 'H1', ])
             ncomp = 1
         elif elem.family() == 'RTCF':
@@ -59,8 +57,6 @@ def extract_element_info(elem):
             degreelist.append([degree-1, degree])
             contlist.append(['H1', 'L2'])
             contlist.append(['L2', 'H1'])
-            elemnamelist.append([variant_to_elemname[variant + 'H1'], variant_to_elemname[variant + 'L2']])
-            elemnamelist.append([variant_to_elemname[variant + 'L2'], variant_to_elemname[variant + 'H1']])
             ncomp = 2
         elif elem.family() == 'RTCE':
             variantlist.append([variant, variant])
@@ -69,8 +65,6 @@ def extract_element_info(elem):
             degreelist.append([degree, degree-1])
             contlist.append(['L2', 'H1'])
             contlist.append(['H1', 'L2'])
-            elemnamelist.append([variant_to_elemname[variant + 'L2'], variant_to_elemname[variant + 'H1']])
-            elemnamelist.append([variant_to_elemname[variant + 'H1'], variant_to_elemname[variant + 'L2']])
             ncomp = 2
         else:
             raise ValueError('themis supports only Q/DQ/RTCF/RTCE on quads')
@@ -80,10 +74,8 @@ def extract_element_info(elem):
             variantlist.append([variant, variant, variant])
             degreelist.append([degree, degree, degree])
             if elem.family() == 'DQ':
-                elemnamelist.append([variant_to_elemname[variant + 'L2'], variant_to_elemname[variant + 'L2'], variant_to_elemname[variant + 'L2']])
                 contlist.append(['L2', 'L2', 'L2'])
             if elem.family() == 'Q':
-                elemnamelist.append([variant_to_elemname[variant + 'H1'], variant_to_elemname[variant + 'H1'], variant_to_elemname[variant + 'H1']])
                 contlist.append(['H1', 'H1', 'H1'])
             ncomp = 1
         elif elem.family() == 'NCF':
@@ -96,9 +88,6 @@ def extract_element_info(elem):
             contlist.append(['H1', 'L2', 'L2'])
             contlist.append(['L2', 'H1', 'L2'])
             contlist.append(['L2', 'L2', 'H1'])
-            elemnamelist.append([variant_to_elemname[variant + 'H1'], variant_to_elemname[variant + 'L2'], variant_to_elemname[variant + 'L2']])
-            elemnamelist.append([variant_to_elemname[variant + 'L2'], variant_to_elemname[variant + 'H1'], variant_to_elemname[variant + 'L2']])
-            elemnamelist.append([variant_to_elemname[variant + 'L2'], variant_to_elemname[variant + 'L2'], variant_to_elemname[variant + 'H1']])
             ncomp = 3
         elif elem.family() == 'NCE':
             variantlist.append([variant, variant, variant])
@@ -110,48 +99,43 @@ def extract_element_info(elem):
             contlist.append(['L2', 'H1', 'H1'])
             contlist.append(['H1', 'L2', 'H1'])
             contlist.append(['H1', 'H1', 'L2'])
-            elemnamelist.append([variant_to_elemname[variant + 'L2'], variant_to_elemname[variant + 'H1'], variant_to_elemname[variant + 'H1']])
-            elemnamelist.append([variant_to_elemname[variant + 'H1'], variant_to_elemname[variant + 'L2'], variant_to_elemname[variant + 'H1']])
-            elemnamelist.append([variant_to_elemname[variant + 'H1'], variant_to_elemname[variant + 'H1'], variant_to_elemname[variant + 'L2']])
             ncomp = 3
         else:
             raise ValueError('themis supports only Q/DQ/NCF/NCE on hexahedrons')
     else:
         raise ValueError('Themis does not support this cell type')
 
-    return ncomp, variantlist, degreelist, elemnamelist, contlist
+    return ncomp, variantlist, degreelist, contlist
 
 
 def flatten_tp_element(elem1, elem2):
-    ncomp1, variantlist1, degreelist1, elemnamelist1, contlist1 = extract_element_info(elem1)
-    ncomp2, variantlist2, degreelist2, elemnamelist2, contlist2 = extract_element_info(elem2)
+    ncomp1, variantlist1, degreelist1, contlist1 = extract_element_info(elem1)
+    ncomp2, variantlist2, degreelist2, contlist2 = extract_element_info(elem2)
     for c1 in range(ncomp1):
         variantlist1[c1].append(variantlist2[0][0])
         degreelist1[c1].append(degreelist2[0][0])
-        elemnamelist1[c1].append(elemnamelist2[0][0])
         contlist1[c1].append(contlist2[0][0])
-    return ncomp1, variantlist1, degreelist1, elemnamelist1, contlist1
+    return ncomp1, variantlist1, degreelist1, contlist1
 
 
 def merge_enriched_element(elem1, elem2):
     if isinstance(elem1, FiniteElement):
-        ncomp1, variantlist1, degreelist1, elemnamelist1, contlist1 = extract_element_info(elem1)
+        ncomp1, variantlist1, degreelist1, contlist1 = extract_element_info(elem1)
     elif isinstance(elem1, TensorProductElement):
         subelem1, subelem2 = elem1.sub_elements()
-        ncomp1, variantlist1, degreelist1, elemnamelist1, contlist1 = flatten_tp_element(subelem1, subelem2)
+        ncomp1, variantlist1, degreelist1, contlist1 = flatten_tp_element(subelem1, subelem2)
 
     if isinstance(elem2, FiniteElement):
-        ncomp2, variantlist2, degreelist2, elemnamelist2, contlist2 = extract_element_info(elem2)
+        ncomp2, variantlist2, degreelist2, contlist2 = extract_element_info(elem2)
     elif isinstance(elem2, TensorProductElement):
         subelem1, subelem2 = elem2.sub_elements()
-        ncomp2, variantlist2, degreelist2, elemnamelist2, contlist2 = flatten_tp_element(subelem1, subelem2)
+        ncomp2, variantlist2, degreelist2, contlist2 = flatten_tp_element(subelem1, subelem2)
 
     ncomp = ncomp1 + ncomp2
     variantlist = variantlist1 + variantlist2
     degreelist = degreelist1 + degreelist2
-    elemnamelist = elemnamelist1 + elemnamelist2
     contlist = contlist1 + contlist2
-    return ncomp, variantlist, degreelist, elemnamelist, contlist
+    return ncomp, variantlist, degreelist, contlist
 
 
 class ThemisElement():
@@ -161,7 +145,10 @@ class ThemisElement():
     def __init__(self, elem, sptsh1=None, sptsl2=None):
 
         # ADD SUPPORT FOR TENSOR ELEMENTS
-        if isinstance(elem, VectorElement):
+        if isinstance(elem, TensorElement):
+            self._ndofs = elem.value_size() # IS THIS CORRECT?
+# CHECK THIS
+        elif isinstance(elem, VectorElement):
             self._ndofs = elem.value_size()  # do this BEFORE extracting baseelem
             elem = elem.sub_elements()[0]
         else:
@@ -176,23 +163,23 @@ class ThemisElement():
                 raise ValueError('Themis supports only EnrichedElement made of 2 HDiv/HCurl elements')
             if not ((isinstance(elem1, FiniteElement) or isinstance(elem1, TensorProductElement)) and (isinstance(elem2, FiniteElement) or isinstance(elem2, TensorProductElement))):
                 raise ValueError('Themis supports only EnrichedElement made of 2 HDiv/HCurl elements that are themselves FiniteElement or TensorProductElement')
-            ncomp, variantlist, degreelist, elemnamelist, contlist = merge_enriched_element(elem1, elem2)
+            ncomp, variantlist, degreelist, contlist = merge_enriched_element(elem1, elem2)
         elif isinstance(elem, TensorProductElement):
             elem1, elem2 = elem.sub_elements()
             if not (elem2.cell().cellname() == 'interval'):
                 raise ValueError('Themis only supports tensor product elements with the second element on an interval')
             if not (isinstance(elem1, FiniteElement) and isinstance(elem2, FiniteElement)):
                 raise ValueError('Themis supports only tensor product elements of FiniteElement')
-            ncomp, variantlist, degreelist, elemnamelist, contlist = flatten_tp_element(elem1, elem2)
+            ncomp, variantlist, degreelist, contlist = flatten_tp_element(elem1, elem2)
         elif isinstance(elem, FiniteElement):
-            ncomp, variantlist, degreelist, elemnamelist, contlist = extract_element_info(elem)
+            ncomp, variantlist, degreelist, contlist = extract_element_info(elem)
         else:
             raise ValueError('Themis supports only FiniteElemet, EnrichedElement and TensorProductElement')
 
         self._cont = elem.sobolev_space()
 
+
         self._ncomp = ncomp
-        self._elemnamelist = elemnamelist
         self._degreelist = degreelist
         self._contlist = contlist
         self._variantlist = variantlist
@@ -209,6 +196,10 @@ class ThemisElement():
         self._entries_of = []
         self._entries_om = []
 
+        self.interpolatory = True
+        if self._ncomp > 1:
+            self.interpolatory = False
+
         for ci in range(self._ncomp):
 
             self._nbasis.append([])
@@ -222,71 +213,75 @@ class ThemisElement():
             self._spts.append([])
             self._entries_of.append([])
             self._entries_om.append([])
-            for elemname, degree, variant in zip(self._elemnamelist[ci], self._degreelist[ci], self._variantlist[ci]):
+            for degree, variant, cont in zip(self._degreelist[ci], self._variantlist[ci], self._contlist[ci]):
 
-                if elemname == 'DMSE':  # this accounts for the fact that DMSE is built using CMSE basis from complex, which counts from 1!
-                    sptsL2 = sptsl2 or ThemisQuadratureNumerical('gll', [degree+2]).get_pts()[0]
+                if not ((variant in ['mse', 'feec', 'mgd'] and cont == 'H1') or (variant == 'feec' and cont == 'L2')):
+                    self.interpolatory = False
+
+                if variant == 'mse' and cont == 'L2':  # this accounts for the fact that DMSE is built using CMSE basis from complex, which counts from 1!
+                    sptsL2 = sptsl2 or GaussLobattoLegendre1D(degree+2)
                 else:
-                    sptsL2 = sptsl2 or ThemisQuadratureNumerical('gll', [degree+1]).get_pts()[0]  # count starts at 0
-                sptsH1 = sptsh1 or ThemisQuadratureNumerical('gll', [degree+1]).get_pts()[0]
+                    sptsL2 = sptsl2 or GaussLobattoLegendre1D(degree+1)  # count starts at 0
+                sptsH1 = sptsh1 or GaussLobattoLegendre1D(degree+1)
+
                 # compute number of shape functions in each direction (=nbasis); and number of degrees of freedom per element
                 self._nbasis[ci].append(degree + 1)
-                if elemname in ['CG', 'CQB', 'CMSE']:
+                if variant in ['feec', 'mse', 'qb'] and cont == 'H1':
                     self._ndofs_per_element[ci].append(degree)
-                if elemname in ['DG', 'DQB', 'DMSE']:
+                if variant in ['feec', 'mse', 'qb'] and cont == 'L2':
                     self._ndofs_per_element[ci].append(degree + 1)
-                if elemname in ['GD', 'DGD']:
+                if variant == 'mgd':
                     self._ndofs_per_element[ci].append(1)
 
                 # set the number of blocks
-                if elemname in ['CG', 'CQB', 'CMSE', 'DG', 'DQB', 'DMSE']:
+                if variant in ['feec', 'qb', 'mse']:
                     self._nblocks[ci].append(1)
-                if elemname == 'GD':
+                if variant == 'mgd' and cont == 'H1':
                     self._nblocks[ci].append(degree)
-                if elemname == 'DGD':
+                if variant == 'mgd' and cont == 'L2':
                     self._nblocks[ci].append(degree+1)
 
                 # compute offsets and offset mults
-                if elemname in ['CG', 'CQB', 'CMSE']:
+                if variant in ['feec', 'mse', 'qb'] and cont == 'H1':
                     of, om = _CG_offset_info(degree)
-                if elemname in ['DG', 'DQB', 'DMSE']:
+                if variant in ['feec', 'mse', 'qb'] and cont == 'L2':
                     of, om = _DG_offset_info(degree)
-                if elemname == 'GD':
+                if variant == 'mgd' and cont == 'H1':
                     of, om = _GD_offset_info(degree)
-                if elemname == 'DGD':
+                if variant == 'mgd' and cont == 'L2':
                     of, om = _DGD_offset_info(degree)
                 self._offsets[ci].append(of)
                 self._offset_mult[ci].append(om)
 
                 # compute entries
-                if elemname in ['CG', 'CQB', 'CMSE']:
+                if variant in ['feec', 'mse', 'qb'] and cont == 'H1':
                     of, om = _CG_entries_info(degree)
-                if elemname in ['DG', 'DQB', 'DMSE']:
+                if variant in ['feec', 'mse', 'qb'] and cont == 'L2':
                     of, om = _DG_entries_info(degree)
-                if elemname == 'GD':
+                if variant == 'mgd' and cont == 'H1':
                     of, om = _GD_entries_info(degree)
-                if elemname == 'DGD':
+                if variant == 'mgd' and cont == 'L2':
                     of, om = _DGD_entries_info(degree)
                 self._entries_of[ci].append(of)
                 self._entries_om[ci].append(om)
 
                 # compute basis and deriv functions
-                if elemname == 'CG':
+                if variant == 'feec' and cont == 'H1':
                     b, d, d2, s = _CG_basis(degree, sptsH1)
-                if elemname == 'DG':
+                if variant == 'feec' and cont == 'L2':
                     b, d, d2, s = _DG_basis(degree, sptsL2)
-                if elemname == 'GD':
+                if variant == 'mgd' and cont == 'H1':
                     b, d, d2, s = _GD_basis(degree)
-                if elemname == 'DGD':
+                if variant == 'mgd' and cont == 'L2':
                     b, d, d2, s = _DGD_basis(degree)
-                if elemname == 'CQB':
+                if variant == 'qb' and cont == 'H1':
                     b, d, d2, s = _CQB_basis(degree)
-                if elemname == 'DQB':
+                if variant == 'qb' and cont == 'L2':
                     b, d, d2, s = _DQB_basis(degree)
-                if elemname == 'CMSE':
+                if variant == 'mse' and cont == 'H1':
                     b, d, d2, s = _CMSE_basis(degree, sptsH1)
-                if elemname == 'DMSE':
-                    b, d, d2, s = _DMSE_basis(degree, sptsL2)  # Note that sptsL2 here is actually the H1 spts from the compelx partner
+                if variant == 'mse' and cont == 'L2':
+                    b, d, d2, s = _DMSE_basis(degree, sptsL2)  # Note that sptsL2 here is actually the H1 spts for degree+1
                 self._basis[ci].append(b)
                 self._derivs[ci].append(d)
                 self._derivs2[ci].append(d2)
@@ -312,33 +307,27 @@ class ThemisElement():
         return self._contlist[ci][direc]
 
     def get_nx(self, ci, direc, ncell, bc):
-        fam = self._elemnamelist[ci][direc]
-        if fam in ['CG', 'CQB', 'CMSE']:
+        variant = self._variantlist[ci][direc]
+        cont = self._contlist[ci][direc]
+        if variant in ['feec', 'mse', 'qb'] and cont == 'H1':
             nx = self._degreelist[ci][direc] * ncell
             if (bc == 'nonperiodic'):
                 nx = nx + 1
-        if fam in ['DG', 'DQB', 'DMSE']:
+        if variant in ['feec', 'mse', 'qb'] and cont == 'L2':
             nx = (self._degreelist[ci][direc]+1) * ncell
-        if fam == 'GD':
+        if variant == 'mgd' and cont == 'H1':
             nx = ncell
             if (bc == 'nonperiodic'):
                 nx = nx + 1
-        if fam == 'DGD':
+        if variant == 'mgd' and cont == 'L2':
             nx = ncell
         return nx
 
     def ndofs(self):
         return self._ndofs
 
-    def get_nbasis(self, ci, direc):
-        return self._nbasis[ci][direc]
-
     def get_ndofs_per_element(self, ci, direc):
         return self._ndofs_per_element[ci][direc]
-
-    def get_local_size(self):
-        bprod = np.prod(self._nbasis)
-        return [bprod, self._ndofs]
 
     def get_entries(self, ci, direc):
         return self._entries_of[ci][direc], self._entries_om[ci][direc]
@@ -475,26 +464,9 @@ class ThemisElement():
                     basis_derivs2[bi, :, i] = np.squeeze(deriv2(x))
         return basis_derivs2
 
-    def get_icells(self, ci, direc, ncell, bc, interior_facet):
-        elemname = self._elemnamelist[ci][direc]
-        degree = self._degreelist[ci][direc]
-        if elemname in ['CG', 'CQB', 'CMSE']:
-            return _CG_interaction_cells(ncell, bc, interior_facet, degree)
-        if elemname in ['DG', 'DQB', 'DMSE']:
-            return _DG_interaction_cells(ncell, bc, interior_facet, degree)
-        if elemname == 'GD':
-            return _GD_interaction_cells(ncell, bc, interior_facet, degree)
-        if elemname == 'DGD':
-            return _DGD_interaction_cells(ncell, bc, interior_facet, degree)
-
     def swidth(self):
         maxnbasis = max(max(self._nbasis))
         return maxnbasis
-
-    def get_info(self, ci, direc, x):
-        b = self.get_basis(ci, direc, x)
-        d = self.get_derivs(ci, direc, x)
-        return b, d, self._offsets[ci][direc], self._offset_mult[ci][direc]
 
     def get_ncomp(self):
         return self._ncomp
@@ -560,50 +532,6 @@ def _DG_offset_info(order):
 def _DG_entries_info(order):
     of, om = _DG_offset_info(order)
     return of[0], om[0]
-
-
-def _CG_interaction_cells(ncell, bc, interior_facet, order):
-    if bc == 'periodic':
-        off = 0
-    else:
-        off = 1
-    interaction_cells = np.zeros((ncell*order + off, 2), dtype=np.int32)
-    ilist = np.arange(0, interaction_cells.shape[0])
-    rightmost_bound = np.floor_divide(ilist, order)   # floor(n/p)
-    leftmost_bound = np.floor_divide(ilist-1, order)  # floor((n-1)/p)
-    # no circular wrapping since we need the actual value in order to get differences in pre-alloc correct ie 2 - (-1) = 3
-    if not interior_facet:
-        interaction_cells[:, 0] = leftmost_bound
-        interaction_cells[:, 1] = rightmost_bound
-        if bc == 'nonperiodic':
-            interaction_cells[0, 0] = interaction_cells[0, 1]
-            interaction_cells[-1, 1] = interaction_cells[-1, 0]
-    if interior_facet:
-        interaction_cells[:, 0] = leftmost_bound - 1
-        interaction_cells[:, 1] = rightmost_bound + 1
-        if bc == 'nonperiodic':
-            interaction_cells[0:order, 0] = interaction_cells[0:order, 0] + 1
-            interaction_cells[(ncell-1)*(order):ncell*(order), 1] = interaction_cells[(ncell-1)*(order):ncell*(order), 1] - 1
-    # print('cg',interaction_cells)
-    return interaction_cells
-
-
-def _DG_interaction_cells(ncell, bc, interior_facet, order):
-    interaction_cells = np.zeros((ncell*(order+1), 2), dtype=np.int32)
-    ilist = np.arange(0, interaction_cells.shape[0])
-    rightmost_bound = np.floor_divide(ilist, order+1)  # floor(n/p)
-    if not interior_facet:
-        interaction_cells[:, 0] = rightmost_bound
-        interaction_cells[:, 1] = rightmost_bound
-    if interior_facet:
-        interaction_cells[:, 0] = rightmost_bound - 1
-        interaction_cells[:, 1] = rightmost_bound + 1
-        if bc == 'nonperiodic':
-            interaction_cells[0:(order+1), 0] = interaction_cells[0:(order+1), 0] + 1
-            interaction_cells[(ncell-1)*(order+1):ncell*(order+1), 1] = interaction_cells[(ncell-1)*(order+1):ncell*(order+1), 1] - 1
-
-    # print('dg',interaction_cells)
-    return interaction_cells
 
 
 #  MGD ELEMENTS
@@ -748,84 +676,6 @@ def _DGD_offset_info(order):
 
 def _DGD_entries_info(order):
     return np.array([0, ], dtype=np.int32), np.array([1, ], dtype=np.int32)
-
-
-def _GD_interaction_cells(ncell, bc, interior_facet, order):
-    if bc == 'periodic':
-        off = 0
-    else:
-        off = 1
-    interaction_cells = np.zeros((ncell+off, 2), dtype=np.int32)
-    ilist = np.arange(0, interaction_cells.shape[0])
-    if order == 3 and bc == 'nonperiodic':
-        if interior_facet:
-            interaction_cells[0, :] = np.array([0, 2], dtype=np.int32)
-            interaction_cells[1, :] = np.array([-1, 2], dtype=np.int32)
-            interaction_cells[2, :] = np.array([-2, 2], dtype=np.int32)
-            interaction_cells[3, :] = np.array([-3, 2], dtype=np.int32)
-            interaction_cells[4:ncell+off-4, :] = np.array([-3, 2], dtype=np.int32)
-            interaction_cells[ncell+off-4, :] = np.array([-3, 2], dtype=np.int32)
-            interaction_cells[ncell+off-3, :] = np.array([-3, 1], dtype=np.int32)
-            interaction_cells[ncell+off-2, :] = np.array([-3, 0], dtype=np.int32)
-            interaction_cells[ncell+off-1, :] = np.array([-3, -1], dtype=np.int32)
-        else:
-            interaction_cells[0, :] = np.array([0, 1], dtype=np.int32)
-            interaction_cells[1, :] = np.array([-1, 1], dtype=np.int32)
-            interaction_cells[2, :] = np.array([-2, 1], dtype=np.int32)
-            interaction_cells[3, :] = np.array([-3, 1], dtype=np.int32)
-            interaction_cells[4:ncell+off-4, :] = np.array([-2, 1], dtype=np.int32)
-            interaction_cells[ncell+off-4, :] = np.array([-2, 2], dtype=np.int32)
-            interaction_cells[ncell+off-3, :] = np.array([-2, 1], dtype=np.int32)
-            interaction_cells[ncell+off-2, :] = np.array([-2, 0], dtype=np.int32)
-            interaction_cells[ncell+off-1, :] = np.array([-2, -1], dtype=np.int32)
-        interaction_cells = interaction_cells + np.expand_dims(ilist, axis=1)
-    else:
-        leftmost = -(order-1)//2-1
-        rightmost = (order-1)//2
-        if interior_facet:
-            leftmost = leftmost - 1
-            rightmost = rightmost + 1
-        interaction_offsets = np.array([leftmost, rightmost], dtype=np.int32)
-        interaction_cells[:, :] = np.expand_dims(ilist, axis=1) + np.expand_dims(interaction_offsets, axis=0)
-        if order == 1 and bc == 'nonperiodic':
-            interaction_cells[0, 0] = 0
-            interaction_cells[-1, -1] = ncell-1
-    return interaction_cells
-
-
-def _DGD_interaction_cells(ncell, bc, interior_facet, order):
-    interaction_cells = np.zeros((ncell, 2), dtype=np.int32)
-    ilist = np.arange(0, interaction_cells.shape[0])
-    if order == 2 and bc == 'nonperiodic':
-        if interior_facet:
-            interaction_cells[0, :] = np.array([0, 2], dtype=np.int32)
-            interaction_cells[1, :] = np.array([-1, 2], dtype=np.int32)
-            interaction_cells[2, :] = np.array([-2, 2], dtype=np.int32)
-            interaction_cells[3:ncell-3, :] = np.array([-2, 2], dtype=np.int32)
-            interaction_cells[ncell-3, :] = np.array([-2, 2], dtype=np.int32)
-            interaction_cells[ncell-2, :] = np.array([-2, 1], dtype=np.int32)
-            interaction_cells[ncell-1, :] = np.array([-2, 0], dtype=np.int32)
-        else:
-            interaction_cells[0, :] = np.array([0, 1], dtype=np.int32)
-            interaction_cells[1, :] = np.array([-1, 1], dtype=np.int32)
-            interaction_cells[2, :] = np.array([-2, 1], dtype=np.int32)
-            interaction_cells[3:ncell-3, :] = np.array([-1, 1], dtype=np.int32)
-            interaction_cells[ncell-3, :] = np.array([-1, 2], dtype=np.int32)
-            interaction_cells[ncell-2, :] = np.array([-1, 1], dtype=np.int32)
-            interaction_cells[ncell-1, :] = np.array([-1, 0], dtype=np.int32)
-        interaction_cells = interaction_cells + np.expand_dims(ilist, axis=1)
-
-        # ADD THIS
-    else:
-        leftmost = -(order-1)//2
-        rightmost = (order-1)//2+1
-        if interior_facet:  # is this correct?
-            leftmost = leftmost - 1
-            rightmost = rightmost + 1
-        interaction_offsets = np.array([leftmost, rightmost], dtype=np.int32)
-        interaction_cells[:, :] = np.expand_dims(ilist, axis=1) + np.expand_dims(interaction_offsets, axis=0)
-        # print('dgd',interaction_cells)
-    return interaction_cells
 
 
 # QB ELEMENTS

@@ -1,6 +1,6 @@
 import tsfc
 from formmanipulation import split_form
-import tsfc.kernel_interface.themis as themis_interface
+import tsfc.kernel_interface.firedrake as kernel_interface
 
 
 class ThemisKernel():
@@ -10,7 +10,6 @@ class ThemisKernel():
         self.ast = kernel.ast
         self.integral_type = kernel.integral_type
         self.coefficient_numbers = kernel.coefficient_numbers
-        self.evaluate = False
         self.zero = False
         self.interpolate = False
 
@@ -26,7 +25,7 @@ def compile_form(form):
         # compiler) to the global coefficient numbers
         number_map = dict((n, coefficient_numbers[c]) for (n, c) in enumerate(f.coefficients()))
 
-        tsfc_kernels = tsfc.compile_form(f, interface=themis_interface.KernelBuilder)
+        tsfc_kernels = tsfc.compile_form(f, interface=kernel_interface.KernelBuilder)
 
         kernels = []
         for kernel in tsfc_kernels:

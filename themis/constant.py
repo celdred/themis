@@ -8,7 +8,7 @@ def _globalify(value):
     data = np.array(value, dtype=np.float32)
     shape = data.shape
     rank = len(shape)
-    if rank == 0:  # or rank == 1: #or rank == 2:
+    if rank in [0,1,2]:
         dat = data
     else:
         raise RuntimeError("Don't know how to make Constant from data with rank %d" % rank)
@@ -51,7 +51,7 @@ class Constant(ufl.Coefficient):
         super(Constant, self).__init__(fs)
         self._repr = 'Constant(%r, %r)' % (self.ufl_element(), self.count())
 
-    # THIS BREAKS FOR NON-SCALAR CONSTANTS, WHICH I THINK IS THE CORRECT BEHAVIOUR ANYWAYS?
+# THIS BREAKS FOR NON-SCALAR CONSTANTS, WHICH I THINK IS THE CORRECT BEHAVIOUR ANYWAYS?
     def __float__(self):
         return float(self.dat)
 

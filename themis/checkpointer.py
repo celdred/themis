@@ -1,6 +1,5 @@
 from petscshim import PETSc
 from function import Function, SplitFunction
-from evaluate import QuadCoefficient
 from firedrake import hdf5interface as h5i
 import numpy as np
 
@@ -32,32 +31,7 @@ class Checkpoint():
         self.viewer = PETSc.ViewerHDF5().create(name + '.h5', mode=mode, comm=PETSc.COMM_WORLD)
 
         self.h5file = h5i.get_h5py_file(self.viewer)
-
-    def store_quad(self, quadcoeff, name=None):
-        if self.mode is FILE_READ:
-            raise IOError("Cannot store to checkpoint opened with mode 'FILE_READ'")
-        if not isinstance(quadcoeff, QuadCoefficient):
-            raise ValueError("Can only store QuadCoefficient")
-
-        name = name or quadcoeff.name()
-        group = self._get_data_group()
-        self._write_timestep_attr(group)
-        self.viewer.pushGroup(group)
-        quadcoeff.vec.setName(name)
-        self.viewer.view(obj=quadcoeff.vec)
-        self.viewer.popGroup()
-
-    def load_quad(self, quadcoeff, name=None):
-        if not isinstance(quadcoeff, QuadCoefficient):
-            raise ValueError("Can only load QuadCoefficient")
-
-        group = self._get_data_group()
-        self.viewer.pushGroup(group)
-        name = name or quadcoeff.name()
-        quadcoeff.vec.setName(name)
-        quadcoeff.vec.load(self.viewer)
-        self.viewer.popGroup()
-
+        
     def store(self, field, name=None):
         if self.mode is FILE_READ:
             raise IOError("Cannot store to checkpoint opened with mode 'FILE_READ'")

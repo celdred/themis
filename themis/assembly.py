@@ -1,6 +1,6 @@
 import numpy as np
 from petscshim import PETSc
-from codegenerator import generate_assembly_routine, generate_evaluate_routine, generate_interpolation_routine
+from codegenerator import generate_assembly_routine, generate_interpolation_routine
 from mpi4py import MPI
 import function
 from constant import Constant
@@ -8,7 +8,7 @@ from constant import Constant
 from pyop2.utils import get_petsc_dir
 from pyop2 import compilation
 import ctypes
-
+import time
 
 class CompiledKernel(object):
     base_cppargs = ["-I%s/include" % d for d in get_petsc_dir()]
@@ -164,6 +164,8 @@ def compile_functional(kernel, tspace, sspace, mesh):
                         kernel.fieldargs_list.append(field.get_lvec(si, ci))
                         fieldargtypeslist.append(ctypes.c_voidp)  # DA
                         fieldargtypeslist.append(ctypes.c_voidp)  # Vec
+# THIS IS BROKEN FOR VECTOR AND TENSOR CONSTANTS
+# https://stackoverflow.com/questions/5862915/passing-numpy-arrays-to-a-c-function-for-input-and-output
             if isinstance(field, Constant):
                 constantargtypeslist.append(ctypes.c_double)
 
@@ -187,10 +189,6 @@ def compile_functional(kernel, tspace, sspace, mesh):
         for ci1 in range(tspace.ncomp):  # tda
             tensorlist.append(ctypes.c_voidp)
 
-    if kernel.evaluate is True:
-        tensorlist.append(ctypes.c_voidp)  # DM
-        tensorlist.append(ctypes.c_voidp)  # Vec
-
     if kernel.interpolate is True:
         tensorlist.append(ctypes.c_voidp)  # DM
         tensorlist.append(ctypes.c_voidp)  # Vec
@@ -205,15 +203,18 @@ def compile_functional(kernel, tspace, sspace, mesh):
         kernel.facet_direc = facet_direc
         kernel.facet_exterior_boundary = facet_exterior_boundary
 
-        if kernel.evaluate is True:
-            assembly_routine = generate_evaluate_routine(mesh, kernel)
-        elif kernel.interpolate is True:
+        if kernel.interpolate is True:
             assembly_routine = generate_interpolation_routine(mesh, kernel)
         else:
             assembly_routine = generate_assembly_routine(mesh, tspace, sspace, kernel)
             # print(assembly_routine)
+# THIS IS THE SLOW PART- GENERATING THE ROUTINE...
+# SHOULD CACHE IT BASICALLY, BUT THIS IS TRICKY...
         assembly_function = CompiledKernel(assembly_routine, "assemble", cppargs=["-O3"], argtypes=argtypeslist, restype=restype)
         kernel.assemblyfunc_list.append(assembly_function)
+        kernel.argtypeslist = argtypeslist
+        kernel.assembly_routine = assembly_routine
+
 
     if not kernel.zero:
         kernel.assemblycompiled = True
@@ -236,7 +237,7 @@ def extract_fields(kernel):
             if isinstance(field, Constant):
                 data = field.dat
                 kernel.constantargs_list.append(float(data))
-                # BROKEN FOR VECTOR/TENSOR CONSTANTS
+# BROKEN FOR VECTOR/TENSOR CONSTANTS
 
 
 def AssembleTwoForm(mat, tspace, sspace, kernel, zeroassembly=False):
@@ -284,7 +285,7 @@ def AssembleTwoForm(mat, tspace, sspace, kernel, zeroassembly=False):
                     submatlist.append(mat.getLocalSubMatrix(isrow_block, iscol_block))
 
             for da, assemblefunc in zip(kernel.dalist, kernel.assemblyfunc_list):
-                # PETSc.Sys.Print('assembling 2-form',kernel.integral_type,da)
+                # PETSc.Sys.Print('assembling 2-form',kernel.integral_type,submatlist)
                 # PETSc.Sys.Print(submatlist)
                 # PETSc.Sys.Print(tdalist)
                 # PETSc.Sys.Print(sdalist)
@@ -376,7 +377,9 @@ def AssembleOneForm(veclist, space, kernel):
                 tdalist.append(space.get_da(ci1))
 
             for da, assemblefunc in zip(kernel.dalist, kernel.assemblyfunc_list):
-                # PETSc.Sys.Print('assembling 1-form',kernel.integral_type,da)
+                # PETSc.Sys.Print('assembling 1-form',kernel.integral_type,veclist)
+                    #PETSc.Sys.Print(kernel.assembly_routine)
+                    # PETSc.Sys.Print(kernel.exterior_facet_type,kernel.exterior_facet_direction)
                 # PETSc.Sys.Print(veclist)
                 # PETSc.Sys.Print(tdalist)
                 # PETSc.Sys.Print(kernel.fieldargs_list)

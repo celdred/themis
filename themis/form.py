@@ -7,6 +7,7 @@ from function import Function
 from ufl_expr import adjoint
 import ufl
 from pyop2.sparsity import get_preallocation
+import time
 
 # 3
 
@@ -465,7 +466,7 @@ class ImplicitMatrix():
 
     def assemble(self, mat):
         self.petscmat.assemble()
-        self.assembled = True
+        self._assembled = True
 
     def destroy(self):
         self.petscmat.destroy()
@@ -531,7 +532,7 @@ class TwoForm():
         # "copy" X into "active" field
         self.activefield._activevector = X
 
-        if (not (self.constantJ and self.mat._assembled)) or ((self.Jp is not None) and (not (self.constantP and self.pmat.assembled))):
+        if (not (self.constantJ and self.mat._assembled)) or ((self.Jp is not None) and (not (self.constantP and self.pmat._assembled))):
             # pre-jacobian callback
             if self._pre_j_callback is not None:
                 self._pre_j_callback(X)

@@ -5,12 +5,12 @@
 
 //Actual kernel snippet
 		{{ kernelstr }}
-		
+
 PetscScalar assemble(DM da, DM sda, Vec formvec {{ fieldargs }} {{ constantargs }})
 {
 
 
- PetscScalar vals[{{ nentries_total }}][{{ ndofs }}] = { {0.,},};
+ PetscScalar vals[{{ entries.nentries_total }}][{{ entries.ndofs }}] = { {0.,},};
 
  {% if ndim == 1 %}
  PetscScalar **data_formvec;
@@ -30,15 +30,15 @@ PetscScalar assemble(DM da, DM sda, Vec formvec {{ fieldargs }} {{ constantargs 
   PetscInt xs,xm,ys,ym,zs,zm,xmax,ymax,zmax;
   // PetscInt x1s,x1m,y1s,y1m,z1s,z1m;
 
-const   PetscInt offsets_x[{{ nentries_x }}] = {{ offsets_x }};
-const   PetscInt offsets_y[{{ nentries_y }}] = {{ offsets_y }};
-const   PetscInt offsets_z[{{ nentries_z }}] = {{ offsets_z }};
-const   PetscInt offset_mult_x[{{ nentries_x }}] = {{ offset_mult_x }};
-const   PetscInt offset_mult_y[{{ nentries_y }}] = {{ offset_mult_y }};
-const   PetscInt offset_mult_z[{{ nentries_z }}] = {{ offset_mult_z }};
+const   PetscInt offsets_x[{{ entries.nentries_x }}] = {{ entries.entries_offset_x }};
+const   PetscInt offsets_y[{{ entries.nentries_y }}] = {{ entries.entries_offset_y }};
+const   PetscInt offsets_z[{{ entries.nentries_z }}] = {{ entries.entries_offset_z }};
+const   PetscInt offset_mult_x[{{ entries.nentries_x }}] = {{ entries.entries_offset_mult_x }};
+const   PetscInt offset_mult_y[{{ entries.nentries_y }}] = {{ entries.entries_offset_mult_y }};
+const   PetscInt offset_mult_z[{{ entries.nentries_z }}] = {{ entries.entries_offset_mult_z }};
 
  {% for field in fieldlist %}
- PetscScalar	{{field.name}}_vals[{{ field.nbasis_total }}][{{ field.ndofs }}] = { { 0.,},};
+ PetscScalar	{{field.name}}_vals[{{ field.nbasis_total }} * {{ field.ndofs }}] = { 0.,};
    PetscInt {{field.name}}_offset;
 
  {% for k in range(field.ncomp) %}
@@ -52,7 +52,7 @@ const   PetscInt {{field.name}}_{{k}}_offset_mult_z[{{ field.nblocks_z[k] }}][{{
    PetscInt bi_{{field.name}}_y_{{k}} = -1000;
    PetscInt bi_{{field.name}}_z_{{k}} = -1000;
 
-#define {{field.name}}_{{k}}_indices [{{field.name}}_offset + lz + {{  field.nbasis_z[k]  }} * (ly + {{ field.nbasis_y[k]  }} * lx)][d]
+#define {{field.name}}_{{k}}_indices [{{field.name}}_offset + d + {{ field.ndofs }} * (lz + {{  field.nbasis_z[k]  }} * (ly + {{ field.nbasis_y[k]  }} * lx))]
 
  {% if ndim == 1 %}
   PetscScalar **data_{{field.name}}_{{k}};
@@ -65,7 +65,7 @@ const   PetscInt {{field.name}}_{{k}}_offset_mult_z[{{ field.nblocks_z[k] }}][{{
       {% endif %}
     {% endfor %}
   {% endfor %}
- 
+
  {% for tabulation in tabulations %}
  const   PetscScalar {{ tabulation.name }}[{{ tabulation.nblocks }}][{{ tabulation.npts }}][{{ tabulation.nbasis }}] = {{ tabulation.values }};
  {% if tabulation.shiftaxis == 0 %}
@@ -84,7 +84,7 @@ const   PetscInt {{field.name}}_{{k}}_offset_mult_z[{{ field.nblocks_z[k] }}][{{
   ierr = DMDAVecGetArrayDOFRead(da_{{field.name}}_{{k}},{{field.name}}_{{k}},&data_{{field.name}}_{{k}});CHKERRQ(ierr);
       {% endfor %}
   {% endfor %}
-  
+
   //Get the data out of Vec formvec
     ierr = DMDAVecGetArrayDOF(sda,formvec,&data_formvec);CHKERRQ(ierr);
 
@@ -97,13 +97,13 @@ const   PetscInt {{field.name}}_{{k}}_offset_mult_z[{{ field.nblocks_z[k] }}][{{
 PetscInt entriesoffsetx = 0;
 PetscInt entriesoffsety = 0;
 PetscInt entriesoffsetz = 0;
- {% if contx == 'H1' %}
+ {% if entries.contx == 'H1' %}
 if (xs+xm != xmax) entriesoffsetx = 1;
       {% endif %}
- {% if conty == 'H1' %}
+ {% if entries.conty == 'H1' %}
 if (ys+ym != ymax) entriesoffsety = 1;
       {% endif %}
- {% if contz == 'H1' %}
+ {% if entries.contz == 'H1' %}
 if (zs+zm != zmax) entriesoffsetz = 1;
       {% endif %}
 
@@ -128,16 +128,16 @@ for (k=zs; k<zs+zm; k++) {
       for (i=xs; i<xs+xm; i++) {
 	      {{ SET_NONPERIODIC_X_TABULATIONS() }}
 	      {{ SET_NONPERIODIC_X_FIELDS() }}
-	    
+
 		//extract element dofs from local dofs
 		 {% for field in fieldlist %}
 		 		{{field.name}}_offset = 0;
 		{% for k in range(field.ncomp) %}
 		{%set offset_mult = field.name~'_'~k ~'_offset_mult' %}
 		{%set offset = field.name~'_'~k ~'_offsets' %}
-		#define ii (i*{{ offset_mult }}_x[bi_{{field.name}}_x_{{k}}][lx] + {{ offset }}_x[bi_{{field.name}}_x_{{k}}][lx]) 
-		#define jj (j*{{ offset_mult }}_y[bi_{{field.name}}_y_{{k}}][ly] + {{ offset }}_y[bi_{{field.name}}_y_{{k}}][ly]) 
-		#define kk (k*{{ offset_mult }}_z[bi_{{field.name}}_z_{{k}}][lz] + {{ offset }}_z[bi_{{field.name}}_z_{{k}}][lz]) 
+		#define ii (i*{{ offset_mult }}_x[bi_{{field.name}}_x_{{k}}][lx] + {{ offset }}_x[bi_{{field.name}}_x_{{k}}][lx])
+		#define jj (j*{{ offset_mult }}_y[bi_{{field.name}}_y_{{k}}][ly] + {{ offset }}_y[bi_{{field.name}}_y_{{k}}][ly])
+		#define kk (k*{{ offset_mult }}_z[bi_{{field.name}}_z_{{k}}][lz] + {{ offset }}_z[bi_{{field.name}}_z_{{k}}][lz])
 		for (lx=0;lx<{{ field.nbasis_x[k] }};lx++){
 		for (ly=0;ly<{{ field.nbasis_y[k] }};ly++){
 		for (lz=0;lz<{{ field.nbasis_z[k] }};lz++){
@@ -155,18 +155,18 @@ for (k=zs; k<zs+zm; k++) {
 		#undef ii
 		#undef jj
 		#undef kk
-		{{field.name}}_offset = {{field.name}}_offset + {{ field.nbasis_x[k] }} * {{ field.nbasis_y[k] }} * {{ field.nbasis_z[k] }};
+		{{field.name}}_offset = {{field.name}}_offset + {{ field.nbasis[k] }} * {{ field.ndofs }};
 		{% endfor %}
 		{% endfor %}
-		
+
 
 		//compute the interpolation at points
-	ierr = PetscMemzero(vals,sizeof(PetscScalar[{{ nentries_total }}][{{ ndofs }}])); CHKERRQ(ierr);
+	ierr = PetscMemzero(vals,sizeof(PetscScalar[{{ entries.nentries_total }}][{{ entries.ndofs }}])); CHKERRQ(ierr);
 
 				{% if not kernelstr == '' %}
 		{{kernelname}}(vals
 				 {% for field in fieldplusconstantslist %}
-				 ,{{field}}
+				 ,&{{field}}
 				{% endfor %}
 				 {% for tabulation in tabulations %}
 				  {% if tabulation.shiftaxis == 0 %}
@@ -186,24 +186,23 @@ for (k=zs; k<zs+zm; k++) {
 #define kk (k * offset_mult_z[lz] + offsets_z[lz])
 #define jj (j * offset_mult_y[ly] + offsets_y[ly])
 #define ii (i * offset_mult_x[lx] + offsets_x[lx])
-for (lx=0;lx<{{ nentries_x }}-entriesoffsetx;lx++) {
-for (ly=0;ly<{{ nentries_y }}-entriesoffsety;ly++) {
-for (lz=0;lz<{{ nentries_z }}-entriesoffsetz;lz++) {
-for (d=0;d<{{ ndofs }};d++) {
+for (lx=0;lx<{{ entries.nentries_x }}-entriesoffsetx;lx++) {
+for (ly=0;ly<{{ entries.nentries_y }}-entriesoffsety;ly++) {
+for (lz=0;lz<{{ entries.nentries_z }}-entriesoffsetz;lz++) {
+for (d=0;d<{{ entries.ndofs }};d++) {
 {% if ndim == 1 %}
-data_formvec[ii][d] = vals [lz + {{  nentries_z  }} * (ly + {{ nentries_y  }} * lx)][d];
+data_formvec[ii][d] = vals [lz + {{  entries.nentries_z  }} * (ly + {{ entries.nentries_y  }} * lx)][d];
 {% endif %}
 {% if ndim == 2 %}
-data_formvec[jj][ii][d] = vals [lz + {{  nentries_z  }} * (ly + {{ nentries_y  }} * lx)][d];
+data_formvec[jj][ii][d] = vals [lz + {{  entries.nentries_z  }} * (ly + {{ entries.nentries_y  }} * lx)][d];
 {% endif %}
 {% if ndim == 3 %}
-data_formvec[kk][jj][ii][d] = vals [lz + {{  nentries_z  }} * (ly + {{ nentries_y  }} * lx)][d];
+data_formvec[kk][jj][ii][d] = vals [lz + {{  entries.nentries_z  }} * (ly + {{ entries.nentries_y  }} * lx)][d];
 {% endif %}
 }}}}
 		#undef ii
 		#undef jj
 		#undef kk
-				
        }}}
 
 //restore fields arrays and data
@@ -212,7 +211,7 @@ data_formvec[kk][jj][ii][d] = vals [lz + {{  nentries_z  }} * (ly + {{ nentries_
     ierr = DMDAVecRestoreArrayDOFRead(da_{{field.name}}_{{k}},{{field.name}}_{{k}},&data_{{field.name}}_{{k}});CHKERRQ(ierr);
       {% endfor %}
    {% endfor %}
-  
+
 //restore data in Vec formvec
     ierr = DMDAVecRestoreArrayDOF(sda,formvec,&data_formvec);CHKERRQ(ierr);
 

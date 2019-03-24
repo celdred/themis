@@ -114,6 +114,11 @@ def adjoint(form, reordered_arguments=None):
                                         part=u.part()))
     return ufl.adjoint(form, reordered_arguments)
 
-# NEED A WRAPPER FOR CONSTANT/VECTOR CONSTANT/TENSOR CONSTANT
-# MAYBE- SEE WHAT FIREDRAKE DOES HERE!
-# CONSTANT IS A FIREDRAKE THING THAT NEEDS THINKING ABOUT..
+# THIS IS BROKEN
+# WHAT IS THE CORRECT MEASURE HERE ANYWAYS FOR A QUAD CELL?
+def CellSize(mesh):
+    """A symbolic representation of the cell size of a mesh.
+
+    :arg mesh: the mesh for which to calculate the cell size.
+    """
+    return ufl.CellVolume(mesh)

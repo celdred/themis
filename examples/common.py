@@ -8,14 +8,14 @@ if backend == 'firedrake':
     from firedrake import IntervalMesh, PeriodicIntervalMesh, PeriodicSquareMesh, SquareMesh, ExtrudedMesh
     from firedrake import DirichletBC
     from firedrake import Constant
-    from firedrake import as_vector, grad, inner, sin, sinh, dx, pi, exp, avg, jump, ds, dS, FacetNormal, action
+    from firedrake import as_vector, grad, inner, sin, sinh, dx, pi, exp, avg, jump, ds, dS, FacetNormal, action, as_matrix, inv, dot
     from firedrake import ds_v, ds_t, ds_b, dS_h, dS_v, HCurlElement, curl
-    from firedrake import FiniteElement, TensorProductElement, SpatialCoordinate, interval, quadrilateral, triangle
+    from firedrake import FiniteElement, TensorProductElement, SpatialCoordinate, interval, quadrilateral, triangle, TensorElement
     from firedrake import HDivElement, split, div, cos, Dx, VectorElement, hexahedron
     from firedrake.petsc import PETSc
     from firedrake import FunctionSpace, MixedFunctionSpace
     from firedrake import Function
-    from firedrake import TestFunction, TrialFunction, TestFunctions, TrialFunctions, derivative
+    from firedrake import TestFunction, TrialFunction, TestFunctions, TrialFunctions, derivative, CellSize
     from firedrake import norm
     from firedrake import NonlinearVariationalProblem, NonlinearVariationalSolver
     from firedrake import Projector
@@ -25,48 +25,9 @@ if backend == 'firedrake':
 
     CubeMesh = None
 
-    from quadrature import ThemisQuadratureNumerical
-
-    class QuadCoefficient():
-        def __init__(self, mesh, vartype, varpullback, field, quad, name='test'):
-            pass
-
-        def evaluate(self):
-            pass
-
-    def store_quad(self, quad, name='test'):
-        pass
-
-    DumbCheckpoint.store_quad = store_quad
-
-if backend == 'themis':
-    from utility_meshes import IntervalMesh, PeriodicIntervalMesh, PeriodicSquareMesh, SquareMesh, ExtrudedMesh, CubeMesh
-    from bcs import DirichletBC
-    from constant import Constant
-    from ufl import as_vector, grad, inner, sin, sinh, dx, pi, exp, avg, jump, ds, dS, FacetNormal, action
-    from ufl import ds_v, ds_t, ds_b, dS_h, dS_v, HCurlElement, curl
-    from ufl import FiniteElement, TensorProductElement, SpatialCoordinate, interval, quadrilateral, triangle
-    from ufl import HDivElement, split, div, cos, Dx, VectorElement, hexahedron
-    from petscshim import PETSc
-    from functionspace import FunctionSpace, MixedFunctionSpace
-    from function import Function
-    from ufl_expr import TestFunction, TrialFunction, TestFunctions, TrialFunctions, derivative
-    from norms import norm
-    from solver import NonlinearVariationalProblem, NonlinearVariationalSolver
-    from project import Projector
-    from checkpointer import Checkpoint as DumbCheckpoint
-    from checkpointer import FILE_READ, FILE_UPDATE, FILE_CREATE
-    from mesh import SingleBlockMesh
-
-    from evaluate import QuadCoefficient
-    from quadrature import ThemisQuadratureNumerical
-
-# universal plotting routine
-
-if backend == 'firedrake':
     from firedrake import plot
 
-    def plot_function(func, funcquad, coordsquad, name):
+    def plot_function(func, coords, name):
         plt.close('all')
         fig = plt.figure(figsize=(10, 10))
         axes = fig.add_subplot(111)
@@ -77,220 +38,331 @@ if backend == 'firedrake':
         fig.savefig(name + '.png')
         plt.close('all')
 
-# BROKEN IN PARALLEL
-# SHOULD REALLY ACTUALLY JUST READ STUFF FROM THE H5FILE
-# THIS IS A DOABLE FIX
+    def get_plotting_spaces(mesh, nquadplot, nquadplot_v=None):
+        return None,None,None
+
+    def evaluate_and_store_field(evalspace, opts, field, name, checkpoint):
+        return field
+
 if backend == 'themis':
-    def plot_function(func, funcquad, coordsquad, name):
-        if funcquad.mesh.ndim == 1:
-            _plot_function1D(func, funcquad, coordsquad, name)
-        if funcquad.mesh.ndim == 2:
-            _plot_function2D(func, funcquad, coordsquad, name)
-        if funcquad.mesh.ndim == 3:
-            _plot_function3D(func, funcquad, coordsquad, name)
+    from utility_meshes import IntervalMesh, PeriodicIntervalMesh, PeriodicSquareMesh, SquareMesh, ExtrudedMesh, CubeMesh, Mesh
+    from bcs import DirichletBC
+    from constant import Constant
+    from ufl import as_vector, grad, inner, sin, sinh, dx, pi, exp, avg, jump, ds, dS, FacetNormal, action, as_matrix, inv, dot
+    from ufl import ds_v, ds_t, ds_b, dS_h, dS_v, HCurlElement, curl
+    from ufl import FiniteElement, TensorProductElement, SpatialCoordinate, interval, quadrilateral, triangle, TensorElement
+    from ufl import HDivElement, split, div, cos, Dx, VectorElement, hexahedron
+    from petscshim import PETSc
+    from functionspace import FunctionSpace, MixedFunctionSpace
+    from function import Function
+    from ufl_expr import TestFunction, TrialFunction, TestFunctions, TrialFunctions, derivative, CellSize
+    from norms import norm
+    from solver import NonlinearVariationalProblem, NonlinearVariationalSolver
+    from project import Projector
+    from checkpointer import Checkpoint as DumbCheckpoint
+    from checkpointer import FILE_READ, FILE_UPDATE, FILE_CREATE
+    from mesh import SingleBlockMesh, SingleBlockExtrudedMesh
 
-    def _plot_function1D(func, funcquad, coordsquad, name):
-        funcarr = funcquad.getarray()
-        coordsarr = coordsquad.getarray()
-        plt.close('all')
-        fig = plt.figure(figsize=(10, 10))
-        dat = np.ravel(funcarr)
-        x = np.ravel(coordsarr[..., 0])
-        plt.plot(x, dat)
-        fig.savefig(name + '.png')
-        plt.close('all')
+    from plotting import get_plotting_spaces, evaluate_and_store_field, plot_function
 
-    def _plot_function2D(func, funcquad, coordsquad, name):
-        funcarr = funcquad.getarray()
-        coordsarr = coordsquad.getarray()
-        plt.close('all')
-        fig = plt.figure(figsize=(10, 10))
-        x = np.ravel(coordsarr[..., 0])
-        y = np.ravel(coordsarr[..., 1])
-        if len(funcarr.shape) == len(coordsarr.shape):  # vector quantity
-            datu = np.ravel(funcarr[..., 0])
-            datv = np.ravel(funcarr[..., 1])
-            mag = np.sqrt(np.square(datu) + np.square(datv))
-            plt.quiver(x, y, datu, datv, mag)
-        else:  # scalar quantity
-            dat = np.ravel(funcarr)
-            plt.tricontour(x, y, dat, cmap='jet')
-            plt.tricontourf(x, y, dat, cmap='jet')
-        plt.colorbar()
-        fig.savefig(name + '.png')
-        plt.close('all')
+def adjust_coordinates(mesh, c):
+    # Distort coordinates
+    xs = SpatialCoordinate(mesh)
+    newcoords = Function(mesh.coordinates.function_space(), name='newcoords')
+    if len(xs) == 1:
+        xlist = [xs[0] + c * sin(2*pi*xs[0]), ]
+    if len(xs) == 2:
+        xlist = [xs[0] + c * sin(2*pi*xs[0])*sin(2*pi*xs[1]), xs[1] + c * sin(2*pi*xs[0])*sin(2*pi*xs[1])]
+    if len(xs) == 3:
+        xlist = [xs[0] + c * sin(2*pi*xs[0])*sin(2*pi*xs[1])*sin(2*pi*xs[2]), xs[1] + c * sin(2*pi*xs[0])*sin(2*pi*xs[1])*sin(2*pi*xs[2]), xs[2] + c * sin(2*pi*xs[0])*sin(2*pi*xs[1])*sin(2*pi*xs[2])]
+    newcoords.interpolate(as_vector(xlist))
+    mesh.coordinates.assign(newcoords)
 
-    # PRETTY BROKEN...
-    def _plot_function3D(func, funcquad, coordsquad, name):
-        funcarr = funcquad.getarray()
-        coordsarr = coordsquad.getarray()
-        plt.close('all')
-        fig = plt.figure(figsize=(10, 10))
-        x = coordsarr[..., 0]
-        # y = coordsarr[..., 1]
-        z = coordsarr[..., 2]
-        # HOW SHOULD WE HANDLE THIS?
-        if len(funcarr.shape) == len(coordsarr.shape):  # vector quantity
-            pass
-        else:  # scalar quantity
-            xz_x = np.ravel(x[:, 5, :])
-            xz_z = np.ravel(z[:, 5, :])
-            xz_dat = np.ravel(funcarr[:, 5, :])
-            plt.tricontour(xz_x, xz_z, xz_dat, cmap='jet')
-            plt.tricontourf(xz_x, xz_z, xz_dat, cmap='jet')
-        plt.colorbar()
-        fig.savefig(name + '.xzslice.png')
-        plt.close('all')
+def set_mesh_coordinate_order(mesh, ndims, bcs, coordorder, vcoordorder=None):
+    vcoordorder = vcoordorder or coordorder
 
+# EXTRUSION CHECKS MIGHT FAIL FOR FIREDRAKE...
+# ALSO HOW DO WE PROPERLY HANDLE VARIANT...
+# WE NEED THE VARIANT FLAG FOR THEMIS BUT IT WILL FAIL FOR FIREDRAKE!
+# Basically something needs to automatically convert variant 'feec' -> None
+    if backend == 'themis':
+        variant = 'feec'
+    if backend == 'firedrake':
+        variant = None
 
-def set_mesh_coordinate_order(mesh, bcs, ndims, coordorder):
-
-    # THIS BREAKS HORRIBLY FOR EXTRUDED MESHES WITH TP COORDINATE ELEMENTS!
     if ndims == 1:
         if bcs[0] == 'nonperiodic':
-            celem = FiniteElement("CG", interval, coordorder, variant='feec')
+            celem = FiniteElement("CG", interval, coordorder, variant = variant)
         else:
-            celem = FiniteElement("DG", interval, coordorder, variant='feec')
-    if ndims == 2:
+            celem = FiniteElement("DG", interval, coordorder, variant = variant)
+    if ndims == 2 and not mesh.extruded:
         if bcs[0] == 'nonperiodic' and bcs[1] == 'nonperiodic':
-            celem = FiniteElement("Q", quadrilateral, coordorder, variant='feec')
+            celem = FiniteElement("Q", quadrilateral, coordorder, variant = variant)
         else:
-            celem = FiniteElement("DQ", quadrilateral, coordorder, variant='feec')
-    if ndims == 3:
+            celem = FiniteElement("DQ", quadrilateral, coordorder, variant = variant)
+    if ndims == 2 and mesh.extruded:
+        if bcs[0] == 'nonperiodic':
+            hcelem = FiniteElement("CG", interval, coordorder, variant = variant)
+            vcelem = FiniteElement("CG", interval, vcoordorder, variant = variant)
+        else:
+            hcelem = FiniteElement("DG", interval, coordorder, variant = variant)
+            vcelem = FiniteElement("CG", interval, vcoordorder, variant = variant)
+        celem = TensorProductElement(hcelem,vcelem)
+    if ndims == 3 and not mesh.extruded:
         if bcs[0] == 'nonperiodic' and bcs[1] == 'nonperiodic' and bcs[2] == 'nonperiodic':
-            celem = FiniteElement("Q", hexahedron, coordorder, variant='feec')
+            celem = FiniteElement("Q", hexahedron, coordorder, variant = variant)
         else:
-            celem = FiniteElement("DQ", hexahedron, coordorder, variant='feec')
-    if backend == 'themis':
-        return SingleBlockMesh(mesh.nxs, mesh.bcs, coordelem=celem)
-    if backend == 'firedrake':
-        vcelem = VectorElement(celem, dim=ndims)
-        coordspace = FunctionSpace(mesh, vcelem)
-        newcoords = Function(coordspace)
-        newcoords.interpolate(SpatialCoordinate(mesh))
-        return Mesh(newcoords)
+            celem = FiniteElement("DQ", hexahedron, coordorder, variant = variant)
+    if ndims == 3 and mesh.extruded:
+        if bcs[0] == 'nonperiodic' and bcs[1] == 'nonperiodic':
+            hcelem = FiniteElement("Q", quadrilateral, coordorder, variant = variant)
+            vcelem = FiniteElement("CG", interval, vcoordorder, variant = variant)
+        else:
+            hcelem = FiniteElement("DQ", quadrilateral, coordorder, variant = variant)
+            vcelem = FiniteElement("CG", interval, vcoordorder, variant = variant)
+        celem = TensorProductElement(hcelem,vcelem)
+
+    velem = VectorElement(celem, dim=ndims)
+    coordspace = FunctionSpace(mesh, velem)
+    newcoords = Function(coordspace)
+    newcoords.interpolate(SpatialCoordinate(mesh))
+    return Mesh(newcoords)
 
 
-def create_mesh(nx, ny, nz, ndims, cell, xbcs, c, coordorder):
+def create_box_mesh(cell, nxs, xbcs, coordorder, vcoordorder = None):
+
     if cell in ['quad', 'tphex']:
         use_quad = True
     if cell in ['tri', 'tptri']:
         use_quad = False
 
-    if ndims == 1:
+    if cell == 'interval':
+        ndims = 1
         if xbcs[0] == 'nonperiodic':
-            mesh = IntervalMesh(nx, 1.0)
+            mesh = IntervalMesh(nxs[0], 1.0)
         if xbcs[0] == 'periodic':
             mesh = PeriodicIntervalMesh(nx, 1.0)
 
-    if ndims == 2 and cell in ['tri', 'quad']:
+    if cell in ['tri', 'quad']:
+        ndims = 2
         if xbcs[0] == 'periodic' and xbcs[1] == 'periodic':
-            mesh = PeriodicSquareMesh(nx, ny, 1.0, quadrilateral=use_quad)
+            mesh = PeriodicSquareMesh(nxs[0], nxs[1], 1.0, quadrilateral=use_quad)
         if xbcs[0] == 'nonperiodic' and xbcs[1] == 'nonperiodic':
-            mesh = SquareMesh(nx, ny, 1.0, quadrilateral=use_quad)
+            mesh = SquareMesh(nxs[0], nxs[1], 1.0, quadrilateral=use_quad)
         if xbcs[0] == 'periodic' and xbcs[1] == 'nonperiodic':
-            mesh = PeriodicSquareMesh(nx, ny, 1.0, direction='x', quadrilateral=use_quad)
+            mesh = PeriodicSquareMesh(nxs[0], nxs[1], 1.0, direction='x', quadrilateral=use_quad)
         if xbcs[0] == 'nonperiodic' and xbcs[1] == 'periodic':
-            mesh = PeriodicSquareMesh(nx, ny, 1.0, direction='y', quadrilateral=use_quad)
-    if ndims == 2 and cell == 'tpquad':
+            mesh = PeriodicSquareMesh(nxs[0], nxs[1], 1.0, direction='y', quadrilateral=use_quad)
+    if cell == 'tpquad':
+        ndims = 2
         if xbcs[1] == 'periodic':
             raise ValueError('cannot do an extruded mesh with periodic bcs in direction of extrusion')
         if xbcs[0] == 'nonperiodic':
-            bmesh = IntervalMesh(nx, 1.0)
+            bmesh = IntervalMesh(nxs[0], 1.0)
         if xbcs[0] == 'periodic':
-            bmesh = PeriodicIntervalMesh(nx, 1.0)
-        mesh = ExtrudedMesh(bmesh, ny)
+            bmesh = PeriodicIntervalMesh(nxs[0], 1.0)
+        mesh = ExtrudedMesh(bmesh, nxs[1])
 
-    if ndims == 3 and cell == 'hex':
-        mesh = CubeMesh(nx, ny, nz, 1.0, xbcs[0], xbcs[1], xbcs[2])
-    if ndims == 3 and (cell in ['tphex', 'tptri']):
+    if cell == 'hex':
+        ndims = 3
+        mesh = CubeMesh(nxs[0], nxs[1], nxs[2], 1.0, xbcs[0], xbcs[1], xbcs[2])
+    if cell in ['tphex', 'tptri']:
+        ndims = 3
         if xbcs[2] == 'periodic':
             raise ValueError('cannot do an extruded mesh with periodic bcs in direction of extrusion')
         if xbcs[0] == 'periodic' and xbcs[1] == 'periodic':
-            bmesh = PeriodicSquareMesh(nx, ny, 1.0, quadrilateral=use_quad)
+            bmesh = PeriodicSquareMesh(nxs[0], nxs[1], 1.0, quadrilateral=use_quad)
         if xbcs[0] == 'nonperiodic' and xbcs[1] == 'nonperiodic':
-            bmesh = SquareMesh(nx, ny, 1.0, quadrilateral=use_quad)
+            bmesh = SquareMesh(nxs[0], nxs[1], 1.0, quadrilateral=use_quad)
         if xbcs[0] == 'periodic' and xbcs[1] == 'nonperiodic':
-            bmesh = PeriodicSquareMesh(nx, ny, 1.0, direction='x', quadrilateral=use_quad)
+            bmesh = PeriodicSquareMesh(nxs[0], nxs[1], 1.0, direction='x', quadrilateral=use_quad)
         if xbcs[0] == 'nonperiodic' and xbcs[1] == 'periodic':
-            bmesh = PeriodicSquareMesh(nx, ny, 1.0, direction='y', quadrilateral=use_quad)
-        mesh = ExtrudedMesh(bmesh, nz)
+            bmesh = PeriodicSquareMesh(nxs[0], nxs[1], 1.0, direction='y', quadrilateral=use_quad)
+        mesh = ExtrudedMesh(bmesh, nxs[2])
 
     # Upgrade coordinate order if needed
     if coordorder > 1:
-        newmesh = set_mesh_coordinate_order(mesh, xbcs, ndims, coordorder)
+        newmesh = set_mesh_coordinate_order(mesh, ndims, xbcs, coordorder, vcoordorder=vcoordorder)
     else:
         newmesh = mesh
 
-    # Distort coordinates
-    xs = SpatialCoordinate(newmesh)
-    newcoords = Function(newmesh.coordinates.function_space(), name='newcoords')
-    if ndims == 1:
-        xlist = [xs[0] + c * sin(2*pi*xs[0]), ]
-    if ndims == 2:
-        xlist = [xs[0] + c * sin(2*pi*xs[0])*sin(2*pi*xs[1]), xs[1] + c * sin(2*pi*xs[0])*sin(2*pi*xs[1])]
-    if ndims == 3:
-        xlist = [xs[0] + c * sin(2*pi*xs[0])*sin(2*pi*xs[1])*sin(2*pi*xs[2]), xs[1] + c * sin(2*pi*xs[0])*sin(2*pi*xs[1])*sin(2*pi*xs[2]), xs[2] + c * sin(2*pi*xs[0])*sin(2*pi*xs[1])*sin(2*pi*xs[2])]
-    newcoords.interpolate(as_vector(xlist))
-    newmesh.coordinates.assign(newcoords)
-
     return newmesh
 
+# FIX THIS
+def create_sphere_mesh(cell, rlevel, coordorder, nlevels = None, extrusion_type='uniform', vcoordorder = None):
 
-def create_elems(ndims, cell, variant, order):
+    if cell == 'quad':
+        mesh = CubedSphereMesh(1.0, refinement_level=rlevel, degree=coordorder)
+    if cell == 'tri':
+        mesh = IcosahedralSphereMesh(1.0, refinement_level=rlevel, degree=coordorder)
+    if cell == 'tphex':
+        basemesh = CubedSphereMesh(1.0, refinement_level=rlevel, degree=coordorder)
+        mesh = ExtrudedMesh(bmesh, nlevels, extrusion_type=extrusion_type)
+    if cell == 'tptri':
+        basemesh = IcosahedralSphereMesh(1.0, refinement_level=rlevel, degree=coordorder)
+        mesh = ExtrudedMesh(bmesh, nlevels, extrusion_type=extrusion_type)
 
-    if variant == 'none':
-        variant = None
-    if ndims == 1:
-        h1elem = FiniteElement("CG", interval, order, variant=variant)
-        l2elem = FiniteElement("DG", interval, order-1, variant=variant)
-        hdivelem = VectorElement(FiniteElement('CG', interval, order, 1, variant=variant), dim=1)
-        hcurlelem = VectorElement(FiniteElement('DG', interval, order-1, 1, variant=variant), dim=1)
-    if ndims == 2:
-        if cell == 'quad':
-            h1elem = FiniteElement("Q", quadrilateral, order, variant=variant)
-            l2elem = FiniteElement("DQ", quadrilateral, order-1, variant=variant)
-            hdivelem = FiniteElement('RTCF', quadrilateral, order, variant=variant)
-            hcurlelem = FiniteElement('RTCE', quadrilateral, order, variant=variant)
-        if cell == 'tri':
-            h1elem = FiniteElement("CG", triangle, order, variant=variant)
-            l2elem = FiniteElement('DG', triangle, order-1, variant=variant)
-            hdivelem = FiniteElement('RTF', triangle, order, variant=variant)  # EVENTUALLY ADD BDM, ETC TO THIS!
-            hcurlelem = FiniteElement('RTE', triangle, order, variant=variant)  # EVENTUALLY ADD BDM, ETC TO THIS!
-        if cell == 'tpquad':
-            h1elem1D = FiniteElement("CG", interval, order, variant=variant)
-            l2elem1D = FiniteElement("DG", interval, order-1, variant=variant)
+    # Upgrade coordinate order if needed
+# THIS IS BROKEN
+# HOW ARE COORDINATES TREATED FOR SPHERICAL MESHES ANYWAYS
+# DEPENDS ON EXTRUSION TYPE...
+    if coordorder > 1:
+        newmesh = set_mesh_coordinate_order(mesh, ndims, xbcs, coordorder, vcoordorder=vcoordorder)
+    else:
+        newmesh = mesh
 
-            l2elem = TensorProductElement(l2elem1D, l2elem1D)
-            hdivelem = HDivElement(TensorProductElement(h1elem1D, l2elem1D)) + HDivElement(TensorProductElement(l2elem1D, h1elem1D))
-            hcurlelem = HCurlElement(TensorProductElement(l2elem1D, h1elem1D)) + HCurlElement(TensorProductElement(h1elem1D, l2elem1D))
-            h1elem = TensorProductElement(h1elem1D, h1elem1D)
-
-    if ndims == 3:
-        if cell == 'hex':
-            h1elem = FiniteElement("Q", hexahedron, order, variant=variant)
-            l2elem = FiniteElement("DQ", hexahedron, order-1, variant=variant)
-            hdivelem = FiniteElement("NCF", hexahedron, order, variant=variant)
-            hcurlelem = FiniteElement("NCE", hexahedron, order, variant=variant)
-        if cell in ['tphex', 'tptri']:
-
-            if cell == 'tphex':
-                h1elem2D = FiniteElement("Q", quadrilateral, order, variant=variant)
-                l2elem2D = FiniteElement("DQ", quadrilateral, order-1, variant=variant)
-                hdivelem2D = FiniteElement('RTCF', quadrilateral, order, variant=variant)
-                hcurlelem2D = FiniteElement('RTCE', quadrilateral, order, variant=variant)
-            if cell == 'tptri':
-                h1elem = FiniteElement("CG", triangle, order, variant=variant)
-                l2elem = FiniteElement('DG', triangle, order-1, variant=variant)
-                hdivelem = FiniteElement('RTF', triangle, order, variant=variant)  # EVENTUALLY ADD BDM, ETC TO THIS!
-                hcurlelem = FiniteElement('RTE', triangle, order, variant=variant)  # EVENTUALLY ADD BDM, ETC TO THIS!
-
-            h1elem1D = FiniteElement("CG", interval, order, variant=variant)
-            l2elem1D = FiniteElement("DG", interval, order-1, variant=variant)
-
-            hdivelem = HDivElement(TensorProductElement(hdivelem2D, l2elem1D)) + HDivElement(TensorProductElement(l2elem2D, h1elem1D))
-            hcurlelem = HCurlElement(TensorProductElement(hcurlelem2D, h1elem1D)) + HCurlElement(TensorProductElement(h1elem2D, l2elem1D))
-            h1elem = TensorProductElement(h1elem2D, h1elem1D)
-            l2elem = TensorProductElement(l2elem2D, l2elem1D)
-
+def _quad(order, variant):
+    h1elem = FiniteElement("Q", quadrilateral, order, variant=variant)
+    l2elem = FiniteElement("DQ", quadrilateral, order-1, variant=variant)
+    hdivelem = FiniteElement('RTCF', quadrilateral, order, variant=variant)
+    hcurlelem = FiniteElement('RTCE', quadrilateral, order, variant=variant)
     return h1elem, l2elem, hdivelem, hcurlelem
+
+def _tri(order, velocityspace):
+    #CGk - RTk-1 - DGk-1 on triangles (order = k)
+    if velocityspace == 'RT':
+        h1elem = FiniteElement("CG", triangle, order)
+        l2elem = FiniteElement('DG', triangle, order-1)
+        hdivelem = FiniteElement('RTF', triangle, order) # RT gives spurious inertia-gravity waves
+        hcurlelem = FiniteElement('RTE', triangle, order)
+
+    #CGk - BDMk-1 - DGk-2 on triangles (order = k-1)
+    if velocityspace == 'BDM':
+        h1elem = FiniteElement("CG", triangle, order+1)
+        l2elem = FiniteElement("DG", triangle, order-1)
+        hdivelem = FiniteElement("BDMF", triangle, order) # BDM gives spurious Rossby waves
+        hcurlelem = FiniteElement("BDME", triangle, order)
+
+    #CG2+B3 - BDFM1 - DG1 on triangles
+    if velocityspace == 'BDFM':
+        if not (order == 2): raise ValueError('BDFM space is only supported for n=2')
+        h1elem = FiniteElement("CG", triangle, order) + FiniteElement("Bubble", triangle, order +1)
+        l2elem = FiniteElement("DG", triangle, order-1)
+        hdivelem = FiniteElement("BDFM", triangle, order) #Note that n=2 is the lowest order element...
+        #WHAT IS THE CORRESPONDING HCURL ELEMENT?
+        #IS THERE ONE?
+        hcurlelem = None
+    return h1elem, l2elem, hdivelem, hcurlelem
+
+def _interval(order, variant):
+    h1elem = FiniteElement("CG", interval, order, variant=variant)
+    l2elem = FiniteElement("DG", interval, order-1, variant=variant)
+    return h1elem, l2elem
+
+def _hex(order, variant):
+    h1elem = FiniteElement("Q", hexahedron, order, variant=variant)
+    l2elem = FiniteElement("DQ", hexahedron, order-1, variant=variant)
+    hdivelem = FiniteElement("NCF", hexahedron, order, variant=variant)
+    hcurlelem = FiniteElement("NCE", hexahedron, order, variant=variant)
+    return h1elem, l2elem, hdivelem, hcurlelem
+
+# ADD SUPPORT FOR CR and SE AS WELL...
+# MAYBE? MAYBE JUST DO THEM AS SEPARATE ELEMENTS..
+# WHAT ABOUT DG GLL?
+def create_complex(cell, velocityspace, variant, order, vorder=None):
+    vorder = vorder or order
+    if variant == 'none': # this ensures Firedrake works properly
+        variant = None
+
+    if cell == 'interval':
+        h1elem, l2elem = _interval(order, variant)
+        hdivelem = VectorElement(h1elem, dim=1)
+        hcurlelem = VectorElement(l2elem, dim=1)
+        cpelem = None
+    if cell == 'quad':
+        h1elem, l2elem, hdivelem, hcurlelem = _quad(order, variant)
+        cpelem = None
+    if cell == 'tri':
+        h1elem, l2elem, hdivelem, hcurlelem = _tri(order, velocityspace)
+        cpelem = None
+    if cell == 'hex': h1elem, l2elem, hdivelem, hcurlelem = _quad(order, variant)
+    if cell in ['tpquad', 'tphex', 'tptri']:
+        if cell == 'tpquad':
+            h1elem2D, l2elem2D = _interval(order, variant)
+            hdivelem2D, hcurlelem2D = _interval(order, variant)
+        if cell == 'tphex':
+            h1elem2D, l2elem2D, hdivelem2D, hcurlelem2D, _ = _quad(order, variant)
+        if cell == 'tptri':
+            h1elem2D, l2elem2D, hdivelem2D, hcurlelem2D, _ = _tri(order, velocityspace)
+        h1elem1D, l2elem1D = _interval(vorder, variant)
+        hdivelem = HDivElement(TensorProductElement(hdivelem2D, l2elem1D)) + HDivElement(TensorProductElement(l2elem2D, h1elem1D))
+        hcurlelem = HCurlElement(TensorProductElement(hcurlelem2D, h1elem1D)) + HCurlElement(TensorProductElement(h1elem2D, l2elem1D))
+        h1elem = TensorProductElement(h1elem2D, h1elem1D)
+        l2elem = TensorProductElement(l2elem2D, l2elem1D)
+        cpelem = TensorProductElement(l2elem2D, h1elem1D)
+
+    return {'h1': h1elem, 'l2': l2elem, 'hdiv': hdivelem, 'hcurl': hcurlelem, 'cp': cpelem}
+
+#
+# def set_mesh_quadrature(mesh, cell, qdegree = None, vqdegree = None):
+#
+#     if qdegree:
+#         if cell in ['interval', 'quad', 'tri', 'hex']:
+#         	mesh.dx = dx(metadata={"quadrature_degree": qdegree})
+#         	mesh.dS = dS(metadata={"quadrature_degree": qdegree})
+#         	mesh.ds = ds(metadata={"quadrature_degree": qdegree})
+# #EVENTUALLY THIS SHOULD ACTUALLY DO SEPARATE DEGREES IN HORIZ AND VERTICAL...
+#         if cell in ['tpquad', 'tphex', 'tptri']:
+#             vqdegree = vqdegree or qdegree
+#         	mesh.dx = dx(metadata={"quadrature_degree": qdegree })
+#         	mesh.ds_b = ds_b(metadata={"quadrature_degree": qdegree })
+#         	mesh.ds_t = ds_t(metadata={"quadrature_degree": qdegree })
+#         	mesh.ds_v = ds_v(metadata={"quadrature_degree": qdegree })
+#         	mesh.dS_h = dS_h(metadata={"quadrature_degree": qdegree })
+#         	mesh.dS_v = dS_v(metadata={"quadrature_degree": qdegree })
+#         	mesh.dS = mesh.dS_h + mesh.dS_v
+#         	mesh.ds_tb = mesh.ds_t + mesh.ds_b
+#         	mesh.ds = mesh.ds_b + mesh.ds_t + mesh.ds_v
+#     else:
+#         if cell in ['interval', 'quad', 'tri', 'hex']:
+#             mesh.dx = dx
+#             mesh.dS = dS
+#             mesh.ds = ds
+#         if cell in ['tpquad', 'tphex', 'tptri']:
+#             mesh.dx = dx
+#             mesh.ds_b = ds_b
+#             mesh.ds_v = ds_v
+#             mesh.ds_t = ds_t
+#             mesh.dS_h = dS_h
+#             mesh.dS_v = dS_v
+#             mesh.dS = mesh.dS_h + mesh.dS_v
+#             mesh.ds_tb = mesh.ds_t + mesh.ds_b
+#             mesh.ds = mesh.ds_b + mesh.ds_t + mesh.ds_v
+#
+# def set_boxmesh_operators(mesh, cell):
+#
+# # ADD OTHER OPERATORS HERE ie div, grad, curl, adjoints, etc.
+# # Basically what we need to make Hamiltonian and Hodge Laplacian stuff dimension-agnostic
+# 	if cell in ['quad', 'tri', 'tpquad']:
+# 		mesh.skewgrad = lambda s : perp(grad(s))
+# 		mesh.perp = lambda u : perp(u)
+#
+#     if cell in ['tpquad']:
+# 		mesh.k = as_vector((0,1))
+#
+#     if cell in ['hex', 'tphex', 'tptri']:
+# 		#mesh.skewgrad = lambda s : cross(mesh.k,grad(s))
+# 		#mesh.perp = lambda u : cross(mesh.k,u)
+#         pass
+#
+# 	if cell in ['tphex','tptri']:
+# 		mesh.k = as_vector((0,0,1))
+#
+# def make_sphere_normals(x):
+# 	R = sqrt(inner(x, x))
+# 	rhat_expr = x/R
+# 	return rhat_expr
+#
+# # ADD OTHER OPERATORS HERE ie div, grad, curl, adjoints, etc.
+# def set_spheremesh_operators(mesh, cell):
+#
+#     if cell in ['quad', 'tri']:
+#     	xs = SpatialCoordinate(mesh)
+#     	mesh.cell_normals = make_sphere_normals(xs)
+#     	mesh.perp = lambda u: cross(mesh.cell_normals, u)
+#     	mesh.skewgrad = lambda s: cross(mesh.cell_normals, grad(s))
+#     	global_normal = as_vector((xs[0],xs[1],xs[2]))
+#     	mesh.init_cell_orientations(global_normal)
+# # FIX
+# 	if cell in ['tphex','tptri']:
+#         pass

@@ -3,9 +3,8 @@
 from common import PETSc, norm, dx, DumbCheckpoint, sin, inner, FILE_CREATE
 from common import FunctionSpace, SpatialCoordinate, Function, Projector, NonlinearVariationalProblem, NonlinearVariationalSolver
 from common import TestFunction, DirichletBC, pi, TestFunctions
-from common import QuadCoefficient, ThemisQuadratureNumerical
 from common import split, div, cos, as_vector, MixedFunctionSpace
-from common import create_mesh, create_elems
+from common import create_box_mesh, create_complex, adjust_coordinates
 from common import derivative
 
 OptDB = PETSc.Options()
@@ -13,6 +12,7 @@ order = OptDB.getInt('order', 1)
 coordorder = OptDB.getInt('coordorder', 1)
 simname = OptDB.getString('simname', 'test')
 variant = OptDB.getString('variant', 'feec')
+velocityspace = OptDB.getString('velocityspace', 'rt')
 xbc = OptDB.getString('xbc', 'nonperiodic')  # periodic nonperiodic
 ybc = OptDB.getString('ybc', 'nonperiodic')  # periodic nonperiodic
 zbc = OptDB.getString('zbc', 'nonperiodic')  # periodic nonperiodic
@@ -31,15 +31,17 @@ if variant == 'mgd' and order > 1:
     nquadplot_default = 2
 nquadplot = OptDB.getInt('nquadplot', nquadplot_default)
 xbcs = [xbc, ybc, zbc]
+nxs = [nx, ny, nz]
 
-PETSc.Sys.Print(variant, order, cell, coordorder, xbc, ybc, zbc, nx, ny, nz)
+PETSc.Sys.Print(variant, velocityspace, order, cell, coordorder, xbcs, nxs)
 
 # create mesh and spaces
-mesh = create_mesh(nx, ny, nz, ndims, cell, xbcs, c, coordorder)
-h1elem, l2elem, hdivelem, hcurlelem = create_elems(ndims, cell, variant, order)
+mesh = create_box_mesh(cell, nxs, xbcs, coordorder)
+elemdict = create_complex(cell, velocityspace, variant, order)
+adjust_coordinates(mesh, c)
 
-l2 = FunctionSpace(mesh, l2elem)
-hdiv = FunctionSpace(mesh, hdivelem)
+l2 = FunctionSpace(mesh, elemdict['l2'])
+hdiv = FunctionSpace(mesh, elemdict['hdiv'])
 
 mixedspace = MixedFunctionSpace([l2, hdiv])
 hhat, uhat = TestFunctions(mixedspace)
@@ -117,14 +119,11 @@ if ndims == 3:
 # create soln and rhs
 hsoln = Function(l2, name='hsoln')
 usoln = Function(hdiv, name='usoln')
-hrhs = Function(l2, name='hrhs')
 
 hsolnproj = Projector(hsolnexpr, hsoln, bcs=[])  # ,options_prefix= 'masssys_'
 usolnproj = Projector(vecsolnexpr, usoln, bcs=ubcs)  # ,options_prefix= 'masssys_'
-hrhsproj = Projector(hrhsexpr, hrhs, bcs=[])  # ,options_prefix= 'masssys_'
 hsolnproj.project()
 usolnproj.project()
-hrhsproj.project()
 
 
 # Create forms and problem
@@ -132,7 +131,7 @@ if poisson:
     Rlhs = (hhat * div(u) + inner(uhat, u) + div(uhat) * h) * dx
 else:
     Rlhs = (hhat * h + hhat * div(u) + inner(uhat, u) + div(uhat) * h) * dx
-Rrhs = inner(hhat, hrhs) * dx
+Rrhs = inner(hhat, hrhsexpr) * dx
 
 # create solvers
 J = derivative(Rlhs - Rrhs, x)
@@ -182,7 +181,6 @@ udirectdiff = Function(hdiv, name='udirectdiff')
 udirectdiffproj = Projector(u-vecsolnexpr, udirectdiff)  # options_prefix= 'masssys_'
 udirectdiffproj.project()
 checkpoint.store(udirectdiff)
-
 checkpoint.write_attribute('fields/', 'hl2err', hl2err)
 checkpoint.write_attribute('fields/', 'ul2err', ul2err)
 checkpoint.write_attribute('fields/', 'uhdiverr', uhdiverr)
@@ -191,47 +189,35 @@ checkpoint.write_attribute('fields/', 'ul2directerr', ul2directerr)
 checkpoint.write_attribute('fields/', 'uhdivdirecterr', uhdivdirecterr)
 
 if plot:
+    from common import plot_function, get_plotting_spaces, evaluate_and_store_field
 
-    # evaluate
-    hsplit, usplit = x.split()
-    evalquad = ThemisQuadratureNumerical('pascal', [nquadplot, ]*ndims)
-    # THESE SHOULD BE L2 WHEN TSFC/UFL SUPPORTS IT PROPERLY...
-    hquad = QuadCoefficient(mesh, 'scalar', 'h1', hsplit, evalquad, name='h_quad')
-    hsolnquad = QuadCoefficient(mesh, 'scalar', 'h1', hsoln, evalquad, name='hsoln_quad')
-    hdiffquad = QuadCoefficient(mesh, 'scalar', 'h1', hdiff, evalquad, name='hdiff_quad')
-    hdirectdiffquad = QuadCoefficient(mesh, 'scalar', 'h1', hdirectdiff, evalquad, name='hdirectdiff_quad')
-    uquad = QuadCoefficient(mesh, 'vector', 'hdiv', usplit, evalquad, name='u_quad')
-    usolnquad = QuadCoefficient(mesh, 'vector', 'hdiv', usoln, evalquad, name='usoln_quad')
-    udiffquad = QuadCoefficient(mesh, 'vector', 'hdiv', udiff, evalquad, name='udiff_quad')
-    udirectdiffquad = QuadCoefficient(mesh, 'vector', 'hdiv', udirectdiff, evalquad, name='udirectdiff_quad')
-    coordsquad = QuadCoefficient(mesh, 'vector', 'h1', mesh.coordinates, evalquad, name='coords_quad')
-    hquad.evaluate()
-    hsolnquad.evaluate()
-    hdiffquad.evaluate()
-    hdirectdiffquad.evaluate()
-    uquad.evaluate()
-    usolnquad.evaluate()
-    udiffquad.evaluate()
-    udirectdiffquad.evaluate()
-    coordsquad.evaluate()
-    checkpoint.store_quad(hquad)
-    checkpoint.store_quad(hsolnquad)
-    checkpoint.store_quad(hdiffquad)
-    checkpoint.store_quad(hdirectdiffquad)
-    checkpoint.store_quad(uquad)
-    checkpoint.store_quad(usolnquad)
-    checkpoint.store_quad(udiffquad)
-    checkpoint.store_quad(udirectdiffquad)
-    checkpoint.store_quad(coordsquad)
+    # This is needed due to faulty handling of SplitFunctions within Themis KernelExpressionBuilder
+    # Need to refactor split(f), f.split(), W.sub(), split(W), etc.
+    hsplit,usplit = x.split()
+    honly = Function(l2, name='h')
+    uonly = Function(hdiv, name='u')
+    honly.assign(hsplit)
+    uonly.assign(usplit)
 
-    from common import plot_function
-    plot_function(hsplit, hquad, coordsquad, 'h')
-    plot_function(hsoln, hsolnquad, coordsquad, 'hsoln')
-    plot_function(hdiff, hdiffquad, coordsquad, 'hdiff')
-    plot_function(hdirectdiff, hdirectdiffquad, coordsquad, 'hddirectiff')
-    plot_function(usplit, uquad, coordsquad, 'u')
-    plot_function(usoln, usolnquad, coordsquad, 'usoln')
-    plot_function(udiff, udiffquad, coordsquad, 'udiff')
-    plot_function(udirectdiff, udirectdiffquad, coordsquad, 'udirectdiff')
+    scalarevalspace, vectorevalspace, opts = get_plotting_spaces(mesh, nquadplot)
+
+    coordseval = evaluate_and_store_field(vectorevalspace, opts, mesh.coordinates, 'coords', checkpoint)
+    heval = evaluate_and_store_field(scalarevalspace, opts, honly, 'h', checkpoint)
+    hsolneval = evaluate_and_store_field(scalarevalspace, opts, hsoln, 'hsoln', checkpoint)
+    hdiffeval = evaluate_and_store_field(scalarevalspace, opts, hdiff, 'hdiff', checkpoint)
+    hdirectdiffeval = evaluate_and_store_field(scalarevalspace, opts, hdirectdiff, 'hdirectdiff', checkpoint)
+    ueval = evaluate_and_store_field(vectorevalspace, opts, uonly, 'u', checkpoint)
+    usolneval = evaluate_and_store_field(vectorevalspace, opts, usoln, 'usoln', checkpoint)
+    udiffeval = evaluate_and_store_field(vectorevalspace, opts, udiff, 'udiff', checkpoint)
+    udirectdiffeval = evaluate_and_store_field(vectorevalspace, opts, udirectdiff, 'udirectdiff', checkpoint)
+
+    plot_function(heval,coordseval,'h')
+    plot_function(hsolneval,coordseval,'hsoln')
+    plot_function(hdiffeval,coordseval,'hdiff')
+    plot_function(hdirectdiffeval,coordseval,'hdirectdiff')
+    plot_function(ueval,coordseval,'u')
+    plot_function(usolneval,coordseval,'usoln')
+    plot_function(udiffeval,coordseval,'udiff')
+    plot_function(udirectdiffeval,coordseval,'udirectdiff')
 
 checkpoint.close()
