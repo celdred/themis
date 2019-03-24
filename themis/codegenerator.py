@@ -20,22 +20,22 @@ def a_to_cinit_string(x):
 class EntriesObject():
     def __init__(self, elem):
 
-        ofx, ofmx = elem.get_entries(0, 0)
-        self.entries_offset_x = a_to_cinit_string(ofx)
-        self.entries_offset_mult_x = a_to_cinit_string(ofmx)
-        self.nentries_x = ofx.shape[0]
+        subelemx = elem.sub_elements[0][0]
+        self.entries_offset_x = subelemx.ofe
+        self.entries_offset_mult_x = subelemx.ome
+        self.nentries_x = subelemx.nentries
 
-        ofy, ofmy = elem.get_entries(0, 1)
-        self.entries_offset_y = a_to_cinit_string(ofy)
-        self.entries_offset_mult_y = a_to_cinit_string(ofmy)
-        self.nentries_y = ofy.shape[0]
+        subelemy = elem.sub_elements[0][1]
+        self.entries_offset_y = subelemy.ofe
+        self.entries_offset_mult_y = subelemy.ome
+        self.nentries_y = subelemy.nentries
 
-        ofz, ofmz = elem.get_entries(0, 2)
-        self.entries_offset_z = a_to_cinit_string(ofz)
-        self.entries_offset_mult_z = a_to_cinit_string(ofmz)
-        self.nentries_z = ofz.shape[0]
+        subelemz = elem.sub_elements[0][2]
+        self.entries_offset_z = subelemz.ofe
+        self.entries_offset_mult_z = subelemz.ome
+        self.nentries_z = subelemz.nentries
 
-        self.nentries_total = ofx.shape[0] * ofy.shape[0] * ofz.shape[0]
+        self.nentries_total = elem.nentries_total
 
         self.contx = subelemx.cont
         self.conty = subelemy.cont
@@ -64,37 +64,41 @@ class SpaceObject():
         self.nblocks_x = []
         self.nblocks_y = []
         self.nblocks_z = []
-        self.nbasis = []
-        self.dalist = ''
-        self.fieldargs = ''
+        #self.nbasis = []
+        #self.dalist = ''
+        #self.fieldargs = ''
+
+        self.dalist = elem.dalist(name)
+        self.fieldargs = elem.fieldargs(name)
 
         for ci in range(self.ncomp):
 
-            self.dalist = self.dalist + ',' + 'DM da_' + name + '_' + str(ci)
-            self.fieldargs = self.fieldargs + ',' + 'DM da_' + name + '_' + str(ci) + ',' + 'Vec ' + name + '_' + str(ci)
+            #self.dalist = self.dalist + ',' + 'DM da_' + name + '_' + str(ci)
+            #self.fieldargs = self.fieldargs + ',' + 'DM da_' + name + '_' + str(ci) + ',' + 'Vec ' + name + '_' + str(ci)
 
-# ALSO PUT EXTRA ELEMENT LOGIC IN HERE!
             subelemx = elem.sub_elements[ci][0]
-            self.offsets_x.append(a_to_cinit_string(subelemx.offsets))
-            self.offset_mult_x.append(a_to_cinit_string(subelemx.offset_mult))
+            self.offsets_x.append(subelemx.of)
+            self.offset_mult_x.append(subelemx.om)
             self.nblocks_x.append(subelemx.nblocks)
             self.nbasis_x.append(subelemx.nbasis)
 
             subelemy = elem.sub_elements[ci][1]
-            self.offsets_y.append(a_to_cinit_string(subelemy.offsets))
-            self.offset_mult_y.append(a_to_cinit_string(subelemy.offset_mult))
+            self.offsets_y.append(subelemy.of)
+            self.offset_mult_y.append(subelemy.om)
             self.nblocks_y.append(subelemy.nblocks)
             self.nbasis_y.append(subelemy.nbasis)
 
             subelemz = elem.sub_elements[ci][2]
-            self.offsets_z.append(a_to_cinit_string(subelemz.offsets))
-            self.offset_mult_z.append(a_to_cinit_string(subelemz.offset_mult))
+            self.offsets_z.append(subelemz.of)
+            self.offset_mult_z.append(subelemz.om)
             self.nblocks_z.append(subelemz.nblocks)
             self.nbasis_z.append(subelemz.nbasis)
 
-            self.nbasis.append(subelemx.nbasis * subelemy.nbasis * subelemz.nbasis)
+            #self.nbasis.append(subelemx.nbasis * subelemy.nbasis * subelemz.nbasis)
+        self.nbasis = elem.nbasis
+        self.nbasis_total = elem.nbasis_total
 
-        self.nbasis_total = np.sum(np.array(self.nbasis_x, dtype=np.int32) * np.array(self.nbasis_y, dtype=np.int32) * np.array(self.nbasis_z, dtype=np.int32))
+        #np.sum(np.array(self.nbasis_x, dtype=np.int32) * np.array(self.nbasis_y, dtype=np.int32) * np.array(self.nbasis_z, dtype=np.int32))
 
 class TabObject():
     def __init__(self, tabulation, kernel, pts):
@@ -204,7 +208,6 @@ interior_facet_types = ['interior_facet', 'interior_facet_vert', 'interior_facet
 
 template_path = "/home/celdred/Dropbox/Research/Code/postdoc/firedrake-themis/gitrepo/themis"
 
-
 def generate_assembly_routine(mesh, space1, space2, kernel):
     start = time.time()
     # load templates
@@ -229,6 +232,7 @@ def generate_assembly_routine(mesh, space1, space2, kernel):
         elem2 = space2.themis_element()
         space2obj = SpaceObject(elem2, 's2')
 
+# MOVE THIS LOGIC TO THEMIS ELEMENT AS WELL...
     if kernel.formdim == 2:
         matlist = ''
         for ci1 in range(space1obj.ncomp):
@@ -350,7 +354,6 @@ def generate_interpolation_routine(mesh, kernel):
 
     # read the template
     template = templateEnv.get_template('interpolation.template')
-
 
     # Load element specific information- entries offsets/offset mult
     elem = kernel.elem
