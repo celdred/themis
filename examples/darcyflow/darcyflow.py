@@ -7,6 +7,7 @@ from common import split, div, cos, as_vector, MixedFunctionSpace
 from common import create_box_mesh, create_complex, adjust_coordinates
 from common import derivative, Constant, FacetNormal, ds, dS, as_matrix, inv, dot, TensorElement
 from common import np
+import time
 
 OptDB = PETSc.Options()
 order = OptDB.getInt('order', 1)
@@ -31,6 +32,8 @@ nxs = [nx, ny]
 
 PETSc.Sys.Print(variant, order, cell, coordorder, nxs)
 
+start = time.time()
+
 # create mesh and spaces
 mesh = create_box_mesh(cell, nxs, xbcs, coordorder)
 elemdict = create_complex(cell, velocityspace, variant, order)
@@ -49,7 +52,10 @@ hhat, uhat = TestFunctions(mixedspace)
 xhat = TestFunction(mixedspace)
 xn = Function(mixedspace, name='x')
 h, u = split(xn)
-PETSc.Sys.Print('made spaces/functions')
+
+end = time.time()
+PETSc.Sys.Print('made spaces/functions',end-start)
+start = time.time()
 
 # set rhs/soln
 x,y = SpatialCoordinate(mesh)
@@ -109,7 +115,10 @@ hsolnproj = Projector(hsolnexpr, hsoln, bcs=[])  # ,options_prefix= 'masssys_'
 usolnproj = Projector(vecsolnexpr, usoln, bcs=[])  # ,options_prefix= 'masssys_'
 hsolnproj.project()
 usolnproj.project()
-PETSc.Sys.Print('projected')
+
+end = time.time()
+PETSc.Sys.Print('projected',end-start)
+start = time.time()
 
 # Create forms and problem
 kappainv = inv(kappa)
@@ -128,11 +137,17 @@ problem = NonlinearVariationalProblem(Rlhs - Rrhs, xn, bcs=[], J=J, Jp=Jp)
 
 problem._constant_jacobian = True
 solver = NonlinearVariationalSolver(problem, options_prefix='linsys_', solver_parameters={'snes_type': 'ksponly'})
-PETSc.Sys.Print('made solver')
+
+end = time.time()
+PETSc.Sys.Print('made solver',end-start)
+start = time.time()
 
 # solve system
 solver.solve()
-PETSc.Sys.Print('solved')
+
+end = time.time()
+PETSc.Sys.Print('solved',end-start)
+start = time.time()
 
 # compute norms
 hl2err = norm(h - hsoln, norm_type='L2')
@@ -174,6 +189,10 @@ checkpoint.write_attribute('fields/', 'hl2directerr', hl2directerr)
 checkpoint.write_attribute('fields/', 'ul2directerr', ul2directerr)
 checkpoint.write_attribute('fields/', 'uhdivdirecterr', uhdivdirecterr)
 
+end = time.time()
+PETSc.Sys.Print('norms and output',end-start)
+start = time.time()
+
 if plot:
     from common import plot_function, get_plotting_spaces, evaluate_and_store_field
 
@@ -207,3 +226,7 @@ if plot:
     plot_function(udirectdiffeval,coordseval,'udirectdiff')
 
 checkpoint.close()
+
+end = time.time()
+PETSc.Sys.Print('plotted',end-start)
+start = time.time()

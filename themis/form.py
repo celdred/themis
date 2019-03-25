@@ -142,28 +142,6 @@ def create_mono(target, source, blocklist, kernellist):
     return mat
 
 
-def get_interior_flags(mesh, kernellist):
-    interior_x = False
-    interior_y = False
-    interior_z = False
-    for kernel in kernellist:
-        if kernel.integral_type == 'interior_facet':
-            interior_x = True
-            interior_y = True
-            interior_z = True
-        if kernel.integral_type == 'interior_facet_horiz':
-            interior_x = True
-            if mesh.extrusion_dim == 2:
-                interior_y = True
-            interior_z = False
-        if kernel.integral_type == 'interior_facet_vert':
-            if mesh.extrusion_dim == 1:
-                interior_y = True
-            if mesh.extrusion_dim == 2:
-                interior_z = True
-    return interior_x, interior_y, interior_z
-
-
 def fill_mono(mat, target, source, blocklist, kernellist, zeroassembly=False):
     # print blocklist
     for si1 in range(target.nspaces):

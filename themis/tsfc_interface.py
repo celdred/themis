@@ -56,9 +56,9 @@ def compile_form(form):
                 tabobj['derivorder'] = int(splittab[3])
                 tabobj['shiftaxis'] = int(splittab[4])
                 if splittab[5] == 'd':
-                    tabobj['discont'] = True
+                    tabobj['cont'] = 'L2'
                 if splittab[5] == 'c':
-                    tabobj['discont'] = False
+                    tabobj['cont'] = 'H1'
                 tabobj['restrict'] = splittab[6]
                 tabobj['shape'] = shape
 

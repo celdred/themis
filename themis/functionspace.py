@@ -1,7 +1,7 @@
 from ufl import FunctionSpace as UFLFunctionSpace
 from ufl import MixedFunctionSpace as UFLMixedFunctionSpace
 from petscshim import PETSc
-from finiteelement import ThemisElement
+from themiselement import ThemisElement
 import numpy as np
 import ufl
 

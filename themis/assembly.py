@@ -42,76 +42,76 @@ def compile_functional(kernel, tspace, sspace, mesh):
     facet_exterior_boundary_list = []
 
     if kernel.integral_type == 'cell':
-        kernel.dalist.append(mesh.get_cell_da())
+        kernel.dalist.append(mesh.cell_da)
         facet_direc_list.append('')
         facet_exterior_boundary_list.append('')
 
     if kernel.integral_type == 'interior_facet':
-        kernel.dalist.append(mesh.get_cell_da())
+        kernel.dalist.append(mesh.cell_da)
         facet_direc_list.append(0)
         facet_exterior_boundary_list.append('')
         if mesh.ndim >= 2:
-            kernel.dalist.append(mesh.get_cell_da())
+            kernel.dalist.append(mesh.cell_da)
             facet_direc_list.append(1)
             facet_exterior_boundary_list.append('')
         if mesh.ndim >= 3:
-            kernel.dalist.append(mesh.get_cell_da())
+            kernel.dalist.append(mesh.cell_da)
             facet_direc_list.append(2)
             facet_exterior_boundary_list.append('')
 
     if kernel.integral_type == 'exterior_facet':
         if mesh.bcs[0] == 'nonperiodic':
-            kernel.dalist.append(mesh.get_cell_da())
-            kernel.dalist.append(mesh.get_cell_da())
+            kernel.dalist.append(mesh.cell_da)
+            kernel.dalist.append(mesh.cell_da)
             facet_direc_list.append(0)
             facet_exterior_boundary_list.append('upper')
             facet_direc_list.append(0)
             facet_exterior_boundary_list.append('lower')
         if mesh.ndim >= 2 and mesh.bcs[1] == 'nonperiodic':
-            kernel.dalist.append(mesh.get_cell_da())
-            kernel.dalist.append(mesh.get_cell_da())
+            kernel.dalist.append(mesh.cell_da)
+            kernel.dalist.append(mesh.cell_da)
             facet_direc_list.append(1)
             facet_exterior_boundary_list.append('upper')
             facet_direc_list.append(1)
             facet_exterior_boundary_list.append('lower')
         if mesh.ndim >= 3 and mesh.bcs[2] == 'nonperiodic':
-            kernel.dalist.append(mesh.get_cell_da())
-            kernel.dalist.append(mesh.get_cell_da())
+            kernel.dalist.append(mesh.cell_da)
+            kernel.dalist.append(mesh.cell_da)
             facet_direc_list.append(2)
             facet_exterior_boundary_list.append('upper')
             facet_direc_list.append(2)
             facet_exterior_boundary_list.append('lower')
 
     if kernel.integral_type == 'interior_facet_vert':  # side facets
-        kernel.dalist.append(mesh.get_cell_da())
+        kernel.dalist.append(mesh.cell_da)
         facet_direc_list.append(0)
         facet_exterior_boundary_list.append('')
         if mesh.extrusion_dim == 2:
-            kernel.dalist.append(mesh.get_cell_da())
+            kernel.dalist.append(mesh.cell_da)
             facet_direc_list.append(1)
             facet_exterior_boundary_list.append('')
 
     if kernel.integral_type == 'interior_facet_horiz':  # extruded facets
         if mesh.extrusion_dim == 1:
-            kernel.dalist.append(mesh.get_cell_da())
+            kernel.dalist.append(mesh.cell_da)
             facet_direc_list.append(1)
             facet_exterior_boundary_list.append('')
         if mesh.extrusion_dim == 2:
-            kernel.dalist.append(mesh.get_cell_da())
+            kernel.dalist.append(mesh.cell_da)
             facet_direc_list.append(2)
             facet_exterior_boundary_list.append('')
 
     if kernel.integral_type == 'exterior_facet_vert':  # side exterior facets
         if mesh.bcs[0] == 'nonperiodic':
-            kernel.dalist.append(mesh.get_cell_da())
-            kernel.dalist.append(mesh.get_cell_da())
+            kernel.dalist.append(mesh.cell_da)
+            kernel.dalist.append(mesh.cell_da)
             facet_direc_list.append(0)
             facet_exterior_boundary_list.append('upper')
             facet_direc_list.append(0)
             facet_exterior_boundary_list.append('lower')
         if mesh.extrusion_dim == 2 and mesh.bcs[1] == 'nonperiodic':
-            kernel.dalist.append(mesh.get_cell_da())
-            kernel.dalist.append(mesh.get_cell_da())
+            kernel.dalist.append(mesh.cell_da)
+            kernel.dalist.append(mesh.cell_da)
             facet_direc_list.append(1)
             facet_exterior_boundary_list.append('upper')
             facet_direc_list.append(1)
@@ -119,21 +119,21 @@ def compile_functional(kernel, tspace, sspace, mesh):
 
     if kernel.integral_type == 'exterior_facet_top':  # extruded exterior facet top
         if mesh.extrusion_dim == 1:
-            kernel.dalist.append(mesh.get_cell_da())
+            kernel.dalist.append(mesh.cell_da)
             facet_direc_list.append(1)
             facet_exterior_boundary_list.append('upper')
         if mesh.extrusion_dim == 2:
-            kernel.dalist.append(mesh.get_cell_da())
+            kernel.dalist.append(mesh.cell_da)
             facet_direc_list.append(2)
             facet_exterior_boundary_list.append('upper')
 
     if kernel.integral_type == 'exterior_facet_bottom':  # extruded exterior facet bottom
         if mesh.extrusion_dim == 1:
-            kernel.dalist.append(mesh.get_cell_da())
+            kernel.dalist.append(mesh.cell_da)
             facet_direc_list.append(1)
             facet_exterior_boundary_list.append('lower')
         if mesh.extrusion_dim == 2:
-            kernel.dalist.append(mesh.get_cell_da())
+            kernel.dalist.append(mesh.cell_da)
             facet_direc_list.append(2)
             facet_exterior_boundary_list.append('lower')
 
@@ -207,9 +207,7 @@ def compile_functional(kernel, tspace, sspace, mesh):
             assembly_routine = generate_interpolation_routine(mesh, kernel)
         else:
             assembly_routine = generate_assembly_routine(mesh, tspace, sspace, kernel)
-            # print(assembly_routine)
-# THIS IS THE SLOW PART- GENERATING THE ROUTINE...
-# SHOULD CACHE IT BASICALLY, BUT THIS IS TRICKY...
+
         assembly_function = CompiledKernel(assembly_routine, "assemble", cppargs=["-O3"], argtypes=argtypeslist, restype=restype)
         kernel.assemblyfunc_list.append(assembly_function)
         kernel.argtypeslist = argtypeslist

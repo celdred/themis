@@ -180,6 +180,10 @@ def create_box_mesh(cell, nxs, xbcs, coordorder, vcoordorder = None):
             bmesh = PeriodicSquareMesh(nxs[0], nxs[1], 1.0, direction='y', quadrilateral=use_quad)
         mesh = ExtrudedMesh(bmesh, nxs[2])
 
+    # Required since Firedrake doesn't flag meshes as extruded
+    mesh.extruded = False
+    if cell in ['tpquad', 'tphex', 'tptri']: mesh.extruded = True
+
     # Upgrade coordinate order if needed
     if coordorder > 1:
         newmesh = set_mesh_coordinate_order(mesh, ndims, xbcs, coordorder, vcoordorder=vcoordorder)

@@ -2,11 +2,27 @@ import jinja2
 import numpy as np
 
 from ufl import FiniteElement, interval
-from finiteelement import IntervalElement
+from themiselement import IntervalElement
 from finat.point_set import TensorPointSet
 from constant import Constant
 import function
+import time
+from petscshim import PETSc
 
+
+exterior_facet_types = ['exterior_facet', 'exterior_facet_vert', 'exterior_facet_bottom', 'exterior_facet_top']
+interior_facet_types = ['interior_facet', 'interior_facet_vert', 'interior_facet_horiz']
+
+template_path = "/home/celdred/Dropbox/Research/Code/postdoc/firedrake-themis/gitrepo/themis"
+
+# load templates and create environment
+templateLoader = jinja2.FileSystemLoader(searchpath=template_path)
+templateEnv = jinja2.Environment(loader=templateLoader, trim_blocks=True)
+
+# read the templates
+interpolation_template = templateEnv.get_template('interpolation.template')
+cellassembly_template = templateEnv.get_template('assemble.template')
+facetassembly_template = templateEnv.get_template('assemble-facets.template')
 
 def a_to_cinit_string(x):
     np.set_printoptions(threshold=np.prod(x.shape))
@@ -16,7 +32,6 @@ def a_to_cinit_string(x):
     sx = sx.replace(']', '}')
     return sx
 
-# THIS WHOLE THING CAN ACTUALLY BE WRAPPED INTO THEMIS ELEMENT!
 class EntriesObject():
     def __init__(self, elem):
 
@@ -35,7 +50,7 @@ class EntriesObject():
         self.entries_offset_mult_z = subelemz.ome
         self.nentries_z = subelemz.nentries
 
-        self.nentries_total = elem.nentries_total
+        self.nentries_total = elem.nentries[0]
 
         self.contx = subelemx.cont
         self.conty = subelemy.cont
@@ -44,7 +59,6 @@ class EntriesObject():
         self.ndofs = elem.ndofs
 
 
-# THIS WHOLE THING CAN ACTUALLY BE WRAPPED INTO THEMIS ELEMENT!
 class SpaceObject():
     def __init__(self, elem, name):
         self.name = name
@@ -64,17 +78,11 @@ class SpaceObject():
         self.nblocks_x = []
         self.nblocks_y = []
         self.nblocks_z = []
-        #self.nbasis = []
-        #self.dalist = ''
-        #self.fieldargs = ''
 
         self.dalist = elem.dalist(name)
-        self.fieldargs = elem.fieldargs(name)
+        self.fieldargs = elem.fieldargslist(name)
 
         for ci in range(self.ncomp):
-
-            #self.dalist = self.dalist + ',' + 'DM da_' + name + '_' + str(ci)
-            #self.fieldargs = self.fieldargs + ',' + 'DM da_' + name + '_' + str(ci) + ',' + 'Vec ' + name + '_' + str(ci)
 
             subelemx = elem.sub_elements[ci][0]
             self.offsets_x.append(subelemx.of)
@@ -94,11 +102,12 @@ class SpaceObject():
             self.nblocks_z.append(subelemz.nblocks)
             self.nbasis_z.append(subelemz.nbasis)
 
-            #self.nbasis.append(subelemx.nbasis * subelemy.nbasis * subelemz.nbasis)
         self.nbasis = elem.nbasis
         self.nbasis_total = elem.nbasis_total
 
-        #np.sum(np.array(self.nbasis_x, dtype=np.int32) * np.array(self.nbasis_y, dtype=np.int32) * np.array(self.nbasis_z, dtype=np.int32))
+
+# Use tabdict to cache tab elems, which can be expensive to generate due to sympy lambdification of many basis functions
+tabdict = {}
 
 class TabObject():
     def __init__(self, tabulation, kernel, pts):
@@ -106,15 +115,17 @@ class TabObject():
         self.name = tabulation['name']
         self.shape = tabulation['shape']
 
-        if tabulation['discont'] is False:
-            tabelem = IntervalElement(tabulation['variant'], 'h1', tabulation['order'])
-        if tabulation['discont'] is True:
-            tabelem = IntervalElement(tabulation['variant'], 'l2', tabulation['order'])
+        if (tabulation['variant'], tabulation['cont'], tabulation['order']) in tabdict:
+            tabelem = tabdict[(tabulation['variant'], tabulation['cont'], tabulation['order'])]
+        else:
+            tabelem = IntervalElement(tabulation['variant'], tabulation['cont'], tabulation['order'])
+            tabdict[(tabulation['variant'], tabulation['cont'], tabulation['order'])] = tabelem
 
-        self.values = a_to_cinit_string(tabelem.tabulate_numerical(pts, tabulation['derivorder']))
-        self.npts = vals.shape[1]
-        self.nbasis = vals.shape[2]
-        self.nblocks = vals.shape[0]
+        self.vals = tabelem.tabulate_numerical(pts, tabulation['derivorder'])
+        self.values = a_to_cinit_string(self.vals)
+        self.npts = self.vals.shape[1]
+        self.nbasis = self.vals.shape[2]
+        self.nblocks = self.vals.shape[0]
         self.shiftaxis = tabulation['shiftaxis']
 
         self.cell = 'bad'
@@ -129,10 +140,6 @@ class TabObject():
                 self.cell = '2'
             if kernel.facet_exterior_boundary == 'upper':
                 self.cell = '1'
-
-        # sanity checks
-        assert(tabulation['shape'] == vals.shape[1:])
-        assert(tabelem.nblocks == vals.shape[0])
 
 
 def get_pts(kernel, ndims, restrict, shiftaxis, shape):
@@ -203,25 +210,9 @@ def get_pts(kernel, ndims, restrict, shiftaxis, shape):
     return allpts[shiftaxis]
 
 
-exterior_facet_types = ['exterior_facet', 'exterior_facet_vert', 'exterior_facet_bottom', 'exterior_facet_top']
-interior_facet_types = ['interior_facet', 'interior_facet_vert', 'interior_facet_horiz']
 
-template_path = "/home/celdred/Dropbox/Research/Code/postdoc/firedrake-themis/gitrepo/themis"
 
 def generate_assembly_routine(mesh, space1, space2, kernel):
-    start = time.time()
-    # load templates
-    templateLoader = jinja2.FileSystemLoader(searchpath=template_path)
-
-    # create environment
-    templateEnv = jinja2.Environment(loader=templateLoader, trim_blocks=True)
-    templateVars = {}
-
-    # read the template
-    if kernel.integral_type in interior_facet_types + exterior_facet_types:
-        template = templateEnv.get_template('assemble-facets.template')
-    else:
-        template = templateEnv.get_template('assemble.template')
 
     # determine space1 and space2 info
     if not (space1 is None):
@@ -232,7 +223,6 @@ def generate_assembly_routine(mesh, space1, space2, kernel):
         elem2 = space2.themis_element()
         space2obj = SpaceObject(elem2, 's2')
 
-# MOVE THIS LOGIC TO THEMIS ELEMENT AS WELL...
     if kernel.formdim == 2:
         matlist = ''
         for ci1 in range(space1obj.ncomp):
@@ -242,6 +232,7 @@ def generate_assembly_routine(mesh, space1, space2, kernel):
         veclist = ''
         for ci1 in range(space1obj.ncomp):
             veclist = veclist + ',' + 'Vec formvec_' + str(ci1)
+
 
     # load fields info, including coordinates
     field_args_string = ''
@@ -280,6 +271,7 @@ def generate_assembly_routine(mesh, space1, space2, kernel):
     for constant in constantlist:
         constant_args_string = constant_args_string + ',' + 'double ' + constant.name()
 
+
     # do tabulations
     tabulations = []
     for tabulation in kernel.tabulations:
@@ -287,7 +279,10 @@ def generate_assembly_routine(mesh, space1, space2, kernel):
         tabobj = TabObject(tabulation, kernel, pts)
         tabulations.append(tabobj)
 
+
     # set template vars
+    templateVars = {}
+
     if kernel.integral_type in interior_facet_types:
         templateVars['facet_type'] = 'interior'
         templateVars['facet_direc'] = kernel.facet_direc
@@ -334,26 +329,17 @@ def generate_assembly_routine(mesh, space1, space2, kernel):
     templateVars['fieldplusconstantslist'] = fieldplusconstantslist
     templateVars['constantargs'] = constant_args_string
 
-    end = time.time()
-    PETSc.Sys.Print('pieces generated',end-start)
-
     # Process template to produce source code
     start = time.time()
-    outputText = template.render(templateVars)
-    end = time.time()
-    PETSc.Sys.Print('template rendered',end-start)
+    if kernel.integral_type in interior_facet_types + exterior_facet_types:
+        outputText = facetassembly_template.render(templateVars)
+    else:
+        outputText = cellassembly_template.render(templateVars)
+
     return outputText
 
 def generate_interpolation_routine(mesh, kernel):
-    # load templates
-    templateLoader = jinja2.FileSystemLoader(searchpath=template_path)
 
-    # create environment
-    templateEnv = jinja2.Environment(loader=templateLoader, trim_blocks=True)
-    templateVars = {}
-
-    # read the template
-    template = templateEnv.get_template('interpolation.template')
 
     # Load element specific information- entries offsets/offset mult
     elem = kernel.elem
@@ -400,6 +386,7 @@ def generate_interpolation_routine(mesh, kernel):
         tabulations.append(tabobj)
 
     # Specify the input variables for the template
+    templateVars = {}
 
     templateVars['tabulations'] = tabulations
     templateVars['bcs'] = mesh.bcs
@@ -418,6 +405,6 @@ def generate_interpolation_routine(mesh, kernel):
     templateVars['constantargs'] = constant_args_string
 
     # Process template to produce source code
-    outputText = template.render(templateVars)
+    outputText = interpolation_template.render(templateVars)
 
     return outputText

@@ -45,6 +45,7 @@ data_formvec_{{ ci }}[kk][jj][ii][d1] += vals_{{ ci }} s1_{{ci}}_indices;
 		{{ kernelstr }}
 
 {% if formdim == 2 %}
+
 PetscErrorCode assemble(DM da {{ submatlist }}  {{ space1.dalist }}  {{ space2.dalist }} {{ fieldargs }} {{ constantargs }})
 {% endif %}
  {% if formdim == 1 %}

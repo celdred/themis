@@ -6,7 +6,7 @@ from bcs import DirichletBC
 from solver import NonlinearVariationalProblem, NonlinearVariationalSolver
 from ufl import inner, dx
 from ufl_expr import TestFunction
-from finiteelement import ThemisElement
+from themiselement import ThemisElement
 from ufl import Mesh, FiniteElement, interval, VectorElement, quadrilateral, TensorProductElement, hexahedron
 
 # THIS IS AN UGLY HACK NEEDED BECAUSE OWNERSHIP RANGES ARGUMENT TO petc4py DMDA_CREATE is BROKEN
@@ -75,16 +75,17 @@ class SingleBlockMesh(Mesh):
         ndofs_per_cell = []  # this is the number of "unique"/canonical dofs per element ie 1 for DG0, 2 for DG1, 1 for CG1, 2 for CG2, etc.
         for i in range(self.ndim):
             subelem = elem.sub_elements[ci][i]
-            nx = subelem.get_nx(self.nxs[i], self.bcs[i])
-            ndofs = subelem.ndofs_per_element
 
+            ndofs = subelem.ndofs_per_element
+            nx = ndofs * self.nxs[i]
+            if subelem.cont == 'H1' and self.bcs[i] == 'nonperiodic': nx = nx + 1
             ndofs_per_cell.append(ndofs)
             sizes.append(nx)
 
-        da = PETSc.DMDA().create(dim=self.ndim, dof=ndof, proc_sizes=self._cell_da.getProcSizes(), sizes=sizes, boundary_type=self._blist, stencil_type=PETSc.DMDA.StencilType.BOX, stencil_width=swidth, setup=False)
+        da = PETSc.DMDA().create(dim=self.ndim, dof=ndof, proc_sizes=self.cell_da.getProcSizes(), sizes=sizes, boundary_type=self._blist, stencil_type=PETSc.DMDA.StencilType.BOX, stencil_width=swidth, setup=False)
 
         # THIS IS AN UGLY HACK NEEDED BECAUSE OWNERSHIP RANGES ARGUMENT TO petc4py DMDA_CREATE is BROKEN
-        bdx = list(np.array(sizes) - np.array(self._cell_da.getSizes(), dtype=np.int32) * np.array(ndofs_per_cell, dtype=np.int32))
+        bdx = list(np.array(sizes) - np.array(self.cell_da.getSizes(), dtype=np.int32) * np.array(ndofs_per_cell, dtype=np.int32))
         # bdx is the "extra" boundary dof for this space (0 if periodic, 1 if non-periodic)
         if self.ndim == 1:
             ndofs_per_cell.append(1)
@@ -94,7 +95,7 @@ class SingleBlockMesh(Mesh):
         if self.ndim == 2:
             ndofs_per_cell.append(1)
             bdx.append(0)
-        decompfunction([self._cell_da, da], [self.ndim, ndofs_per_cell[0], ndofs_per_cell[1], ndofs_per_cell[2], int(bdx[0]), int(bdx[1]), int(bdx[2])])
+        decompfunction([self.cell_da, da], [self.ndim, ndofs_per_cell[0], ndofs_per_cell[1], ndofs_per_cell[2], int(bdx[0]), int(bdx[1]), int(bdx[2])])
         da.setUp()
 
         return da
@@ -292,7 +293,7 @@ def create_reference_domain_coordinates(cell_da, celem):
     ranges = cell_da.getRanges()
     sizes = cell_da.getSizes()
     ndims = len(ranges)
-    # print(celem)
+    coordslist = []
     for i in range(ndims):
         subelem = themis_celem.sub_elements[0][i]
         nx = sizes[i]
@@ -307,7 +308,6 @@ def create_reference_domain_coordinates(cell_da, celem):
         coords1D = elementcoords + elementwisecoords
         if subelem.cont == 'H1' and ranges[i][1] == sizes[i]:  # if this process owns the boundary
             coords1D = np.append(coords1D, 1.0)
-
         coordslist.append(coords1D)
     coordsND = np.meshgrid(*coordslist, indexing='ij')
     coordsND = np.stack(coordsND, axis=-1)
