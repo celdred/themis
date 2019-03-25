@@ -5,7 +5,7 @@ import ufl
 
 
 def _globalify(value):
-    data = np.array(value, dtype=np.float32)
+    data = np.array(value, dtype=np.float64)
     shape = data.shape
     rank = len(shape)
     if rank in [0,1,2]:

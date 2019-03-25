@@ -136,8 +136,8 @@ class ThemisElement():
     def __init__(self, elem):
 
         if isinstance(elem, TensorElement):
-# THIS MIGHT BE WRONG, CHECK IT!
-            self.ndofs = elem.value_size()
+            self.ndofs = elem.value_size() # do this BEFORE extracting baseelem
+            elem = elem.sub_elements()[0]
         elif isinstance(elem, VectorElement):
             self.ndofs = elem.value_size()  # do this BEFORE extracting baseelem
             elem = elem.sub_elements()[0]

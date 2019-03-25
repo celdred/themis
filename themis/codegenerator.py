@@ -233,44 +233,35 @@ def generate_assembly_routine(mesh, space1, space2, kernel):
         for ci1 in range(space1obj.ncomp):
             veclist = veclist + ',' + 'Vec formvec_' + str(ci1)
 
-
-    # load fields info, including coordinates
-    field_args_string = ''
-    constant_args_string = ''
-    fieldobjs = []
-    fieldplusconstantslist = []
-
     # get the list of fields and constants
-    fieldlist = []
-    constantlist = []
+    field_args_string = '' # this goes in function call
+    constant_args_string = '' # this goes in function call
+    kernel_args_string = '' # this goes in kernel call
+    fieldobjs = []
+
     if not kernel.zero:
-        fieldlist.append((mesh.coordinates, None, 0))
-        fieldplusconstantslist.append('coords_0_vals')
+        # coordinates
+        fspace = mesh.coordinates.function_space().get_space(0)
+        elem = fspace.get_space(0).themis_element()
+        fieldobj = SpaceObject(elem, 'coords_0')
+        field_args_string = field_args_string + fieldobj.fieldargs
+        fieldobjs.append(fieldobj)
+        kernel_args_string = kernel_args_string + ',' + '&' + 'coords_0_vals'
+
+        # other fields
         for fieldindex in kernel.coefficient_map:
             field = kernel.coefficients[fieldindex]
             if isinstance(field, function.Function):
                 for si in range(field.function_space().nspaces):
-                    fieldlist.append((field, fieldindex, si))
-                    fieldplusconstantslist.append('w' + str(fieldindex) + '_' + str(si) + '_vals')
+                    fspace = field.function_space().get_space(si)
+                    elem = fspace.get_space(si).themis_element()
+                    fieldobj = SpaceObject(elem, field.name() + '_' + str(si))
+                    field_args_string = field_args_string + fieldobj.fieldargs
+                    fieldobjs.append(fieldobj)
+                    kernel_args_string = kernel_args_string + ',' + '&' + field.name() + '_' + str(si) + '_vals'
             if isinstance(field, Constant):
-                constantlist.append(field)
-                #fieldplusconstantslist.append('&' + field.name())
-                fieldplusconstantslist.append(field.name())
-
-    for field, fieldindex, si in fieldlist:
-        fspace = field.function_space().get_space(si)
-        elem = fspace.get_space(si).themis_element()
-        if fieldindex is None:
-            fieldobj = SpaceObject(elem, 'coords_0')
-        else:
-            fieldobj = SpaceObject(elem, 'w' + str(fieldindex) + '_' + str(si))
-        field_args_string = field_args_string + fieldobj.fieldargs
-        fieldobjs.append(fieldobj)
-
-# THIS IS BROKEN FOR VECTOR/TENSOR CONSTANTS
-    for constant in constantlist:
-        constant_args_string = constant_args_string + ',' + 'double ' + constant.name()
-
+                constant_args_string = constant_args_string + ',' + 'const double *' + field.name()
+                kernel_args_string  = kernel_args_string + ',' + field.name()
 
     # do tabulations
     tabulations = []
@@ -278,7 +269,6 @@ def generate_assembly_routine(mesh, space1, space2, kernel):
         pts = get_pts(kernel, mesh.ndim, tabulation['restrict'], tabulation['shiftaxis'], tabulation['shape'])
         tabobj = TabObject(tabulation, kernel, pts)
         tabulations.append(tabobj)
-
 
     # set template vars
     templateVars = {}
@@ -325,9 +315,8 @@ def generate_assembly_routine(mesh, space1, space2, kernel):
 
     templateVars['fieldlist'] = fieldobjs
     templateVars['fieldargs'] = field_args_string
-
-    templateVars['fieldplusconstantslist'] = fieldplusconstantslist
     templateVars['constantargs'] = constant_args_string
+    templateVars['kernelargs'] = kernel_args_string
 
     # Process template to produce source code
     start = time.time()
@@ -345,37 +334,24 @@ def generate_interpolation_routine(mesh, kernel):
     elem = kernel.elem
     entries = EntriesObject(elem)
 
-    # load fields info, including coordinates
-    field_args_string = ''
-    constant_args_string = ''
-    fieldobjs = []
-    # fielddict = {}
-    fieldplusconstantslist = []
-
     # get the list of fields and constants
-    fieldlist = []
-    constantlist = []
+    field_args_string = '' # this goes in function call
+    constant_args_string = '' # this goes in function call
+    kernel_args_string = '' # this goes in kernel call
+    fieldobjs = []
     for fieldindex in kernel.coefficient_map:
         field = kernel.coefficients[fieldindex]
         if isinstance(field, function.Function):
             for si in range(field.function_space().nspaces):
-                fieldlist.append((field, si))
-                fieldplusconstantslist.append(field.name() + '_' + str(si) + '_vals')
+                fspace = field.function_space().get_space(si)
+                elem = fspace.get_space(si).themis_element()
+                fieldobj = SpaceObject(elem, field.name() + '_' + str(si))
+                field_args_string = field_args_string + fieldobj.fieldargs
+                fieldobjs.append(fieldobj)
+                kernel_args_string = kernel_args_string + ',' + '&' + field.name() + '_' + str(si) + '_vals'
         if isinstance(field, Constant):
-            constantlist.append(field)
-            #fieldplusconstantslist.append('&' + field.name())
-            fieldplusconstantslist.append(field.name())
-# BROKEN FOR VECTOR/TENSOR CONSTANTS
-
-    for field, si in fieldlist:
-        fspace = field.function_space().get_space(si)
-        elem = fspace.get_space(si).themis_element()
-        fieldobj = SpaceObject(elem, field.name() + '_' + str(si))
-        field_args_string = field_args_string + fieldobj.fieldargs
-        fieldobjs.append(fieldobj)
-
-    for constant in constantlist:
-        constant_args_string = constant_args_string + ',' + 'double ' + constant.name()
+            constant_args_string = constant_args_string + ',' + 'const double *' + field.name()
+            kernel_args_string  = kernel_args_string + ',' + field.name()
 
     # do tabulations
     arrpts = np.array(kernel.pts)
@@ -400,9 +376,8 @@ def generate_interpolation_routine(mesh, kernel):
 
     templateVars['fieldlist'] = fieldobjs
     templateVars['fieldargs'] = field_args_string
-
-    templateVars['fieldplusconstantslist'] = fieldplusconstantslist
     templateVars['constantargs'] = constant_args_string
+    templateVars['kernelargs'] = kernel_args_string
 
     # Process template to produce source code
     outputText = interpolation_template.render(templateVars)

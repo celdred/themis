@@ -9,6 +9,7 @@ from pyop2.utils import get_petsc_dir
 from pyop2 import compilation
 import ctypes
 import time
+from numpy.ctypeslib import ndpointer
 
 class CompiledKernel(object):
     base_cppargs = ["-I%s/include" % d for d in get_petsc_dir()]
@@ -139,8 +140,6 @@ def compile_functional(kernel, tspace, sspace, mesh):
 
     # create field args list: matches construction used in codegenerator.py
 
-# MAYBE THIS SHOULD REALLY BE PART OF CODE GENERATOR.PY?
-
     kernel.fieldargs_list = []
     kernel.constantargs_list = []
     fieldargtypeslist = []
@@ -164,12 +163,9 @@ def compile_functional(kernel, tspace, sspace, mesh):
                         kernel.fieldargs_list.append(field.get_lvec(si, ci))
                         fieldargtypeslist.append(ctypes.c_voidp)  # DA
                         fieldargtypeslist.append(ctypes.c_voidp)  # Vec
-# THIS IS BROKEN FOR VECTOR AND TENSOR CONSTANTS
-# https://stackoverflow.com/questions/5862915/passing-numpy-arrays-to-a-c-function-for-input-and-output
             if isinstance(field, Constant):
-                constantargtypeslist.append(ctypes.c_double)
+                constantargtypeslist.append(ndpointer(ctypes.c_double, flags="C_CONTIGUOUS"))
 
-# THIS NEEDS SOME SORT OF CACHING CHECK- BASICALLY WE SHOULDN'T REALLY RE-GENERATE THE BIG C STRING EVERY TIME...
     kernel.assemblyfunc_list = []
     tensorlist = []
 
@@ -233,9 +229,7 @@ def extract_fields(kernel):
                 field.scatter()
 
             if isinstance(field, Constant):
-                data = field.dat
-                kernel.constantargs_list.append(float(data))
-# BROKEN FOR VECTOR/TENSOR CONSTANTS
+                kernel.constantargs_list.append(field.dat)
 
 
 def AssembleTwoForm(mat, tspace, sspace, kernel, zeroassembly=False):

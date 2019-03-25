@@ -613,9 +613,7 @@ for (k=zs; k<zs+zm; k++) {
     //extruded doesn't need a facet number
   	 {% if extruded == 1 %}
 		{{kernelname}}(vals
-				 {% for field in fieldplusconstantslist %}
-				 ,{{field}}
-				 				{% endfor %}
+            {{ kernelargs }}
 				 {% for tabulation in tabulations %}
 				  {% if tabulation.shiftaxis == 0 %}
 				 ,{{tabulation.name}}[bi{{tabulation.cell}}_{{ tabulation.name }}_x_0]
@@ -633,9 +631,7 @@ for (k=zs; k<zs+zm; k++) {
     //non-extruded needs a facet number, but it is the same convention as extruded ie - = 2 and + = 1 (or similar for y/z directions)
   	 {% if extruded == 0 %}
 		{{kernelname}}(vals
-				 {% for field in fieldplusconstantslist %}
-				 ,&{{field}}
-				 				{% endfor %}
+            {{ kernelargs }}
 				 ,facet_number
 				 {% for tabulation in tabulations %}
 				  {% if tabulation.shiftaxis == 0 %}
