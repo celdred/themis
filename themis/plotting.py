@@ -1,11 +1,13 @@
 
 
 from ufl import FiniteElement, TensorProductElement, VectorElement, interval, quadrilateral, hexahedron
-from functionspace import FunctionSpace
-from function import Function
+from themis.functionspace import FunctionSpace
+from themis.function import Function
 import matplotlib.pyplot as plt
 import numpy as np
 import matplotlib.tri as tri
+
+__all__ = ["get_plotting_spaces", "evaluate_and_store_field", "plot_function"]
 
 def Pascal1D(n):
     pts = np.linspace(-1., 1., 2*n+1)

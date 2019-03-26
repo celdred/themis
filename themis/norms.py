@@ -1,8 +1,10 @@
-from function import Function
+from themis.function import Function
 from ufl import inner, div, grad, curl, sqrt, dx
-from form import ZeroForm
+from themis.form import ZeroForm
 
 # ATTRIBUTE THIS- BASICALLY FIREDRAKE VERSION
+
+__all__ = ["errornorm", "norm"]
 
 
 def errornorm(u, uh, norm_type="L2"):

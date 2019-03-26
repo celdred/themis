@@ -1,11 +1,13 @@
 
 import ufl
-import ufl_expr
-from petscshim import PETSc
-from form import TwoForm, OneForm
+from themis import ufl_expr
+from themis.petscshim import PETSc
+from themis.form import TwoForm, OneForm
 # import time
+from themis.function import Function
 
 # ADD FIREDRAKE ATTRIBUTION
+__all__ = ["NonlinearVariationalProblem", "NonlinearVariationalSolver"]
 
 
 class NonlinearVariationalProblem():
@@ -24,7 +26,6 @@ class NonlinearVariationalProblem():
                 compiler (optional)
         :param dict constant_jacobian: True is J is constant, False if not
         """
-        from function import Function
 
     # Store input UFL forms and solution Function
         self.F = F
@@ -173,7 +174,7 @@ class NonlinearVariationalSolver():  # solving_utils.ParametersMixin
         self.Fform = OneForm(problem.F, self.problem.u, bcs=problem.bcs, pre_f_callback=pre_f_callback)
 
         self.snes.setFunction(self.Fform.assembleform, self.Fform.vector)
-        
+
         # print('solver F',problem.F)
         # print('solver J',problem.J)
         # print('solver Jp',problem.Jp)
@@ -257,7 +258,7 @@ class NonlinearVariationalSolver():  # solving_utils.ParametersMixin
 
 def _extract_bcs(bcs):
     "Extract and check argument bcs"
-    from bcs import DirichletBC
+    from themis import DirichletBC
     if bcs is None:
         return ()
     try:

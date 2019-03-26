@@ -1,14 +1,15 @@
 import jinja2
 import numpy as np
 
-from ufl import FiniteElement, interval
-from themiselement import IntervalElement
+from themis import FiniteElement, interval
+from themis.themiselement import IntervalElement
 from finat.point_set import TensorPointSet
-from constant import Constant
-import function
+from themis.constant import Constant
+import themis.function as function
 import time
-from petscshim import PETSc
+from themis.petscshim import PETSc
 
+__all__ = ["generate_assembly_routine", "generate_interpolation_routine"]
 
 exterior_facet_types = ['exterior_facet', 'exterior_facet_vert', 'exterior_facet_bottom', 'exterior_facet_top']
 interior_facet_types = ['interior_facet', 'interior_facet_vert', 'interior_facet_horiz']

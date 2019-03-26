@@ -2,21 +2,21 @@
 import numpy as np
 from tsfc import compile_expression_at_points as compile_ufl_kernel
 import ufl
-import function
+import themis
 import tsfc.kernel_interface.firedrake as kernel_interface
-from petscshim import PETSc
-from assembly import extract_fields, compile_functional
+from themis.petscshim import PETSc
+from themis.assembly_utils import extract_fields, compile_functional
 
+__all__ = ["Interpolator", "interpolate"]
 
 def interpolate(expr, V, overwrite_pts=None):
     return Interpolator(expr, V, overwrite_pts=overwrite_pts).interpolate()
-
 
 class Interpolator():
 
     def __init__(self, expr, V, overwrite_pts=None):
         assert isinstance(expr, ufl.classes.Expr)
-        if isinstance(V, function.Function):
+        if isinstance(V, themis.Function):
             f = V
             V = f.function_space()
         else:

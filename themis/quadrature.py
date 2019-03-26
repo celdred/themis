@@ -1,7 +1,8 @@
 import sympy
-from lagrange import gauss_lobatto, gauss_legendre, lagrange_poly_support
+from themis.lagrange import gauss_lobatto, gauss_legendre, lagrange_poly_support
 import numpy as np
 
+__all__ = ["QuadratureExact", "QuadratureNumerical"]
 
 def rescale_pts(pts):
     return 0.5 * pts + 0.5

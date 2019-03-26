@@ -1,7 +1,7 @@
 from ufl import Coefficient
-from petscshim import PETSc
-import interpolator
+from themis.petscshim import PETSc
 
+__all__ = ["Function", "SplitFunction"]
 
 class SplitFunction():
     # NEED A GOOD DEFAULT NAME HERE!!!
@@ -118,6 +118,7 @@ class Function(Coefficient):
 
     def interpolate(self, expression, overwrite_pts=None):
         if self.ufl_function_space().interpolatory:
+            from themis import interpolator
             return interpolator.interpolate(expression, self, overwrite_pts=overwrite_pts)
         else:
             raise TypeError('cannot interpolate in %s',self.ufl_function_space())

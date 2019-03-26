@@ -1,7 +1,8 @@
 import tsfc
-from formmanipulation import split_form
+from themis.formmanipulation import split_form
 import tsfc.kernel_interface.firedrake as kernel_interface
 
+__all__ = ["compile_form", ]
 
 class ThemisKernel():
     def __init__(self, kernel):

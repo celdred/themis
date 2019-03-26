@@ -1,11 +1,12 @@
 import numpy as np
-from form import get_block, restore_block
-from petscshim import PETSc
-from function import Function
-from constant import Constant
+from themis.form import get_block, restore_block
+from themis.petscshim import PETSc
+from themis.function import Function
+from themis.constant import Constant
+from themis.project import Projector
 import ufl
-from project import Projector
 
+__all__ = ["DirichletBC",]
 
 class DirichletBC():
 

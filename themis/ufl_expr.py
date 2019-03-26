@@ -6,8 +6,9 @@ from ufl.split_functions import split
 from ufl.algorithms import extract_arguments
 
 import ufl
-from function import Function
+from themis.function import Function
 
+__all__ = ["Argument", "TestFunction", "TrialFunction", "TestFunctions", "TrialFunctions", "derivative", "adjoint", "CellSize"]
 
 class Argument(ufl.Argument):
     def function_space(self):

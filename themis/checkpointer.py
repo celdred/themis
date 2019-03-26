@@ -1,5 +1,5 @@
-from petscshim import PETSc
-from function import Function, SplitFunction
+from themis.petscshim import PETSc
+from themis.function import Function, SplitFunction
 from firedrake import hdf5interface as h5i
 import numpy as np
 
@@ -12,9 +12,10 @@ FILE_CREATE = PETSc.Viewer.Mode.WRITE
 FILE_UPDATE = PETSc.Viewer.Mode.APPEND
 """Open a checkpoint file for updating.  Creates the file if it does not exist, providing both read and write access."""
 
+__all__ = ["DumbCheckpoint", "FILE_READ", "FILE_CREATE", "FILE_UPDATE", ]
 
 # ADD FIREDRAKE ATTRIBUTION
-class Checkpoint():
+class DumbCheckpoint():
     def __init__(self, name, mode=FILE_UPDATE):
 
         self.mode = mode
@@ -31,7 +32,7 @@ class Checkpoint():
         self.viewer = PETSc.ViewerHDF5().create(name + '.h5', mode=mode, comm=PETSc.COMM_WORLD)
 
         self.h5file = h5i.get_h5py_file(self.viewer)
-        
+
     def store(self, field, name=None):
         if self.mode is FILE_READ:
             raise IOError("Cannot store to checkpoint opened with mode 'FILE_READ'")

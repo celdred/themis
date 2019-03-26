@@ -1,13 +1,13 @@
 
 
-from common import PETSc, norm, dx, DumbCheckpoint, sin, inner, FILE_CREATE
-from common import FunctionSpace, SpatialCoordinate, Function, Projector, NonlinearVariationalProblem, NonlinearVariationalSolver
-from common import TestFunction, DirichletBC, pi, TestFunctions
-from common import split, div, cos, as_vector, MixedFunctionSpace
-from common import create_box_mesh, create_complex, adjust_coordinates
-from common import derivative, Constant, FacetNormal, ds, dS, as_matrix, inv, dot, TensorElement
-from common import np
+from interop import PETSc, norm, dx, DumbCheckpoint, sin, inner, FILE_CREATE
+from interop import FunctionSpace, SpatialCoordinate, Function, Projector, NonlinearVariationalProblem, NonlinearVariationalSolver
+from interop import TestFunction, DirichletBC, pi, TestFunctions
+from interop import split, div, cos, as_vector, MixedFunctionSpace
+from interop import derivative, Constant, FacetNormal, ds, dS, as_matrix, inv, dot, TensorElement
+import numpy as np
 import time
+from utilities import adjust_coordinates, create_box_mesh, create_complex
 
 OptDB = PETSc.Options()
 order = OptDB.getInt('order', 1)

@@ -1,8 +1,10 @@
 import numpy as np
 import sympy
-from lagrange import lagrange_poly_support
-from quadrature import QuadratureNumerical
+from themis.lagrange import lagrange_poly_support
+from themis.quadrature import QuadratureNumerical
 from ufl import FiniteElement, VectorElement, TensorElement, TensorProductElement, HDivElement, HCurlElement, EnrichedElement
+
+__all__ = ["ThemisElement", "IntervalElement"]
 
 def a_to_cinit_string(x):
     np.set_printoptions(threshold=np.prod(x.shape))

@@ -1,15 +1,16 @@
 import numpy
 # import collections
-from ufl_expr import Argument
+from themis.ufl_expr import Argument
 
 from ufl import as_vector
 from ufl.classes import Zero
 from ufl.algorithms.map_integrands import map_integrand_dags
 from ufl.corealg.map_dag import MultiFunction
-from functionspace import FunctionSpace  # , MixedFunctionSpace
+from themis.functionspace import FunctionSpace  # , MixedFunctionSpace
 
 from ufl import MixedElement
 
+__all__ = ["FormSplitter", "split_form"]
 
 ##################################
 

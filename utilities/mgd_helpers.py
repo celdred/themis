@@ -1,11 +1,11 @@
 
-# from petscshim import PETSc
 from ufl import FiniteElement, TensorProductElement, interval, quadrilateral, HDivElement, hexahedron, HCurlElement, EnrichedElement, MixedElement, VectorElement
-from functionspace import FunctionSpace, MixedFunctionSpace
-from ufl_expr import TestFunction, TrialFunction, TestFunctions, TrialFunctions
+from themis.functionspace import FunctionSpace, MixedFunctionSpace
+from themis.ufl_expr import TestFunction, TrialFunction, TestFunctions, TrialFunctions
 from ufl.corealg.multifunction import MultiFunction
 from ufl.algorithms.map_integrands import map_integrand_dags
 
+__all__ = ["lower_form_order", ]
 
 class Replacer(MultiFunction):
     def __init__(self, mapping):

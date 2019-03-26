@@ -1,9 +1,11 @@
-from mesh import SingleBlockMesh, SingleBlockExtrudedMesh
+from themis.mesh import SingleBlockMesh, SingleBlockExtrudedMesh
 import numpy as np
 from ufl import SpatialCoordinate, as_vector
-from function import Function
-from constant import Constant
+from themis.function import Function
+from themis.constant import Constant
 
+__all__ = ["create_box_mesh", "Mesh", "ExtrudedMesh", "PeriodicIntervalMesh", "PeriodicRectangleMesh", "PeriodicSquareMesh",
+"IntervalMesh", "SquareMesh", "CubeMesh", "BoxMesh", "RectangleMesh"]
 
 def create_box_mesh(nxs, lxs, pxs, bcs):
     assert(len(nxs) == len(lxs))

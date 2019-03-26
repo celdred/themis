@@ -1,13 +1,18 @@
-from petscshim import PETSc
+from themis.petscshim import PETSc
 import numpy as np
-from functionspace import FunctionSpace
-from function import Function
-from bcs import DirichletBC
-from solver import NonlinearVariationalProblem, NonlinearVariationalSolver
+from themis.functionspace import FunctionSpace
+from themis.function import Function
+from themis.bcs import DirichletBC
+from themis.solver import NonlinearVariationalProblem, NonlinearVariationalSolver
 from ufl import inner, dx
-from ufl_expr import TestFunction
-from themiselement import ThemisElement
+from themis.ufl_expr import TestFunction
+from themis.themiselement import ThemisElement
 from ufl import Mesh, FiniteElement, interval, VectorElement, quadrilateral, TensorProductElement, hexahedron
+from themis.assembly_utils import CompiledKernel
+import ctypes
+
+__all__ = ["SingleBlockMesh", "SingleBlockExtrudedMesh"]
+
 
 # THIS IS AN UGLY HACK NEEDED BECAUSE OWNERSHIP RANGES ARGUMENT TO petc4py DMDA_CREATE is BROKEN
 decompfunction_code = r"""
@@ -57,8 +62,7 @@ return 0;
 }
 """
 
-from assembly import CompiledKernel
-import ctypes
+
 
 decompfunction = CompiledKernel(decompfunction_code, "decompfunction", cppargs=["-O3"], argtypes=[ctypes.c_voidp, ctypes.c_voidp,
                                                                                                   ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ], restype=ctypes.c_int)

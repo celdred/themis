@@ -3,6 +3,8 @@ import ufl
 
 # ADD FIREDRAKE ATTRIBUTION
 
+__all__ = ["Constant", ]
+
 
 def _globalify(value):
     data = np.array(value, dtype=np.float64)

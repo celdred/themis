@@ -1,15 +1,16 @@
 
-from petscshim import PETSc
+from themis.petscshim import PETSc
 import numpy as np
-from assembly import AssembleTwoForm, AssembleOneForm, AssembleZeroForm
-from tsfc_interface import compile_form
-from function import Function
-from ufl_expr import adjoint
+from themis.assembly import AssembleTwoForm, AssembleOneForm, AssembleZeroForm
+from themis.tsfc_interface import compile_form
+from themis.function import Function
+from themis.ufl_expr import adjoint
 import ufl
 from pyop2.sparsity import get_preallocation
 import time
 
 # 3
+__all__ = ["ZeroForm", "OneForm", "TwoForm"]
 
 
 def create_matrix(form, mat_type, target, source, blocklist, kernellist):

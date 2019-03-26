@@ -1,10 +1,11 @@
 from ufl import FunctionSpace as UFLFunctionSpace
 from ufl import MixedFunctionSpace as UFLMixedFunctionSpace
-from petscshim import PETSc
-from themiselement import ThemisElement
+from themis.petscshim import PETSc
+from themis.themiselement import ThemisElement
 import numpy as np
 import ufl
 
+__all__ = ["FunctionSpace", "MixedFunctionSpace", "VectorFunctionSpace", "TensorFunctionSpace"]
 
 class FunctionSpace(UFLFunctionSpace):
 
