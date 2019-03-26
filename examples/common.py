@@ -141,7 +141,7 @@ def create_box_mesh(cell, nxs, xbcs, coordorder, vcoordorder = None):
         if xbcs[0] == 'nonperiodic':
             mesh = IntervalMesh(nxs[0], 1.0)
         if xbcs[0] == 'periodic':
-            mesh = PeriodicIntervalMesh(nx, 1.0)
+            mesh = PeriodicIntervalMesh(nxs[0], 1.0)
 
     if cell in ['tri', 'quad']:
         ndims = 2
@@ -201,10 +201,10 @@ def create_sphere_mesh(cell, rlevel, coordorder, nlevels = None, extrusion_type=
         mesh = IcosahedralSphereMesh(1.0, refinement_level=rlevel, degree=coordorder)
     if cell == 'tphex':
         basemesh = CubedSphereMesh(1.0, refinement_level=rlevel, degree=coordorder)
-        mesh = ExtrudedMesh(bmesh, nlevels, extrusion_type=extrusion_type)
+        mesh = ExtrudedMesh(basemesh, nlevels, extrusion_type=extrusion_type)
     if cell == 'tptri':
         basemesh = IcosahedralSphereMesh(1.0, refinement_level=rlevel, degree=coordorder)
-        mesh = ExtrudedMesh(bmesh, nlevels, extrusion_type=extrusion_type)
+        mesh = ExtrudedMesh(basemesh, nlevels, extrusion_type=extrusion_type)
 
     # Upgrade coordinate order if needed
 # THIS IS BROKEN
@@ -214,7 +214,8 @@ def create_sphere_mesh(cell, rlevel, coordorder, nlevels = None, extrusion_type=
         newmesh = set_mesh_coordinate_order(mesh, ndims, xbcs, coordorder, vcoordorder=vcoordorder)
     else:
         newmesh = mesh
-
+    return newmesh
+    
 def _quad(order, variant):
     h1elem = FiniteElement("Q", quadrilateral, order, variant=variant)
     l2elem = FiniteElement("DQ", quadrilateral, order-1, variant=variant)

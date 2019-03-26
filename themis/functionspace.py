@@ -387,11 +387,8 @@ def VectorFunctionSpace(mesh, element, dim=None, name='fspace', si=0, parent=Non
     element = ufl.VectorElement(sub_element, dim=dim)
     return FunctionSpace(mesh, element, name=name)
 
-    shape = shape or (mesh.ufl_cell().geometric_dimension(),) * 2
-    element = ufl.TensorElement(sub_element, shape=shape, symmetry=symmetry)
-
 def TensorFunctionSpace(mesh, element, shape=None, symmetry=None, name='fspace', si=0, parent=None):
     sub_element = make_scalar_element(element)
-    shape = shape or (mesh.ufl_cell().geometric_dimension(),mesh.ufl_cell().geometric_dimension())
+    shape = shape or (mesh.ufl_cell().geometric_dimension(), mesh.ufl_cell().geometric_dimension())
     element = ufl.TensorElement(sub_element, shape=shape, symmetry=symmetry)
     return FunctionSpace(mesh, element, name=name)

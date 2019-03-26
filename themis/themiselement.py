@@ -421,7 +421,6 @@ def _GD_basis(order, symb):
     b = -order
     p = a * np.arange(order+1) + b
     p = sympy.Rational(1, 2) * p + sympy.Rational(1, 2)
-    spts = [0, 1]
     for i in range(0, order+1):
         basis = lagrange_poly_support(i, p, symb)
         symbas.append(basis)
@@ -486,7 +485,6 @@ def create_compatible_l2_basis(cg_symbas):
 
 
 def _DGD_basis(order, symb):
-    spts = [sympy.Rational(1, 2), ]
     if order >= 1:
         cg_symbas, _, _ = _GD_basis(order+1, symb)
         symbas, derivs, derivs2 = create_compatible_l2_basis(cg_symbas)
