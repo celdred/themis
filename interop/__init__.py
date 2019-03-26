@@ -23,9 +23,11 @@ if backend == 'firedrake':
         return field
 
     BoxMesh = None
+    coordvariant = None
 
 if backend == 'themis':
 
     from themis import *
     CubedSphereMesh = None
     IcosahedralSphereMesh = None
+    coordvariant = 'feec'

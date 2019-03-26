@@ -29,13 +29,14 @@ if variant == 'mgd' and order > 1:
 nquadplot = OptDB.getInt('nquadplot', nquadplot_default)
 xbcs = ['nonperiodic', 'nonperiodic']
 nxs = [nx, ny]
+lxs = [1.0, 1.0]
 
 PETSc.Sys.Print(variant, order, cell, coordorder, nxs)
 
 start = time.time()
 
 # create mesh and spaces
-mesh = create_box_mesh(cell, nxs, xbcs, coordorder)
+mesh = create_box_mesh(cell, nxs, xbcs, lxs, coordorder)
 elemdict = create_complex(cell, velocityspace, variant, order)
 
 xs = SpatialCoordinate(mesh)
