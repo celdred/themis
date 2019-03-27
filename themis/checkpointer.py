@@ -1,6 +1,5 @@
-from petscshim import PETSc
-from function import Function, SplitFunction
-from evaluate import QuadCoefficient
+from themis.petscshim import PETSc
+from themis.function import Function, SplitFunction
 from firedrake import hdf5interface as h5i
 import numpy as np
 
@@ -13,9 +12,10 @@ FILE_CREATE = PETSc.Viewer.Mode.WRITE
 FILE_UPDATE = PETSc.Viewer.Mode.APPEND
 """Open a checkpoint file for updating.  Creates the file if it does not exist, providing both read and write access."""
 
+__all__ = ["DumbCheckpoint", "FILE_READ", "FILE_CREATE", "FILE_UPDATE", ]
 
-# ADD FIREDRAKE ATTRIBUTION
-class Checkpoint():
+
+class DumbCheckpoint():
     def __init__(self, name, mode=FILE_UPDATE):
 
         self.mode = mode
@@ -32,31 +32,6 @@ class Checkpoint():
         self.viewer = PETSc.ViewerHDF5().create(name + '.h5', mode=mode, comm=PETSc.COMM_WORLD)
 
         self.h5file = h5i.get_h5py_file(self.viewer)
-
-    def store_quad(self, quadcoeff, name=None):
-        if self.mode is FILE_READ:
-            raise IOError("Cannot store to checkpoint opened with mode 'FILE_READ'")
-        if not isinstance(quadcoeff, QuadCoefficient):
-            raise ValueError("Can only store QuadCoefficient")
-
-        name = name or quadcoeff.name()
-        group = self._get_data_group()
-        self._write_timestep_attr(group)
-        self.viewer.pushGroup(group)
-        quadcoeff.vec.setName(name)
-        self.viewer.view(obj=quadcoeff.vec)
-        self.viewer.popGroup()
-
-    def load_quad(self, quadcoeff, name=None):
-        if not isinstance(quadcoeff, QuadCoefficient):
-            raise ValueError("Can only load QuadCoefficient")
-
-        group = self._get_data_group()
-        self.viewer.pushGroup(group)
-        name = name or quadcoeff.name()
-        quadcoeff.vec.setName(name)
-        quadcoeff.vec.load(self.viewer)
-        self.viewer.popGroup()
 
     def store(self, field, name=None):
         if self.mode is FILE_READ:
@@ -82,7 +57,6 @@ class Checkpoint():
                 soff = fspace.get_space_offset(si)
                 for ci in range(fspace.get_space(si).ncomp):
                     coff = fspace.get_space(si).get_component_offset(ci)
-                    # PETSc.Sys.Print(name,si,soff,ci,coff)
                     if isinstance(field, SplitFunction):
                         sii = 0
                     if isinstance(field, Function):

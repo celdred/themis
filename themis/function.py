@@ -1,6 +1,7 @@
 from ufl import Coefficient
-from petscshim import PETSc
-import interpolator
+from themis.petscshim import PETSc
+
+__all__ = ["Function", "SplitFunction"]
 
 
 class SplitFunction():
@@ -116,5 +117,9 @@ class Function(Coefficient):
         of this this :class:`Function`'s :class:`.FunctionSpace`."""
         return self._split
 
-    def interpolate(self, expression):
-        return interpolator.interpolate(expression, self)
+    def interpolate(self, expression, overwrite_pts=None):
+        if self.ufl_function_space().interpolatory:
+            from themis import interpolator
+            return interpolator.interpolate(expression, self, overwrite_pts=overwrite_pts)
+        else:
+            raise TypeError('cannot interpolate in %s', self.ufl_function_space())

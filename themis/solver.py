@@ -1,11 +1,11 @@
 
 import ufl
-import ufl_expr
-from petscshim import PETSc
-from form import TwoForm, OneForm
-# import time
+from themis import ufl_expr
+from themis.petscshim import PETSc
+from themis.form import TwoForm, OneForm
+from themis.function import Function
 
-# ADD FIREDRAKE ATTRIBUTION
+__all__ = ["NonlinearVariationalProblem", "NonlinearVariationalSolver"]
 
 
 class NonlinearVariationalProblem():
@@ -24,7 +24,6 @@ class NonlinearVariationalProblem():
                 compiler (optional)
         :param dict constant_jacobian: True is J is constant, False if not
         """
-        from function import Function
 
     # Store input UFL forms and solution Function
         self.F = F
@@ -57,10 +56,8 @@ class NonlinearVariationalProblem():
         self.form_compiler_parameters = form_compiler_parameters
         self._constant_jacobian = constant_jacobian
 
-# ADD FIREDRAKE ATTRIBUTION
 
-
-class NonlinearVariationalSolver():  # solving_utils.ParametersMixin
+class NonlinearVariationalSolver():
     """Solves a :class:`NonlinearVariationalProblem`."""
 
     def __init__(self, problem, **kwargs):
@@ -174,10 +171,6 @@ class NonlinearVariationalSolver():  # solving_utils.ParametersMixin
 
         self.snes.setFunction(self.Fform.assembleform, self.Fform.vector)
 
-        # print('solver F',problem.F)
-        # print('solver J',problem.J)
-        # print('solver Jp',problem.Jp)
-
         # This logic allows us to create a variational problem that sets both J and Jp with J=Jp, and can switch between assembled J / no Jp and matfree J / assembled P
         if (problem.J == problem.Jp) and (mat_type == pmat_type):
             problem.Jp = None
@@ -208,7 +201,6 @@ class NonlinearVariationalSolver():  # solving_utils.ParametersMixin
             if fieldsplit_type == 'schur':
                 split0fields = OptDB.getString(optprefix + 'pc_fieldsplit_0_fields')
                 split1fields = OptDB.getString(optprefix + 'pc_fieldsplit_1_fields')
-                # PETSc.Sys.Print(fieldsplit_type, split0fields, split1fields)
                 split0fields = split0fields.split(",")
                 split1fields = split1fields.split(",")
 
@@ -235,7 +227,6 @@ class NonlinearVariationalSolver():  # solving_utils.ParametersMixin
 
         # Apply the boundary conditions to the initial guess.
 
-        # time1 = time.time()
         for bc in self.problem.bcs:
             bc.apply_vector(self.problem.u._activevector)
 
@@ -248,16 +239,13 @@ class NonlinearVariationalSolver():  # solving_utils.ParametersMixin
         # ADD THIS BACK IN!
         # solving_utils.check_snes_convergence(self.snes)
 
-        # print('full solve',time.time()-time1)
     def destroy(self):
         self.snes.destroy()
-
-# ADD FIREDRAKE ATTRIBUTION
 
 
 def _extract_bcs(bcs):
     "Extract and check argument bcs"
-    from bcs import DirichletBC
+    from themis import DirichletBC
     if bcs is None:
         return ()
     try:

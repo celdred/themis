@@ -1,8 +1,8 @@
-from function import Function
+from themis.function import Function
 from ufl import inner, div, grad, curl, sqrt, dx
-from form import ZeroForm
+from themis.form import ZeroForm
 
-# ATTRIBUTE THIS- BASICALLY FIREDRAKE VERSION
+__all__ = ["errornorm", "norm"]
 
 
 def errornorm(u, uh, norm_type="L2"):
@@ -23,9 +23,7 @@ def errornorm(u, uh, norm_type="L2"):
     if not isinstance(uh, Function):
         raise ValueError("uh should be a Function, is a %r", type(uh))
 
-    return norm(u - uh, norm_type=norm_type)  # degree=maxdegree
-
-# ATTRIBUTE THIS- BASICALLY FIREDRAKE VERSION
+    return norm(u - uh, norm_type=norm_type)
 
 
 def norm(v, norm_type="L2", degree=None):
@@ -62,10 +60,6 @@ def norm(v, norm_type="L2", degree=None):
               ||v||_{H_\mathrm{curl}}^2 = \int (v, v) + (\\nabla \wedge v, \\nabla \wedge v) \mathrm{d}x
     """
 
-    # if not degree == None:
-    #    dxn = dx(2*degree+1)
-    # else:
-    #    dxn = dx
     typ = norm_type.lower()
     if typ == 'l2':
         form = inner(v, v)*dx

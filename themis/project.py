@@ -1,10 +1,10 @@
 
 import ufl
-import ufl_expr
-from function import Function
-from solver import NonlinearVariationalProblem, NonlinearVariationalSolver
+from themis import ufl_expr
+from themis.function import Function
+from themis.solver import NonlinearVariationalProblem, NonlinearVariationalSolver
 
-# NEEDS FIREDRAKE ATTRIBUTION
+__all__ = ["Projector", ]
 
 
 class Projector():

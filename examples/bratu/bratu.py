@@ -3,8 +3,7 @@
 from common import PETSc, dx, DumbCheckpoint, inner, grad, exp
 from common import FunctionSpace, Function, NonlinearVariationalProblem, NonlinearVariationalSolver
 from common import TrialFunction, TestFunction, DirichletBC, Constant
-from common import QuadCoefficient, ThemisQuadratureNumerical
-from common import create_mesh, create_elems
+from common import create_box_mesh, create_complex, adjust_coordinates
 from common import derivative
 
 OptDB = PETSc.Options()
@@ -22,19 +21,23 @@ plot = OptDB.getBool('plot', True)
 mgd_lowest = OptDB.getBool('mgd_lowest', False)
 c = OptDB.getScalar('c', 0.0)
 
+xbcs = ['nonperiodic', 'nonperiodic', 'nonperiodic']
+nxs = [nx, ny, nz]
+
 nquadplot_default = order
 if variant == 'mgd' and order > 1:
     nquadplot_default = 2
 nquadplot = OptDB.getInt('nquadplot', nquadplot_default)
 
-PETSc.Sys.Print(variant, order, cell, ndims, nx, ny, nz)
+PETSc.Sys.Print(variant, order, cell, coordorder, nxs)
 
 # create mesh and spaces
-xbcs = ['nonperiodic', 'nonperiodic', 'nonperiodic']
-mesh = create_mesh(nx, ny, nz, ndims, cell, xbcs, c, coordorder)
-h1elem, l2elem, hdivelem, hcurlelem = create_elems(ndims, cell, variant, order)
 
-h1 = FunctionSpace(mesh, h1elem)
+mesh = create_box_mesh(cell, nxs, xbcs, coordorder)
+elemdict = create_complex(cell, 'rt', variant, order)
+adjust_coordinates(mesh, c)
+
+h1 = FunctionSpace(mesh, elemdict['h1'])
 
 hhat = TestFunction(h1)
 h = TrialFunction(h1)
@@ -69,18 +72,15 @@ checkpoint = DumbCheckpoint(simname)
 checkpoint.store(x)
 checkpoint.store(mesh.coordinates)
 
-# evaluate
 # plot
 if plot:
-    evalquad = ThemisQuadratureNumerical('pascal', [nquadplot, ]*ndims)
-    xquad = QuadCoefficient(mesh, 'scalar', 'h1', x, evalquad, name='x_quad')
-    coordsquad = QuadCoefficient(mesh, 'vector', 'h1', mesh.coordinates, evalquad, name='coords_quad')
-    xquad.evaluate()
-    coordsquad.evaluate()
-    checkpoint.store_quad(xquad)
-    checkpoint.store_quad(coordsquad)
+    from common import plot_function, get_plotting_spaces, evaluate_and_store_field
 
-    from common import plot_function
-    plot_function(x, xquad, coordsquad, 'x')
+    scalarevalspace, vectorevalspace, opts = get_plotting_spaces(mesh, nquadplot)
+
+    coordseval = evaluate_and_store_field(vectorevalspace, opts, mesh.coordinates, 'coords', checkpoint)
+    eval = evaluate_and_store_field(scalarevalspace, opts, x, 'x', checkpoint)
+
+    plot_function(eval, coordseval, 'x')
 
 checkpoint.close()

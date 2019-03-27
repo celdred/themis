@@ -20,30 +20,30 @@ bi_{{field.name}}_z_{{k}} = ({{ field.nblocks_z[k] }} - 1) / 2;
 {%macro SET_PERIODIC_SPACES() -%}
 
 {% if formdim >= 1 %}
-{% for ci1 in range(nci1) %}
-{% if (bcs[0] == 'periodic') or (nblocks1_x[ci1] == 1) %}
-bi_1_x_{{  ci1 }}  = ({{ nblocks1_x[ci1] }} - 1) / 2;
+{% for ci1 in range(space1.ncomp) %}
+{% if (bcs[0] == 'periodic') or (space1.nblocks_x[ci1] == 1) %}
+bi_1_x_{{  ci1 }}  = ({{ space1.nblocks_x[ci1] }} - 1) / 2;
 {% endif %}
-{% if (bcs[1] == 'periodic') or (nblocks1_y[ci1] == 1) %}
-bi_1_y_{{  ci1 }}  = ({{ nblocks1_y[ci1] }} - 1) / 2;
+{% if (bcs[1] == 'periodic') or (space1.nblocks_y[ci1] == 1) %}
+bi_1_y_{{  ci1 }}  = ({{ space1.nblocks_y[ci1] }} - 1) / 2;
 {% endif %}
-{% if (bcs[2] == 'periodic') or (nblocks1_z[ci1] == 1) %}
-bi_1_z_{{  ci1 }}  = ({{ nblocks1_z[ci1] }} - 1) / 2;
+{% if (bcs[2] == 'periodic') or (space1.nblocks_z[ci1] == 1) %}
+bi_1_z_{{  ci1 }}  = ({{ space1.nblocks_z[ci1] }} - 1) / 2;
 {% endif %}
 {% endfor %}
 {% endif %}
 
 
 {% if formdim == 2 %}
-{% for ci2 in range(nci2) %}
-{% if (bcs[0] == 'periodic') or (nblocks2_x[ci2] == 1) %}
-bi_2_x_{{  ci2 }}  = ({{ nblocks2_x[ci2] }} - 1) / 2;
+{% for ci2 in range(space2.ncomp) %}
+{% if (bcs[0] == 'periodic') or (space2.nblocks_x[ci2] == 1) %}
+bi_2_x_{{  ci2 }}  = ({{ space2.nblocks_x[ci2] }} - 1) / 2;
 {% endif %}
-{% if (bcs[1] == 'periodic') or (nblocks2_y[ci2] == 1) %}
-bi_2_y_{{  ci2 }}  = ({{ nblocks2_y[ci2] }} - 1) / 2;
+{% if (bcs[1] == 'periodic') or (space2.nblocks_y[ci2] == 1) %}
+bi_2_y_{{  ci2 }}  = ({{ space2.nblocks_y[ci2] }} - 1) / 2;
 {% endif %}
-{% if (bcs[2] == 'periodic') or (nblocks2_z[ci2] == 1) %}
-bi_2_z_{{  ci2 }}  = ({{ nblocks2_z[ci2] }} - 1) / 2;
+{% if (bcs[2] == 'periodic') or (space2.nblocks_z[ci2] == 1) %}
+bi_2_z_{{  ci2 }}  = ({{ space2.nblocks_z[ci2] }} - 1) / 2;
 {% endif %}
 {% endfor %}
 {% endif %}
@@ -112,17 +112,17 @@ if (k >= (zmax - {{M}})) bi_{{name}}_z_{{ci}} = {{NB}} - (zmax - k);
 
 {%macro SET_NONPERIODIC_X_SPACES() -%}
 {% if formdim >= 1 %}
-{% for ci1 in range(nci1) %}
-{% if (bcs[0] == 'nonperiodic') and (nblocks1_x[ci1] > 1) %}
-{{ set_x_dir('1',ci1,nblocks1_x[ci1]) }}
+{% for ci1 in range(space1.ncomp) %}
+{% if (bcs[0] == 'nonperiodic') and (space1.nblocks_x[ci1] > 1) %}
+{{ set_x_dir('1',ci1,space1.nblocks_x[ci1]) }}
 {% endif %}
 {% endfor %}
 {% endif %}
 
 {% if formdim == 2 %}
-{% for ci2 in range(nci2) %}
-{% if (bcs[0] == 'nonperiodic') and (nblocks2_x[ci2] > 1) %}
-{{ set_x_dir('2',ci2,nblocks2_x[ci2]) }}
+{% for ci2 in range(space2.ncomp) %}
+{% if (bcs[0] == 'nonperiodic') and (space2.nblocks_x[ci2] > 1) %}
+{{ set_x_dir('2',ci2,space2.nblocks_x[ci2]) }}
 {% endif %}
 {% endfor %}
 {% endif %}
@@ -157,17 +157,17 @@ if (k >= (zmax - {{M}})) bi_{{name}}_z_{{ci}} = {{NB}} - (zmax - k);
 
 {%macro SET_NONPERIODIC_Y_SPACES() -%}
 {% if formdim >= 1 %}
-{% for ci1 in range(nci1) %}
-{% if (bcs[1] == 'nonperiodic') and (nblocks1_y[ci1] > 1) %}
-{{ set_y_dir('1',ci1,nblocks1_y[ci1]) }}
+{% for ci1 in range(space1.ncomp) %}
+{% if (bcs[1] == 'nonperiodic') and (space1.nblocks_y[ci1] > 1) %}
+{{ set_y_dir('1',ci1,space1.nblocks_y[ci1]) }}
 {% endif %}
 {% endfor %}
 {% endif %}
 
 {% if formdim == 2 %}
-{% for ci2 in range(nci2) %}
-{% if (bcs[1] == 'nonperiodic') and (nblocks2_y[ci2] > 1) %}
-{{ set_y_dir('2',ci2,nblocks2_y[ci2]) }}
+{% for ci2 in range(space2.ncomp) %}
+{% if (bcs[1] == 'nonperiodic') and (space2.nblocks_y[ci2] > 1) %}
+{{ set_y_dir('2',ci2,space2.nblocks_y[ci2]) }}
 {% endif %}
 {% endfor %}
 {% endif %}
@@ -199,17 +199,17 @@ if (k >= (zmax - {{M}})) bi_{{name}}_z_{{ci}} = {{NB}} - (zmax - k);
 
 {%macro SET_NONPERIODIC_Z_SPACES() -%}
 {% if formdim >= 1 %}
-{% for ci1 in range(nci1) %}
-{% if (bcs[2] == 'nonperiodic') and (nblocks1_z[ci1] > 1) %}
-{{ set_z_dir('1',ci1,nblocks1_z[ci1]) }}
+{% for ci1 in range(space1.ncomp) %}
+{% if (bcs[2] == 'nonperiodic') and (space1.nblocks_z[ci1] > 1) %}
+{{ set_z_dir('1',ci1,space1.nblocks_z[ci1]) }}
 {% endif %}
 {% endfor %}
 {% endif %}
 
 {% if formdim == 2 %}
-{% for ci2 in range(nci2) %}
-{% if (bcs[2] == 'nonperiodic') and (nblocks2_z[ci2] > 1) %}
-{{ set_z_dir('2',ci2,nblocks2_z[ci2]) }}
+{% for ci2 in range(space2.ncomp) %}
+{% if (bcs[2] == 'nonperiodic') and (space2.nblocks_z[ci2] > 1) %}
+{{ set_z_dir('2',ci2,space2.nblocks_z[ci2]) }}
 {% endif %}
 {% endfor %}
 {% endif %}
@@ -224,26 +224,3 @@ if (k >= (zmax - {{M}})) bi_{{name}}_z_{{ci}} = {{NB}} - (zmax - k);
 {% endfor %}
 
 {% endmacro %}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

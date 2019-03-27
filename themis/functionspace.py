@@ -1,9 +1,11 @@
 from ufl import FunctionSpace as UFLFunctionSpace
 from ufl import MixedFunctionSpace as UFLMixedFunctionSpace
-from petscshim import PETSc
-from finiteelement import ThemisElement
+from themis.petscshim import PETSc
+from themis.themiselement import ThemisElement
 import numpy as np
 import ufl
+
+__all__ = ["FunctionSpace", "MixedFunctionSpace", "VectorFunctionSpace", "TensorFunctionSpace"]
 
 
 class FunctionSpace(UFLFunctionSpace):
@@ -15,26 +17,6 @@ class FunctionSpace(UFLFunctionSpace):
     # useful primarily for VectorSpaces, since they have multiple components
     def get_component_offset(self, ci):
         return self._component_offsets[ci]
-
-    ################
-    # returns the GLOBAL sizes for component ci
-    def get_nxny(self, ci):
-        sizes = self._da[ci].getSizes()
-        return sizes
-
-    # returns the LOCAL (WITHOUT GHOSTS) sizes for component ci
-    def get_local_nxny(self, ci):
-        ranges = self._da[ci].getRanges()
-        nxs = []
-        for xy in ranges:
-            nxs.append((xy[1] - xy[0]))
-        return nxs
-
-    # returns the indices in global i/j/k space for component ci
-    def get_xy(self, ci):
-        ranges = self._da[ci].getRanges()
-        return ranges
-    # 3
 
     # returns the NON-GHOSTED total number of LOCAL dofs (ie per process) for component ci
     def get_localndofs(self, ci):
@@ -60,13 +42,6 @@ class FunctionSpace(UFLFunctionSpace):
 
     def output(self):
         pass
-        # for ci in range(self.ncomp):
-        #    for bi in range(self.npatches):
-        #        da_output(self.get_da(ci, bi), self._name + '.da_cb' + str(ci) + '.' + str(bi))
-        #        lgmap_output(self.get_lgmap(ci, bi), self._name + '.lgmap_cb.' + str(ci) + '.' + str(bi))
-        #        is_output(self.get_component_block_lis(ci, bi), self._name + '.cb_lis.' + str(ci) + '.' + str(bi))
-        # da_output(self._composite_da, self._name + '.compda')
-        # lgmap_output(self.get_overall_lgmap(), self.name + '.overalllgmap')
 
     # DAs
     # return the da for component ci
@@ -97,20 +72,20 @@ class FunctionSpace(UFLFunctionSpace):
         return self._cb_lis[self._component_offsets[ci]]
         # return self.component_das[ci].getLocalISs()[bi]
 
-    # DOES THIS WORK FOR VECTOR SPACES?
-    # NO, IT DOESN'T TAKE INTO ACCOUNT THAT NDOF IS NOT EQUAL TO 1...
+# DOES THIS WORK FOR VECTOR SPACES?
+# NO, IT DOESN'T TAKE INTO ACCOUNT THAT NDOF IS NOT EQUAL TO 1...
     # returns the SPLIT LOCAL indices of the owned portion of the physical boundary for component ci in direc
     def get_boundary_indices(self, ci, direc):
 
         # check if this space has any nodes on the boundary for ci in direc
         direcdict = {'x-': 0, 'x+': 0, 'y-': 1, 'y+': 1, 'z-': 2, 'z+': 2}
         intdirec = direcdict[direc]
-        if self._themiselement.get_continuity(ci, intdirec) == 'L2':
+        if self._themiselement.sub_elements[ci][intdirec].cont == 'L2':
             return [-1, ]
 
-        da = self.get_da(ci)
+        da = self._da[ci]
         ndims = self._mesh.ndim
-        nxs = self.get_nxny(ci)
+        nxs = self._da[ci].getSizes()
 
         corners = da.getGhostCorners()
         ranges = da.getRanges()
@@ -214,7 +189,9 @@ class FunctionSpace(UFLFunctionSpace):
         self._themiselement = ThemisElement(element)
         self._uflelement = element
 
-        self.ncomp = self._themiselement.get_ncomp()
+        self.interpolatory = self._themiselement.interpolatory
+
+        self.ncomp = self._themiselement.ncomp
         self._mesh = mesh
         self._name = name
         self._spaces = [self, ]
@@ -245,8 +222,6 @@ class FunctionSpace(UFLFunctionSpace):
         self._component_lgmaps = self._composite_da.getLGMaps()
         self._overall_lgmap = self._composite_da.getLGMap()
         self._cb_lis = self._composite_da.getLocalISs()
-
-        # PETSc.Sys.Print(element,self._da[0][0].getGhostRanges(),self._da[0][0].getRanges())
 
 
 class MixedFunctionSpace(UFLMixedFunctionSpace):
@@ -405,8 +380,9 @@ def VectorFunctionSpace(mesh, element, dim=None, name='fspace', si=0, parent=Non
     element = ufl.VectorElement(sub_element, dim=dim)
     return FunctionSpace(mesh, element, name=name)
 
-# IMPLEMENT THIS!
 
-
-def TensorFunctionSpace():
-    pass
+def TensorFunctionSpace(mesh, element, shape=None, symmetry=None, name='fspace', si=0, parent=None):
+    sub_element = make_scalar_element(element)
+    shape = shape or (mesh.ufl_cell().geometric_dimension(), mesh.ufl_cell().geometric_dimension())
+    element = ufl.TensorElement(sub_element, shape=shape, symmetry=symmetry)
+    return FunctionSpace(mesh, element, name=name)

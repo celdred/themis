@@ -1,14 +1,14 @@
 
-from petscshim import PETSc
+from themis.petscshim import PETSc
 import numpy as np
-from assembly import AssembleTwoForm, AssembleOneForm, AssembleZeroForm
-from tsfc_interface import compile_form
-from function import Function
-from ufl_expr import adjoint
+from themis.assembly import AssembleTwoForm, AssembleOneForm, AssembleZeroForm
+from themis.tsfc_interface import compile_form
+from themis.function import Function
+from themis.ufl_expr import adjoint
 import ufl
 from pyop2.sparsity import get_preallocation
 
-# 3
+__all__ = ["ZeroForm", "OneForm", "TwoForm"]
 
 
 def create_matrix(form, mat_type, target, source, blocklist, kernellist):
@@ -62,8 +62,6 @@ def create_matrix(form, mat_type, target, source, blocklist, kernellist):
     mat.setOption(PETSc.Mat.Option.KEEP_NONZERO_PATTERN, True)
     mat.setOption(PETSc.Mat.Option.NO_OFF_PROC_ZERO_ROWS, False)
 
-    # print('zeroed')
-    # mat.view()
     return mat
 
 
@@ -141,28 +139,6 @@ def create_mono(target, source, blocklist, kernellist):
     return mat
 
 
-def get_interior_flags(mesh, kernellist):
-    interior_x = False
-    interior_y = False
-    interior_z = False
-    for kernel in kernellist:
-        if kernel.integral_type == 'interior_facet':
-            interior_x = True
-            interior_y = True
-            interior_z = True
-        if kernel.integral_type == 'interior_facet_horiz':
-            interior_x = True
-            if mesh.extrusion_dim == 2:
-                interior_y = True
-            interior_z = False
-        if kernel.integral_type == 'interior_facet_vert':
-            if mesh.extrusion_dim == 1:
-                interior_y = True
-            if mesh.extrusion_dim == 2:
-                interior_z = True
-    return interior_x, interior_y, interior_z
-
-
 def fill_mono(mat, target, source, blocklist, kernellist, zeroassembly=False):
     # print blocklist
     for si1 in range(target.nspaces):
@@ -192,8 +168,6 @@ def restore_block(isrow, iscol, matrix, submat):
     else:
         matrix.restoreLocalSubMatrix(isrow, iscol, submat)
 
-########################
-
 
 class OneForm():
 
@@ -201,10 +175,7 @@ class OneForm():
         self.F = F
         self.bcs = bcs
         self._pre_f_callback = pre_f_callback
-
         self.space = self.F.arguments()[0].function_space()
-        # NAMES?
-
         self.activefield = activefield
 
         # create vector
@@ -223,7 +194,6 @@ class OneForm():
             self.local_assembly_idx.append(idx)
             self.local_assembly_kernels.append(kernels)
 
-    # BROKEN
     def output(self, view, ts=None):
         pass
 
@@ -317,7 +287,6 @@ class Matrix():
 
         self._assembled = True
 
-# DOES DESTROYING A NEST AUTOMATICALLY DESTROY THE SUB MATRICES?
     def destroy(self):
         self.petscmat.destroy()
 
@@ -465,7 +434,7 @@ class ImplicitMatrix():
 
     def assemble(self, mat):
         self.petscmat.assemble()
-        self.assembled = True
+        self._assembled = True
 
     def destroy(self):
         self.petscmat.destroy()
@@ -531,7 +500,7 @@ class TwoForm():
         # "copy" X into "active" field
         self.activefield._activevector = X
 
-        if (not (self.constantJ and self.mat._assembled)) or ((self.Jp is not None) and (not (self.constantP and self.pmat.assembled))):
+        if (not (self.constantJ and self.mat._assembled)) or ((self.Jp is not None) and (not (self.constantP and self.pmat._assembled))):
             # pre-jacobian callback
             if self._pre_j_callback is not None:
                 self._pre_j_callback(X)
@@ -546,10 +515,6 @@ class TwoForm():
 
         # restore the old active field
         self.activefield._activevector = self.activefield._vector
-
-        # PETSc.Sys.Print('mat', self.mat.petscmat.getInfo(info=3))
-        # if not (self.Jp is None):
-        #   PETSc.Sys.Print('pmat', self.pmat.petscmat.getInfo(info=3))
 
         # WHAT SHOULD I REALLY BE RETURNING HERE?
         return PETSc.Mat.Structure.SAME_NONZERO_PATTERN

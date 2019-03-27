@@ -1,8 +1,11 @@
-from mesh import SingleBlockMesh, SingleBlockExtrudedMesh
+from themis.mesh import SingleBlockMesh, SingleBlockExtrudedMesh
 import numpy as np
 from ufl import SpatialCoordinate, as_vector
-from function import Function
-from constant import Constant
+from themis.function import Function
+from themis.constant import Constant
+
+__all__ = ["create_box_mesh", "Mesh", "ExtrudedMesh", "PeriodicIntervalMesh", "PeriodicRectangleMesh", "PeriodicSquareMesh",
+           "IntervalMesh", "SquareMesh", "CubeMesh", "BoxMesh", "RectangleMesh"]
 
 
 def create_box_mesh(nxs, lxs, pxs, bcs):
@@ -27,13 +30,20 @@ def create_box_mesh(nxs, lxs, pxs, bcs):
     return mesh
 
 
+def Mesh(newcoords):
+    oldmesh = newcoords.space._mesh
+    if not oldmesh.extruded:
+        return SingleBlockMesh(oldmesh.nxs, oldmesh.bcs, coords=newcoords)
+    if oldmesh.extruded:
+        basemesh = SingleBlockMesh(oldmesh.nxs[:-1], oldmesh.bcs[:-1])
+        return SingleBlockExtrudedMesh(basemesh, oldmesh.nxs[-1], coords=newcoords)
+
+
 def ExtrudedMesh(basemesh, layers, layer_height=None, extrusion_type='uniform'):
     if not (extrusion_type == 'uniform'):
         raise ValueError('cannot handle non-uniform extrusion yet')
-    if layer_height is None:
-        layer_height = 1.0/layers
 
-    emesh = SingleBlockExtrudedMesh(basemesh, layers, layer_height)
+    emesh = SingleBlockExtrudedMesh(basemesh, layers, layer_height=layer_height)
 
     return emesh
 

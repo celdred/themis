@@ -2,8 +2,7 @@
 from common import PETSc, norm, dx, DumbCheckpoint, sin, sinh, inner, grad, FILE_CREATE, exp, cos
 from common import FunctionSpace, SpatialCoordinate, Function, Projector, NonlinearVariationalProblem, NonlinearVariationalSolver
 from common import TestFunction, DirichletBC, pi
-from common import QuadCoefficient, ThemisQuadratureNumerical
-from common import create_mesh, create_elems
+from common import create_box_mesh, create_complex, adjust_coordinates
 from common import derivative
 
 OptDB = PETSc.Options()
@@ -25,21 +24,22 @@ use_sinh = OptDB.getBool('use_sinh', False)
 use_exp = OptDB.getBool('use_exp', False)
 c = OptDB.getScalar('c', 0.0)
 
+xbcs = [xbc, ybc, zbc]
+nxs = [nx, ny, nz]
 
-PETSc.Sys.Print(variant, order, cell, coordorder, xbc, ybc, zbc, nx, ny, nz)
+PETSc.Sys.Print(variant, order, cell, coordorder, xbcs, nxs)
 
 nquadplot_default = order
 if variant == 'mgd' and order > 1:
     nquadplot_default = 2
 nquadplot = OptDB.getInt('nquadplot', nquadplot_default)
-xbcs = [xbc, ybc, zbc]
-
 
 # create mesh and spaces
-mesh = create_mesh(nx, ny, nz, ndims, cell, xbcs, c, coordorder)
+mesh = create_box_mesh(cell, nxs, xbcs, coordorder)
+elemdict = create_complex(cell, 'rt', variant, order)
+adjust_coordinates(mesh, c)
 
-h1elem, l2elem, hdivelem, hcurlelem = create_elems(ndims, cell, variant, order)
-h1 = FunctionSpace(mesh, h1elem)
+h1 = FunctionSpace(mesh, elemdict['h1'])
 
 hhat = TestFunction(h1)
 h = Function(h1, name='h')
@@ -95,18 +95,14 @@ if ndims == 3:
 
 # create soln and rhs
 soln = Function(h1, name='hsoln')
-rhs = Function(h1, name='rhs')
 
 solnproj = Projector(solnexpr, soln, bcs=bcs)  # ,options_prefix= 'masssys_')
-rhsproj = Projector(rhsexpr, rhs, bcs=bcs)  # options_prefix= 'masssys_'
 solnproj.project()
-rhsproj.project()
-rhsproj.project()
 
 # Create forms and problem
 # Degree estimation for tensor product elements with more than 2 components is broken, hence the need for the below
 Rlhs = (hhat * h - scale*inner(grad(hhat), grad(h))) * dx  # degree=(order*2+1)
-Rrhs = hhat * rhs * dx  # degree=(order*2+1)
+Rrhs = hhat * rhsexpr * dx  # degree=(order*2+1)
 
 # create solvers
 J = derivative(Rlhs - Rrhs, h)
@@ -156,28 +152,19 @@ checkpoint.write_attribute('fields/', 'h1directerr', h1directerr)
 
 # plot
 if plot:
-    # evaluate
-    evalquad = ThemisQuadratureNumerical('pascal', [nquadplot, ]*ndims)
-    hquad = QuadCoefficient(mesh, 'scalar', 'h1', h, evalquad, name='h_quad')
-    solnquad = QuadCoefficient(mesh, 'scalar', 'h1', soln, evalquad, name='hsoln_quad')
-    diffquad = QuadCoefficient(mesh, 'scalar', 'h1', diff, evalquad, name='hdiff_quad')
-    directdiffquad = QuadCoefficient(mesh, 'scalar', 'h1', directdiff, evalquad, name='hdirectdiff_quad')
-    coordsquad = QuadCoefficient(mesh, 'vector', 'h1', mesh.coordinates, evalquad, name='coords_quad')
-    hquad.evaluate()
-    solnquad.evaluate()
-    diffquad.evaluate()
-    directdiffquad.evaluate()
-    coordsquad.evaluate()
-    checkpoint.store_quad(hquad)
-    checkpoint.store_quad(solnquad)
-    checkpoint.store_quad(diffquad)
-    checkpoint.store_quad(directdiffquad)
-    checkpoint.store_quad(coordsquad)
+    from common import plot_function, get_plotting_spaces, evaluate_and_store_field
 
-    from common import plot_function
-    plot_function(h, hquad, coordsquad, 'h')
-    plot_function(soln, solnquad, coordsquad, 'hsoln')
-    plot_function(diff, diffquad, coordsquad, 'hdiff')
-    plot_function(directdiff, directdiffquad, coordsquad, 'hdirectdiff')
+    scalarevalspace, vectorevalspace, opts = get_plotting_spaces(mesh, nquadplot)
+
+    coordseval = evaluate_and_store_field(vectorevalspace, opts, mesh.coordinates, 'coords', checkpoint)
+    heval = evaluate_and_store_field(scalarevalspace, opts, h, 'h', checkpoint)
+    hsolneval = evaluate_and_store_field(scalarevalspace, opts, soln, 'hsoln', checkpoint)
+    hdiffeval = evaluate_and_store_field(scalarevalspace, opts, diff, 'hdiff', checkpoint)
+    hdirectdiffeval = evaluate_and_store_field(scalarevalspace, opts, directdiff, 'hdirectdiff', checkpoint)
+
+    plot_function(heval, coordseval, 'h')
+    plot_function(hsolneval, coordseval, 'hsoln')
+    plot_function(hdiffeval, coordseval, 'hdiff')
+    plot_function(hdirectdiffeval, coordseval, 'hdirectdiff')
 
 checkpoint.close()

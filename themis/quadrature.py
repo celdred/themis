@@ -1,6 +1,8 @@
 import sympy
-from lagrange import gauss_lobatto, gauss_legendre, lagrange_poly_support
+from themis.lagrange import gauss_lobatto, gauss_legendre, lagrange_poly_support
 import numpy as np
+
+__all__ = ["QuadratureExact", "QuadratureNumerical"]
 
 
 def rescale_pts(pts):
@@ -19,70 +21,36 @@ def rescale_wts_exact(wt):
     return wt * sympy.Rational(1, 2)
 
 
-class ThemisQuadrature():
-
-    def get_pts(self):
-        return self.pts
-
-    def get_wts(self):
-        return self.wts
-
-    def get_nquad(self):
-        return self.nquadpts
-
-
-class ThemisQuadratureNumerical(ThemisQuadrature):
-    def __init__(self, qtype, nquadptslist):
+class QuadratureNumerical():
+    def __init__(self, qtype, npts):
 
         self.exact = False
-        self.finatquad = None
         if qtype == 'gll':
             quad = GaussLobattoLegendre1D
         if qtype == 'gl':
             quad = GaussLegendre1D
         if qtype == 'newtoncotesopen':
             quad = NewtonCotesOpen1D
-        if qtype == 'pascal':
-            quad = Pascal1D
-        # ADD MANY MORE QUAD TYPES HERE!
 
-        if len(nquadptslist) == 1:
-            nquadptslist.append(1)
-        if len(nquadptslist) == 2:
-            nquadptslist.append(1)
-        self.nquadpts = np.array(nquadptslist, dtype=np.int32)
-        self.pts = []
-        self.wts = []
-        for npts in nquadptslist:
-            pt, wt = quad(npts)
-            self.pts.append(rescale_pts(pt))
-            self.wts.append(rescale_wts(wt))
+        pt, wt = quad(npts)
+        self.pts = rescale_pts(pt)
+        self.wts = rescale_wts(wt)
 
 
-class ThemisQuadratureExact(ThemisQuadrature):
-    def __init__(self, qtype, nquadptslist):
+class QuadratureExact():
+    def __init__(self, qtype, npts):
 
         self.exact = True
-        self.finatquad = None
         if qtype == 'gllexact':
             quad = GaussLobattoLegendre1DExact
         if qtype == 'glexact':
             quad = GaussLegendre1DExact
-
-        if len(nquadptslist) == 1:
-            nquadptslist.append(1)
-        if len(nquadptslist) == 2:
-            nquadptslist.append(1)
-        self.nquadpts = np.array(nquadptslist, dtype=np.int32)
-        self.pts = []
-        self.wts = []
-        for npts in nquadptslist:
-            pt, wt = quad(npts)
-            for i in range(len(pt)):
-                pt[i] = rescale_pts_exact(pt[i])
-                wt[i] = rescale_wts_exact(wt[i])
-            self.pts.append(pt)
-            self.wts.append(wt)
+        pt, wt = quad(npts)
+        for i in range(len(pt)):
+            pt[i] = rescale_pts_exact(pt[i])
+            wt[i] = rescale_wts_exact(wt[i])
+        self.pts = pt
+        self.wts = wt
 
 # ALL OF THESE QUADRATURE RULES ARE DEFINED ON THE INTERVAL -1,1
 
@@ -99,21 +67,12 @@ def NewtonCotesOpen1D(n):
 
     return pts, wts
 
-# NOTE: THIS RULE IS INTENDED ONLY FOR PLOTTING, AND THEREFORE WTS IS USELESS
-
-
-def Pascal1D(n):
-    pts = np.linspace(-1., 1., 2*n+1)
-    pts = pts[1:-1:2]
-    wts = np.zeros((n))
-    return pts, wts
-
 
 def GaussLegendre1D(n):
 
     pts = np.array(gauss_legendre(n), dtype=np.float64)
     x = sympy.var('x')
-    p = sympy.polys.orthopolys.legendre_poly(n, x)  # legendre_poly(n)
+    p = sympy.polys.orthopolys.legendre_poly(n, x)
     wts = np.zeros((n))
     pd = sympy.diff(p, x)
     pdfunc = sympy.lambdify(x, pd, "numpy")
@@ -121,8 +80,6 @@ def GaussLegendre1D(n):
     wts = 2./((1.-np.square(pts))*np.square(diffp))
 
     return pts, wts
-
-# This will fail for numerical assembly, since it returns a list instead of a Numpy array
 
 
 def GaussLegendre1DExact(n):
@@ -148,8 +105,6 @@ def GaussLegendre1DExact(n):
         wts = []
 
     return pts, wts
-
-# This will fail for numerical assembly, since it returns a list instead of a Numpy array
 
 
 def GaussLobattoLegendre1DExact(n):
@@ -202,9 +157,9 @@ def GaussLobattoLegendre1D(n):
         pts = np.array(gauss_lobatto(n), dtype=np.float64)
         wts = np.zeros((n))
         x = sympy.var('x')
-        p = sympy.polys.orthopolys.legendre_poly(n-1, x)  # legendre_poly(n)
+        p = sympy.polys.orthopolys.legendre_poly(n-1, x)
         interior_pts = pts[1:-1]
-        p = sympy.polys.orthopolys.legendre_poly(n-1, x)  # legendre_poly(n)
+        p = sympy.polys.orthopolys.legendre_poly(n-1, x)
         pfunc = sympy.lambdify(x, p, "numpy")
         pnum = pfunc(interior_pts)
         wts[1:-1] = 2./((n*(n-1.))*np.square(pnum))
