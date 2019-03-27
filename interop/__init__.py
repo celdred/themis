@@ -3,8 +3,8 @@ backend = 'themis'
 
 if backend == 'firedrake':
     from firedrake import *
-
     import matplotlib.pyplot as plt
+
     def plot_function(func, coords, name):
         plt.close('all')
         fig = plt.figure(figsize=(10, 10))
@@ -17,7 +17,7 @@ if backend == 'firedrake':
         plt.close('all')
 
     def get_plotting_spaces(mesh, nquadplot, nquadplot_v=None):
-        return None,None,None
+        return None, None, None
 
     def evaluate_and_store_field(evalspace, opts, field, name, checkpoint):
         return field

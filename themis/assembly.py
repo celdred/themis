@@ -2,10 +2,10 @@
 import numpy as np
 from themis.petscshim import PETSc
 from mpi4py import MPI
-import time
 from themis.assembly_utils import extract_fields, compile_functional
 
 __all__ = ["assemble", "AssembleOneForm", "AssembleTwoForm", "AssembleZeroForm"]
+
 
 def AssembleTwoForm(mat, tspace, sspace, kernel, zeroassembly=False):
 
@@ -17,19 +17,17 @@ def AssembleTwoForm(mat, tspace, sspace, kernel, zeroassembly=False):
 
         if zeroassembly:
             kernel.zero = True
+
         # compile functional IFF form not already compiled
         # also extract coefficient and geometry args lists
-        # time1 = time.time()
         with PETSc.Log.Event('compile'):
             if not kernel.assemblycompiled:
                 compile_functional(kernel, tspace, sspace, mesh)
-        # print('compiled-2',time.time()-time1,zeroassembly)
 
         # scatter fields into local vecs
         # time1 = time.time()
         with PETSc.Log.Event('extract'):
             extract_fields(kernel)
-        # print('extracted-2',time.time()-time1,zeroassembly)
 
         # assemble
         # time1 = time.time()
@@ -52,12 +50,6 @@ def AssembleTwoForm(mat, tspace, sspace, kernel, zeroassembly=False):
                     submatlist.append(mat.getLocalSubMatrix(isrow_block, iscol_block))
 
             for da, assemblefunc in zip(kernel.dalist, kernel.assemblyfunc_list):
-                # PETSc.Sys.Print('assembling 2-form',kernel.integral_type,submatlist)
-                # PETSc.Sys.Print(submatlist)
-                # PETSc.Sys.Print(tdalist)
-                # PETSc.Sys.Print(sdalist)
-                # PETSc.Sys.Print(kernel.fieldargs_list)
-                # PETSc.Sys.Print(kernel.constantargs_list)
                 assemblefunc([da, ] + submatlist + tdalist + sdalist + kernel.fieldargs_list, kernel.constantargs_list)
 
             # restore sub matrices
@@ -71,7 +63,6 @@ def AssembleTwoForm(mat, tspace, sspace, kernel, zeroassembly=False):
 
         if zeroassembly:
             kernel.zero = False
-        # print('assembled-2',time.time()-time1,zeroassembly)
 
 
 def AssembleZeroForm(mesh, kernellist):
@@ -122,20 +113,15 @@ def AssembleOneForm(veclist, space, kernel):
 
         # compile functional IFF form not already compiled
         # also extract coefficient and geometry args lists
-        # time1 = time.time()
         with PETSc.Log.Event('compile'):
             if not kernel.assemblycompiled:
                 compile_functional(kernel, space, None, mesh)
-        # print('compiled-1',time.time()-time1)
 
         # scatter fields into local vecs
-        # time1 = time.time()
         with PETSc.Log.Event('extract'):
             extract_fields(kernel)
-        # print('extracted-1',time.time()-time1)
 
         # assemble
-        # time1 = time.time()
         with PETSc.Log.Event('assemble'):
 
             # get the list of das
@@ -144,16 +130,7 @@ def AssembleOneForm(veclist, space, kernel):
                 tdalist.append(space.get_da(ci1))
 
             for da, assemblefunc in zip(kernel.dalist, kernel.assemblyfunc_list):
-                # PETSc.Sys.Print('assembling 1-form',kernel.integral_type,veclist)
-                    #PETSc.Sys.Print(kernel.assembly_routine)
-                    # PETSc.Sys.Print(kernel.exterior_facet_type,kernel.exterior_facet_direction)
-                # PETSc.Sys.Print(veclist)
-                # PETSc.Sys.Print(tdalist)
-                # PETSc.Sys.Print(kernel.fieldargs_list)
-                # PETSc.Sys.Print(kernel.constantargs_list)
-                # PETSc.Sys.Print(kernel.fieldargs_list[0].getGhostRanges())
                 assemblefunc([da, ] + veclist + tdalist + kernel.fieldargs_list, kernel.constantargs_list)
-        # print('assembled-1',time.time()-time1)
 
 
 # this is a helper function to create a TwoForm, given a UFL Form

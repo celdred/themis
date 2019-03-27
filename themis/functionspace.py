@@ -7,6 +7,7 @@ import ufl
 
 __all__ = ["FunctionSpace", "MixedFunctionSpace", "VectorFunctionSpace", "TensorFunctionSpace"]
 
+
 class FunctionSpace(UFLFunctionSpace):
 
     def __iter__(self):
@@ -41,13 +42,6 @@ class FunctionSpace(UFLFunctionSpace):
 
     def output(self):
         pass
-        # for ci in range(self.ncomp):
-        #    for bi in range(self.npatches):
-        #        da_output(self.get_da(ci, bi), self._name + '.da_cb' + str(ci) + '.' + str(bi))
-        #        lgmap_output(self.get_lgmap(ci, bi), self._name + '.lgmap_cb.' + str(ci) + '.' + str(bi))
-        #        is_output(self.get_component_block_lis(ci, bi), self._name + '.cb_lis.' + str(ci) + '.' + str(bi))
-        # da_output(self._composite_da, self._name + '.compda')
-        # lgmap_output(self.get_overall_lgmap(), self.name + '.overalllgmap')
 
     # DAs
     # return the da for component ci
@@ -229,8 +223,6 @@ class FunctionSpace(UFLFunctionSpace):
         self._overall_lgmap = self._composite_da.getLGMap()
         self._cb_lis = self._composite_da.getLocalISs()
 
-        # PETSc.Sys.Print(element,self._da[0][0].getGhostRanges(),self._da[0][0].getRanges())
-
 
 class MixedFunctionSpace(UFLMixedFunctionSpace):
 
@@ -387,6 +379,7 @@ def VectorFunctionSpace(mesh, element, dim=None, name='fspace', si=0, parent=Non
     dim = dim or mesh.ufl_cell().geometric_dimension()
     element = ufl.VectorElement(sub_element, dim=dim)
     return FunctionSpace(mesh, element, name=name)
+
 
 def TensorFunctionSpace(mesh, element, shape=None, symmetry=None, name='fspace', si=0, parent=None):
     sub_element = make_scalar_element(element)

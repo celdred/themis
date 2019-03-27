@@ -4,6 +4,7 @@ import numpy as np
 
 __all__ = ["QuadratureExact", "QuadratureNumerical"]
 
+
 def rescale_pts(pts):
     return 0.5 * pts + 0.5
 
@@ -53,6 +54,7 @@ class QuadratureExact():
 
 # ALL OF THESE QUADRATURE RULES ARE DEFINED ON THE INTERVAL -1,1
 
+
 def NewtonCotesOpen1D(n):
 
     pts = np.linspace(-1., 1., n+2)
@@ -64,6 +66,7 @@ def NewtonCotesOpen1D(n):
         wts[i] = sympy.integrate(li, (x, -1., 1.))
 
     return pts, wts
+
 
 def GaussLegendre1D(n):
 
@@ -77,6 +80,7 @@ def GaussLegendre1D(n):
     wts = 2./((1.-np.square(pts))*np.square(diffp))
 
     return pts, wts
+
 
 def GaussLegendre1DExact(n):
     if n == 1:
@@ -101,6 +105,7 @@ def GaussLegendre1DExact(n):
         wts = []
 
     return pts, wts
+
 
 def GaussLobattoLegendre1DExact(n):
     if n == 1:  # THIS IS USEFUL FOR DISPERSION STUFF (FOR GETTING SPTS CORRECT FOR DG0 SPACES) DESPITE NOT ACTUALLY EXISTING
@@ -140,6 +145,7 @@ def GaussLobattoLegendre1DExact(n):
 
     return pts, wts
 
+
 def GaussLobattoLegendre1D(n):
     if n == 1:  # THIS IS USEFUL FOR DISPERSION STUFF (FOR GETTING SPTS CORRECT FOR DG0 SPACES) DESPITE NOT ACTUALLY EXISTING
         pts = np.array([0., ], dtype=np.float64)
@@ -151,9 +157,9 @@ def GaussLobattoLegendre1D(n):
         pts = np.array(gauss_lobatto(n), dtype=np.float64)
         wts = np.zeros((n))
         x = sympy.var('x')
-        p = sympy.polys.orthopolys.legendre_poly(n-1, x)  # legendre_poly(n)
+        p = sympy.polys.orthopolys.legendre_poly(n-1, x)
         interior_pts = pts[1:-1]
-        p = sympy.polys.orthopolys.legendre_poly(n-1, x)  # legendre_poly(n)
+        p = sympy.polys.orthopolys.legendre_poly(n-1, x)
         pfunc = sympy.lambdify(x, p, "numpy")
         pnum = pfunc(interior_pts)
         wts[1:-1] = 2./((n*(n-1.))*np.square(pnum))

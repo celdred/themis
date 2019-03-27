@@ -1,8 +1,5 @@
-# from ufl import Argument
-from ufl.split_functions import split
 
-# from ufl.assertions import ufl_assert
-# from ufl.algorithms import  extract_coefficients
+from ufl.split_functions import split
 from ufl.algorithms import extract_arguments
 
 import ufl
@@ -10,13 +7,10 @@ from themis.function import Function
 
 __all__ = ["Argument", "TestFunction", "TrialFunction", "TestFunctions", "TrialFunctions", "derivative", "adjoint", "CellSize"]
 
+
 class Argument(ufl.Argument):
     def function_space(self):
         return self.ufl_function_space()
-
-####################
-# THESE ARE FROM FIREDRAKE
-# NEED ATTRIBUTION
 
 
 def TestFunction(function_space, part=None):
@@ -104,7 +98,7 @@ def adjoint(form, reordered_arguments=None):
 
     # ufl.adjoint creates new Arguments if no reordered_arguments is
     # given.  To avoid that, always pass reordered_arguments with
-    # firedrake.Argument objects.
+    # themis.Argument objects.
     if reordered_arguments is None:
         v, u = extract_arguments(form)
         reordered_arguments = (Argument(u.function_space(),
@@ -117,6 +111,8 @@ def adjoint(form, reordered_arguments=None):
 
 # THIS IS BROKEN
 # WHAT IS THE CORRECT MEASURE HERE ANYWAYS FOR A QUAD CELL?
+
+
 def CellSize(mesh):
     """A symbolic representation of the cell size of a mesh.
 

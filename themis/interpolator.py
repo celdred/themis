@@ -9,8 +9,10 @@ from themis.assembly_utils import extract_fields, compile_functional
 
 __all__ = ["Interpolator", "interpolate"]
 
+
 def interpolate(expr, V, overwrite_pts=None):
     return Interpolator(expr, V, overwrite_pts=overwrite_pts).interpolate()
+
 
 class Interpolator():
 
@@ -20,7 +22,7 @@ class Interpolator():
             f = V
             V = f.function_space()
         else:
-            f = function.Function(V)
+            f = themis.Function(V)
 
         # Make sure we have an expression of the right length i.e. a value for
         # each component in the value shape of each function space
@@ -43,9 +45,6 @@ class Interpolator():
             raise RuntimeError('Shape mismatch: Expression shape %r, FunctionSpace shape %r'
                                % (expr.ufl_shape, V.ufl_element().value_shape()))
 
-        # if expr.ufl_shape != V.shape:
-        #    raise ValueError("UFL expression has incorrect shape for interpolation.")
-
         mesh = V.ufl_domain()
         to_element = V.themis_element()
 
@@ -54,7 +53,7 @@ class Interpolator():
             ptsy = np.array(to_element.sub_elements[0][1].spts)
             ptsz = np.array(to_element.sub_elements[0][2].spts)
         else:
-            ptsx,ptsy,ptsz = overwrite_pts
+            ptsx, ptsy, ptsz = overwrite_pts
         to_pts = []
         for lx in range(ptsx.shape[0]):
             for ly in range(ptsy.shape[0]):

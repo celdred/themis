@@ -5,7 +5,8 @@ from themis.function import Function
 from themis.constant import Constant
 
 __all__ = ["create_box_mesh", "Mesh", "ExtrudedMesh", "PeriodicIntervalMesh", "PeriodicRectangleMesh", "PeriodicSquareMesh",
-"IntervalMesh", "SquareMesh", "CubeMesh", "BoxMesh", "RectangleMesh"]
+           "IntervalMesh", "SquareMesh", "CubeMesh", "BoxMesh", "RectangleMesh"]
+
 
 def create_box_mesh(nxs, lxs, pxs, bcs):
     assert(len(nxs) == len(lxs))
@@ -28,6 +29,7 @@ def create_box_mesh(nxs, lxs, pxs, bcs):
 
     return mesh
 
+
 def Mesh(newcoords):
     oldmesh = newcoords.space._mesh
     if not oldmesh.extruded:
@@ -36,6 +38,7 @@ def Mesh(newcoords):
         basemesh = SingleBlockMesh(oldmesh.nxs[:-1], oldmesh.bcs[:-1])
         return SingleBlockExtrudedMesh(basemesh, oldmesh.nxs[-1], coords=newcoords)
 
+
 def ExtrudedMesh(basemesh, layers, layer_height=None, extrusion_type='uniform'):
     if not (extrusion_type == 'uniform'):
         raise ValueError('cannot handle non-uniform extrusion yet')
@@ -43,7 +46,6 @@ def ExtrudedMesh(basemesh, layers, layer_height=None, extrusion_type='uniform'):
     emesh = SingleBlockExtrudedMesh(basemesh, layers, layer_height=layer_height)
 
     return emesh
-
 
 
 def PeriodicIntervalMesh(ncells, length_or_left, right=None):

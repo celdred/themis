@@ -193,7 +193,7 @@ if plot:
 
     # This is needed due to faulty handling of SplitFunctions within Themis KernelExpressionBuilder
     # Need to refactor split(f), f.split(), W.sub(), split(W), etc.
-    hsplit,usplit = x.split()
+    hsplit, usplit = x.split()
     honly = Function(l2, name='h')
     uonly = Function(hdiv, name='u')
     honly.assign(hsplit)
@@ -211,13 +211,13 @@ if plot:
     udiffeval = evaluate_and_store_field(vectorevalspace, opts, udiff, 'udiff', checkpoint)
     udirectdiffeval = evaluate_and_store_field(vectorevalspace, opts, udirectdiff, 'udirectdiff', checkpoint)
 
-    plot_function(heval,coordseval,'h')
-    plot_function(hsolneval,coordseval,'hsoln')
-    plot_function(hdiffeval,coordseval,'hdiff')
-    plot_function(hdirectdiffeval,coordseval,'hdirectdiff')
-    plot_function(ueval,coordseval,'u')
-    plot_function(usolneval,coordseval,'usoln')
-    plot_function(udiffeval,coordseval,'udiff')
-    plot_function(udirectdiffeval,coordseval,'udirectdiff')
+    plot_function(heval, coordseval, 'h')
+    plot_function(hsolneval, coordseval, 'hsoln')
+    plot_function(hdiffeval, coordseval, 'hdiff')
+    plot_function(hdirectdiffeval, coordseval, 'hdirectdiff')
+    plot_function(ueval, coordseval, 'u')
+    plot_function(usolneval, coordseval, 'usoln')
+    plot_function(udiffeval, coordseval, 'udiff')
+    plot_function(udirectdiffeval, coordseval, 'udirectdiff')
 
 checkpoint.close()

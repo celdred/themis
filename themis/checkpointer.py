@@ -14,7 +14,7 @@ FILE_UPDATE = PETSc.Viewer.Mode.APPEND
 
 __all__ = ["DumbCheckpoint", "FILE_READ", "FILE_CREATE", "FILE_UPDATE", ]
 
-# ADD FIREDRAKE ATTRIBUTION
+
 class DumbCheckpoint():
     def __init__(self, name, mode=FILE_UPDATE):
 
@@ -57,7 +57,6 @@ class DumbCheckpoint():
                 soff = fspace.get_space_offset(si)
                 for ci in range(fspace.get_space(si).ncomp):
                     coff = fspace.get_space(si).get_component_offset(ci)
-                    # PETSc.Sys.Print(name,si,soff,ci,coff)
                     if isinstance(field, SplitFunction):
                         sii = 0
                     if isinstance(field, Function):

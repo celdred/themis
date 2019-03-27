@@ -4,6 +4,7 @@ import tsfc.kernel_interface.firedrake as kernel_interface
 
 __all__ = ["compile_form", ]
 
+
 class ThemisKernel():
     def __init__(self, kernel):
         self.assemblycompiled = False
@@ -43,7 +44,6 @@ def compile_form(form):
 
             tkernel.tabulations = []
 
-            # for tabname,pts in kernel.tabulations:
             for tabname, shape in kernel.tabulations:
                 splittab = tabname.split('_')
 

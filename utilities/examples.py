@@ -1,7 +1,8 @@
 
-from interop import SpatialCoordinate, Function, as_vector, sin
+from interop import SpatialCoordinate, Function, as_vector, sin, pi
 
 __all__ = ['adjust_coordinates', ]
+
 
 def adjust_coordinates(mesh, c):
     # Distort coordinates

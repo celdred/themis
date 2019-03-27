@@ -4,6 +4,7 @@ from interop import quadrilateral, interval, triangle, hexahedron
 
 __all__ = ['create_complex', ]
 
+
 def _quad(order, variant):
     h1elem = FiniteElement("Q", quadrilateral, order, variant=variant)
     l2elem = FiniteElement("DQ", quadrilateral, order-1, variant=variant)
@@ -58,9 +59,9 @@ def _hex(order, variant):
 
 # ADD SUPPORT FOR CR and SE AS WELL...
 # if velocityspace == 'SE':
-    #elemdict['h1'] = FiniteElement("CG", interval, order,variant='spectral')
+    # elemdict['h1'] = FiniteElement("CG", interval, order,variant='spectral')
 # if velocityspace == 'NC':
-    #elemdict['l2'] = FiniteElement("CR", triangle, order)
+    # elemdict['l2'] = FiniteElement("CR", triangle, order)
 # MAYBE? MAYBE JUST DO THEM AS SEPARATE ELEMENTS..
 # WHAT ABOUT DG GLL?
 
@@ -79,7 +80,7 @@ def create_complex(cell, velocityspace, variant, order, vorder=None):
         h1elem, l2elem, hdivelem, hcurlelem = _quad(order, variant)
         cpelem = None
     if cell == 'tri':
-        if not variant is None:
+        if variant is not None:
             raise ValueError("variants are not support on triangles")
         h1elem, l2elem, hdivelem, hcurlelem = _tri(order, velocityspace)
         cpelem = None
@@ -92,7 +93,7 @@ def create_complex(cell, velocityspace, variant, order, vorder=None):
         if cell == 'tphex':
             h1elem2D, l2elem2D, hdivelem2D, hcurlelem2D, _ = _quad(order, variant)
         if cell == 'tptri':
-            if not variant is None:
+            if variant is not None:
                 raise ValueError("variants are not support on triangles")
             h1elem2D, l2elem2D, hdivelem2D, hcurlelem2D, _ = _tri(order, velocityspace)
         h1elem1D, l2elem1D = _interval(vorder, variant)

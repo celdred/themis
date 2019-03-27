@@ -6,6 +6,7 @@ from ufl import FiniteElement, VectorElement, TensorElement, TensorProductElemen
 
 __all__ = ["ThemisElement", "IntervalElement"]
 
+
 def a_to_cinit_string(x):
     np.set_printoptions(threshold=np.prod(x.shape))
     sx = np.array2string(x, separator=',', precision=100)
@@ -14,12 +15,13 @@ def a_to_cinit_string(x):
     sx = sx.replace(']', '}')
     return sx
 
+
 def extract_element_info(elem):
     degree = elem.degree()
     variant = elem.variant()
     if variant is None:
         raise ValueError("Themis only supports elements with variant set")
-    if not variant in ['mgd', 'feec', 'mse', 'qb']:
+    if variant not in ['mgd', 'feec', 'mse', 'qb']:
         raise ValueError('Themis doesnt know how to handle variant %s', variant)
 
     degreelist = []
@@ -138,7 +140,7 @@ class ThemisElement():
     def __init__(self, elem):
 
         if isinstance(elem, TensorElement):
-            self.ndofs = elem.value_size() # do this BEFORE extracting baseelem
+            self.ndofs = elem.value_size()  # do this BEFORE extracting baseelem
             elem = elem.sub_elements()[0]
         elif isinstance(elem, VectorElement):
             self.ndofs = elem.value_size()  # do this BEFORE extracting baseelem
@@ -200,7 +202,7 @@ class ThemisElement():
             self.nentries.append(self.sub_elements[ci][0].nentries * self.sub_elements[ci][1].nentries * self.sub_elements[ci][2].nentries)
 
         self.nentries_total = np.sum(np.array(self.nentries[ci]), dtype=np.int32)
-        self.nbasis_total = np.sum(np.array(self.nbasis), dtype = np.int32)
+        self.nbasis_total = np.sum(np.array(self.nbasis), dtype=np.int32)
 
     def dalist(self, name):
         dalist = ''
@@ -218,6 +220,7 @@ class ThemisElement():
         return self._maxdegree + 1
         # maxnbasis = max(max(self._nbasis))
         # return maxnbasis
+
 
 class IntervalElement():
 
@@ -243,27 +246,43 @@ class IntervalElement():
             self.symb = symb
 
         # compute offsets and offset mults
-        if variant in ['feec', 'mse', 'qb'] and cont == 'H1':   of, om = _CG_offset_info(degree)
-        if variant in ['feec', 'mse', 'qb'] and cont == 'L2':   of, om = _DG_offset_info(degree)
-        if variant == 'mgd' and cont == 'H1':                   of, om = _GD_offset_info(degree)
-        if variant == 'mgd' and cont == 'L2':                   of, om = _DGD_offset_info(degree)
+        if variant in ['feec', 'mse', 'qb'] and cont == 'H1':
+            of, om = _CG_offset_info(degree)
+        if variant in ['feec', 'mse', 'qb'] and cont == 'L2':
+            of, om = _DG_offset_info(degree)
+        if variant == 'mgd' and cont == 'H1':
+            of, om = _GD_offset_info(degree)
+        if variant == 'mgd' and cont == 'L2':
+            of, om = _DGD_offset_info(degree)
 
         # compute entries
-        if variant in ['feec', 'mse', 'qb'] and cont == 'H1':   ofe, ome = _CG_entries_info(degree)
-        if variant in ['feec', 'mse', 'qb'] and cont == 'L2':   ofe, ome = _DG_entries_info(degree)
-        if variant == 'mgd' and cont == 'H1':                   ofe, ome = _GD_entries_info(degree)
-        if variant == 'mgd' and cont == 'L2':                   ofe, ome = _DGD_entries_info(degree)
+        if variant in ['feec', 'mse', 'qb'] and cont == 'H1':
+            ofe, ome = _CG_entries_info(degree)
+        if variant in ['feec', 'mse', 'qb'] and cont == 'L2':
+            ofe, ome = _DG_entries_info(degree)
+        if variant == 'mgd' and cont == 'H1':
+            ofe, ome = _GD_entries_info(degree)
+        if variant == 'mgd' and cont == 'L2':
+            ofe, ome = _DGD_entries_info(degree)
 
         # compute basis and deriv functions
         if basis:
-            if variant == 'feec' and cont == 'H1':  b, d, d2 = _CG_basis(degree, symb, spts)
-            if variant == 'feec' and cont == 'L2':  b, d, d2 = _DG_basis(degree, symb, spts)
-            if variant == 'mgd' and cont == 'H1':   b, d, d2 = _GD_basis(degree, symb)
-            if variant == 'mgd' and cont == 'L2':   b, d, d2 = _DGD_basis(degree, symb)
-            if variant == 'qb' and cont == 'H1':    b, d, d2 = _CQB_basis(degree, symb)
-            if variant == 'qb' and cont == 'L2':    b, d, d2 = _DQB_basis(degree, symb)
-            if variant == 'mse' and cont == 'H1':   b, d, d2 = _CMSE_basis(degree, symb, spts)
-            if variant == 'mse' and cont == 'L2':   b, d, d2 = _DMSE_basis(degree, symb, spts)  # Note that spts here is actually the H1 spts from the derham complex partner
+            if variant == 'feec' and cont == 'H1':
+                b, d, d2 = _CG_basis(degree, symb, spts)
+            if variant == 'feec' and cont == 'L2':
+                b, d, d2 = _DG_basis(degree, symb, spts)
+            if variant == 'mgd' and cont == 'H1':
+                b, d, d2 = _GD_basis(degree, symb)
+            if variant == 'mgd' and cont == 'L2':
+                b, d, d2 = _DGD_basis(degree, symb)
+            if variant == 'qb' and cont == 'H1':
+                b, d, d2 = _CQB_basis(degree, symb)
+            if variant == 'qb' and cont == 'L2':
+                b, d, d2 = _DQB_basis(degree, symb)
+            if variant == 'mse' and cont == 'H1':
+                b, d, d2 = _CMSE_basis(degree, symb, spts)
+            if variant == 'mse' and cont == 'L2':
+                b, d, d2 = _DMSE_basis(degree, symb, spts)  # Note that spts here is actually the H1 spts from the derham complex partner
 
         # compute ndofs and nblocks
         if variant in ['feec', 'mse', 'qb'] and cont == 'H1':
@@ -317,9 +336,12 @@ class IntervalElement():
         tabulation = []
         for bi in range(self.nblocks):
             tab = sympy.zeros(npts, self.nbasis)
-            if derivorder == 0: symfuncs = self.basis[bi]
-            if derivorder == 1: symfuncs = self.derivs[bi]
-            if derivorder == 2: symfuncs = self.derivs2[bi]
+            if derivorder == 0:
+                symfuncs = self.basis[bi]
+            if derivorder == 1:
+                symfuncs = self.derivs[bi]
+            if derivorder == 2:
+                symfuncs = self.derivs2[bi]
             for i in range(self.nbasis):
                 for j in range(npts):
                     if (symfuncs[i] == 1.0 and derivorder == 0):  # check for the constant basis function
@@ -331,13 +353,15 @@ class IntervalElement():
             tabulation.append(tab)
         return tabulation
 
-
     def tabulate_numerical(self, x, derivorder):
         npts = x.shape[0]
         tabulation = np.zeros((self.nblocks, npts, self.nbasis))
-        if derivorder == 0: symfuncs = self.lambdified_basis
-        if derivorder == 1: symfuncs = self.lambdified_derivs
-        if derivorder == 2: symfuncs = self.lambdified_derivs2
+        if derivorder == 0:
+            symfuncs = self.lambdified_basis
+        if derivorder == 1:
+            symfuncs = self.lambdified_derivs
+        if derivorder == 2:
+            symfuncs = self.lambdified_derivs2
         for bi in range(self.nblocks):
             for i in range(self.nbasis):
                 if (symfuncs[bi][i] == 1.0 and derivorder == 0):  # check for the constant basis function
@@ -349,6 +373,7 @@ class IntervalElement():
         return tabulation
 
 # Lagrange Elements
+
 
 def _CG_basis(order, symb, spts):
     symbas = []
@@ -384,15 +409,18 @@ def _CG_offset_info(order):
     # 'p*i','p*i+1'...'p*i+p'
     return np.expand_dims(offsets, axis=0), np.expand_dims(offset_multiplier, axis=0)
 
+
 def _CG_entries_info(order):
     of, om = _CG_offset_info(order)
     return of[0], om[0]
+
 
 def _DG_offset_info(order):
     offsets = np.arange(0, order+1, dtype=np.int32)
     offset_multiplier = (order+1) * np.ones(offsets.shape, dtype=np.int32)
     # 'p*i','p*i+1'...'p*i+p'
     return np.expand_dims(offsets, axis=0), np.expand_dims(offset_multiplier, axis=0)
+
 
 def _DG_entries_info(order):
     of, om = _DG_offset_info(order)
@@ -414,6 +442,7 @@ def _DG_entries_info(order):
     # f3p = -.5*(-(x+1)**3   + (x+1)**2/2 + 9/4*(x+1) - 9/8)   # 0 1 [0 0]
     # f4p =  .5*(-(x+1)**3/3 + (x+1)**2/2 + (x+1)/12  - 1/8)   # 1 0 [0 0]
     # return [f4m,f3m,f2m,f1m], [f4,f3,f2,f1], [f4p,f3p,f2p,f1p]
+
 
 def _GD_basis(order, symb):
     symbas = []
@@ -466,6 +495,8 @@ def _GD_basis(order, symb):
         return [symbas]*order, [derivs]*order, [derivs2]*order
 
 # uses the formulas from Hiemstra et. al 2014 to create a compatible DG basis from a given CG basis
+
+
 def create_compatible_l2_basis(cg_symbas):
     nblocks = len(cg_symbas)
     ncg_basis = len(cg_symbas[0])
@@ -532,6 +563,7 @@ def _DGD_entries_info(order):
 
 # QB ELEMENTS
 
+
 def bernstein_polys(n, var):
     '''Returns the n+1 bernstein basis polynomials of degree n (n>=1) on [-1,1]'''
     # if n==0:
@@ -546,6 +578,7 @@ def bernstein_polys(n, var):
         # basisfunc = basisfunc.subs(t,(var-a)/(b-a))
         polys.append(basisfunc)
     return polys
+
 
 def _CQB_basis(order, symb):
     symbas = bernstein_polys(order, symb)
@@ -572,6 +605,7 @@ def _DQB_basis(order, symb):
 _CMSE_basis = _CG_basis
 
 # Here, spts argument is actually those used for the corresponding CG space!
+
 
 def _DMSE_basis(order, symb, spts):
     if order >= 1:

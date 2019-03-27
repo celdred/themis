@@ -23,26 +23,26 @@ try:
 except AttributeError:
     pass
 del ufl
-from ufl import *
+from ufl import *  # noqa: F401
 
-from themis.assembly import *
-from themis.bcs import *
-from themis.checkpointer import *
-from themis.codegenerator import *
-from themis.constant import *
-from themis.form import *
-from themis.formmanipulation import *
-from themis.function import *
-from themis.functionspace import *
-from themis.interpolator import *
-from themis.mesh import *
-from themis.norms import *
-from themis.petscshim import *
-from themis.plotting import *
-from themis.project import *
-from themis.quadrature import *
-from themis.solver import *
-from themis.themiselement import *
-from themis.tsfc_interface import *
-from themis.ufl_expr import *
-from themis.utility_meshes import *
+from themis.assembly import *  # noqa: F401
+from themis.bcs import *  # noqa: F401
+from themis.checkpointer import *  # noqa: F401
+from themis.codegenerator import *  # noqa: F401
+from themis.constant import *  # noqa: F401
+from themis.form import *  # noqa: F401
+from themis.formmanipulation import *  # noqa: F401
+from themis.function import *  # noqa: F401
+from themis.functionspace import *  # noqa: F401
+from themis.interpolator import *  # noqa: F401
+from themis.mesh import *  # noqa: F401
+from themis.norms import *  # noqa: F401
+from themis.petscshim import *  # noqa: F401
+from themis.plotting import *  # noqa: F401
+from themis.project import *  # noqa: F401
+from themis.quadrature import *  # noqa: F401
+from themis.solver import *  # noqa: F401
+from themis.themiselement import *  # noqa: F401
+from themis.tsfc_interface import *  # noqa: F401
+from themis.ufl_expr import *  # noqa: F401
+from themis.utility_meshes import *  # noqa: F401

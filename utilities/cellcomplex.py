@@ -3,13 +3,15 @@ from interop import FiniteElement, TensorProductElement, VectorElement
 from interop import quadrilateral, interval, triangle, hexahedron
 from interop import Function, FunctionSpace
 from interop import IntervalMesh, PeriodicIntervalMesh
-from interop import SquareMesh, PeriodicSquareMesh, RectangleMesh, PeriodicRectangleMesh
+from interop import RectangleMesh, PeriodicRectangleMesh
 from interop import ExtrudedMesh, Mesh, BoxMesh
-from interop import CubedSphereMesh, IcosahedralSphereMesh
 from interop import SpatialCoordinate
 from interop import coordvariant
+from interop import perp, grad, as_vector, sqrt, inner
+from interop import dx, ds, ds_b, ds_v, ds_t, dS, dS_h, dS_v
 
 __all__ = ['create_box_mesh', 'set_mesh_quadrature', 'set_boxmesh_operators']
+
 
 def set_mesh_coordinate_order(mesh, cell, bcs, coordorder, vcoordorder=None):
     vcoordorder = vcoordorder or coordorder
@@ -163,8 +165,6 @@ def create_box_mesh(cell, nxs, xbcs, lxs, coordorder, vcoordorder=None):
 #     return newmesh
 
 
-
-
 def set_mesh_quadrature(mesh, cell, qdegree=None, vqdegree=None):
 
     if qdegree:
@@ -205,18 +205,18 @@ def set_mesh_quadrature(mesh, cell, qdegree=None, vqdegree=None):
 
 def set_boxmesh_operators(mesh, cell):
 
-# ADD OTHER OPERATORS HERE ie div, grad, curl, adjoints, etc.
-# Basically what we need to make Hamiltonian and Hodge Laplacian stuff dimension-agnostic
+    # ADD OTHER OPERATORS HERE ie div, grad, curl, adjoints, etc.
+    # Basically what we need to make Hamiltonian and Hodge Laplacian stuff dimension-agnostic
     if cell in ['quad', 'tri', 'tpquad']:
-            mesh.skewgrad = lambda s: perp(grad(s))
-            mesh.perp = lambda u: perp(u)
+        mesh.skewgrad = lambda s: perp(grad(s))
+        mesh.perp = lambda u: perp(u)
 
     if cell in ['tpquad']:
         mesh.k = as_vector((0, 1))
 
     if cell in ['hex', 'tphex', 'tptri']:
-        #mesh.skewgrad = lambda s : cross(mesh.k,grad(s))
-        #mesh.perp = lambda u : cross(mesh.k,u)
+        # mesh.skewgrad = lambda s : cross(mesh.k,grad(s))
+        # mesh.perp = lambda u : cross(mesh.k,u)
         pass
 
         if cell in ['tphex', 'tptri']:

@@ -2,10 +2,7 @@ import numpy as np
 import sympy
 import mpmath
 
-# From PyWENO #
-
-################################################################################
-# polynomial generator, roots etc
+# From PyWENO
 
 
 def lagrange_poly(n, p, var):
@@ -50,10 +47,6 @@ def find_roots(p):
     return sorted(roots)
 
 
-################################################################################
-# quadrature points
-
-
 def gauss_legendre(n):
     '''Return Gauss-Legendre nodes.
     Gauss-Legendre nodes are roots of P_n(x).
@@ -84,9 +77,6 @@ def gauss_radau(n):
     p = legendre_poly(n) + legendre_poly(n-1)
     r = find_roots(p)
     return r
-
-##########################################
-# My own stuff
 
 
 def LagrangePoly(x, order, i, xi=None):

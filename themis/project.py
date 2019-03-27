@@ -4,9 +4,8 @@ from themis import ufl_expr
 from themis.function import Function
 from themis.solver import NonlinearVariationalProblem, NonlinearVariationalSolver
 
-# NEEDS FIREDRAKE ATTRIBUTION
+__all__ = ["Projector", ]
 
-__all__ = ["Projector",]
 
 class Projector():
     """

@@ -7,9 +7,7 @@ from themis.function import Function
 from themis.ufl_expr import adjoint
 import ufl
 from pyop2.sparsity import get_preallocation
-import time
 
-# 3
 __all__ = ["ZeroForm", "OneForm", "TwoForm"]
 
 
@@ -64,8 +62,6 @@ def create_matrix(form, mat_type, target, source, blocklist, kernellist):
     mat.setOption(PETSc.Mat.Option.KEEP_NONZERO_PATTERN, True)
     mat.setOption(PETSc.Mat.Option.NO_OFF_PROC_ZERO_ROWS, False)
 
-    # print('zeroed')
-    # mat.view()
     return mat
 
 
@@ -172,8 +168,6 @@ def restore_block(isrow, iscol, matrix, submat):
     else:
         matrix.restoreLocalSubMatrix(isrow, iscol, submat)
 
-########################
-
 
 class OneForm():
 
@@ -181,10 +175,7 @@ class OneForm():
         self.F = F
         self.bcs = bcs
         self._pre_f_callback = pre_f_callback
-
         self.space = self.F.arguments()[0].function_space()
-        # NAMES?
-
         self.activefield = activefield
 
         # create vector
@@ -203,7 +194,6 @@ class OneForm():
             self.local_assembly_idx.append(idx)
             self.local_assembly_kernels.append(kernels)
 
-    # BROKEN
     def output(self, view, ts=None):
         pass
 
@@ -297,7 +287,6 @@ class Matrix():
 
         self._assembled = True
 
-# DOES DESTROYING A NEST AUTOMATICALLY DESTROY THE SUB MATRICES?
     def destroy(self):
         self.petscmat.destroy()
 
@@ -526,10 +515,6 @@ class TwoForm():
 
         # restore the old active field
         self.activefield._activevector = self.activefield._vector
-
-        # PETSc.Sys.Print('mat', self.mat.petscmat.getInfo(info=3))
-        # if not (self.Jp is None):
-        #   PETSc.Sys.Print('pmat', self.pmat.petscmat.getInfo(info=3))
 
         # WHAT SHOULD I REALLY BE RETURNING HERE?
         return PETSc.Mat.Structure.SAME_NONZERO_PATTERN

@@ -1,13 +1,10 @@
 import jinja2
 import numpy as np
 
-from themis import FiniteElement, interval
 from themis.themiselement import IntervalElement
 from finat.point_set import TensorPointSet
 from themis.constant import Constant
 import themis.function as function
-import time
-from themis.petscshim import PETSc
 
 __all__ = ["generate_assembly_routine", "generate_interpolation_routine"]
 
@@ -25,6 +22,7 @@ interpolation_template = templateEnv.get_template('interpolation.template')
 cellassembly_template = templateEnv.get_template('assemble.template')
 facetassembly_template = templateEnv.get_template('assemble-facets.template')
 
+
 def a_to_cinit_string(x):
     np.set_printoptions(threshold=np.prod(x.shape))
     sx = np.array2string(x, separator=',', precision=100)
@@ -32,6 +30,7 @@ def a_to_cinit_string(x):
     sx = sx.replace('[', '{')
     sx = sx.replace(']', '}')
     return sx
+
 
 class EntriesObject():
     def __init__(self, elem):
@@ -109,6 +108,7 @@ class SpaceObject():
 
 # Use tabdict to cache tab elems, which can be expensive to generate due to sympy lambdification of many basis functions
 tabdict = {}
+
 
 class TabObject():
     def __init__(self, tabulation, kernel, pts):
@@ -211,8 +211,6 @@ def get_pts(kernel, ndims, restrict, shiftaxis, shape):
     return allpts[shiftaxis]
 
 
-
-
 def generate_assembly_routine(mesh, space1, space2, kernel):
 
     # determine space1 and space2 info
@@ -235,9 +233,9 @@ def generate_assembly_routine(mesh, space1, space2, kernel):
             veclist = veclist + ',' + 'Vec formvec_' + str(ci1)
 
     # get the list of fields and constants
-    field_args_string = '' # this goes in function call
-    constant_args_string = '' # this goes in function call
-    kernel_args_string = '' # this goes in kernel call
+    field_args_string = ''  # this goes in function call
+    constant_args_string = ''  # this goes in function call
+    kernel_args_string = ''  # this goes in kernel call
     fieldobjs = []
 
     if not kernel.zero:
@@ -262,7 +260,7 @@ def generate_assembly_routine(mesh, space1, space2, kernel):
                     kernel_args_string = kernel_args_string + ',' + '&' + field.name() + '_' + str(si) + '_vals'
             if isinstance(field, Constant):
                 constant_args_string = constant_args_string + ',' + 'const double *' + field.name()
-                kernel_args_string  = kernel_args_string + ',' + field.name()
+                kernel_args_string = kernel_args_string + ',' + field.name()
 
     # do tabulations
     tabulations = []
@@ -320,7 +318,6 @@ def generate_assembly_routine(mesh, space1, space2, kernel):
     templateVars['kernelargs'] = kernel_args_string
 
     # Process template to produce source code
-    start = time.time()
     if kernel.integral_type in interior_facet_types + exterior_facet_types:
         outputText = facetassembly_template.render(templateVars)
     else:
@@ -328,17 +325,17 @@ def generate_assembly_routine(mesh, space1, space2, kernel):
 
     return outputText
 
-def generate_interpolation_routine(mesh, kernel):
 
+def generate_interpolation_routine(mesh, kernel):
 
     # Load element specific information- entries offsets/offset mult
     elem = kernel.elem
     entries = EntriesObject(elem)
 
     # get the list of fields and constants
-    field_args_string = '' # this goes in function call
-    constant_args_string = '' # this goes in function call
-    kernel_args_string = '' # this goes in kernel call
+    field_args_string = ''  # this goes in function call
+    constant_args_string = ''  # this goes in function call
+    kernel_args_string = ''  # this goes in kernel call
     fieldobjs = []
     for fieldindex in kernel.coefficient_map:
         field = kernel.coefficients[fieldindex]
@@ -352,7 +349,7 @@ def generate_interpolation_routine(mesh, kernel):
                 kernel_args_string = kernel_args_string + ',' + '&' + field.name() + '_' + str(si) + '_vals'
         if isinstance(field, Constant):
             constant_args_string = constant_args_string + ',' + 'const double *' + field.name()
-            kernel_args_string  = kernel_args_string + ',' + field.name()
+            kernel_args_string = kernel_args_string + ',' + field.name()
 
     # do tabulations
     arrpts = np.array(kernel.pts)

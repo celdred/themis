@@ -1,8 +1,6 @@
 import numpy as np
 import ufl
 
-# ADD FIREDRAKE ATTRIBUTION
-
 __all__ = ["Constant", ]
 
 
@@ -10,13 +8,11 @@ def _globalify(value):
     data = np.array(value, dtype=np.float64)
     shape = data.shape
     rank = len(shape)
-    if rank in [0,1,2]:
+    if rank in [0, 1, 2]:
         dat = data
     else:
         raise RuntimeError("Don't know how to make Constant from data with rank %d" % rank)
     return dat, rank, shape
-
-# ADD FIREDRAKE ATTRIBUTION
 
 
 class Constant(ufl.Coefficient):
@@ -53,12 +49,10 @@ class Constant(ufl.Coefficient):
         super(Constant, self).__init__(fs)
         self._repr = 'Constant(%r, %r)' % (self.ufl_element(), self.count())
 
-# THIS BREAKS FOR NON-SCALAR CONSTANTS, WHICH I THINK IS THE CORRECT BEHAVIOUR ANYWAYS?
     def __float__(self):
         return float(self.dat)
 
     def name(self):
-        # return self.__str__().translate(None,'{}')
         return self.__str__().translate(str.maketrans('', '', '{}'))
 
     def evaluate(self, x, mapping, component, index_values):

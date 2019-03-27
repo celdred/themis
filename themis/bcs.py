@@ -6,7 +6,8 @@ from themis.constant import Constant
 from themis.project import Projector
 import ufl
 
-__all__ = ["DirichletBC",]
+__all__ = ["DirichletBC", ]
+
 
 class DirichletBC():
 
@@ -32,18 +33,9 @@ class DirichletBC():
         self.si = space._si
 
         localrowoffset = 0
-        # globalrowoffset = 0
         for i in range(0, self.si):
             for ci in range(space._parent.get_space(i).ncomp):
                 localrowoffset = localrowoffset + space._parent.get_space(i).get_localghostedndofs(ci)
-                # globalrowoffset = globalrowoffset + space._parent.get_space(i).get_localndofs(ci)
-                # PETSc.Sys.Print(space._parent.get_space(self.si).get_localndofs(ci, 0),space._parent.get_space(self.si).get_localghostedndofs(ci, 0))
-                # localrowoffset = localrowoffset + space._parent.get_space(self.si).get_localndofs(ci, 0)
-
-        # PETSc.Sys.Print(space,space._si,localrowoffset,globalrowoffset)
-# HOW DO WE HANDLE THE CASE OF SETTING COMPONENTS OF A VECTOR OR TENSOR SPACE EQUAL TO SOMETHING?
-# DOES THIS EVEN REALLY MAKE SENSE?
-# OR A NORMAL COMPONENT, ETC?
 
         for direc in direclist:
             for ci in range(space.get_space(self.si).ncomp):
@@ -51,8 +43,6 @@ class DirichletBC():
                 rows = space.get_space(self.si).get_boundary_indices(ci, direc)  # returns split component local rows
                 if rows[0] == -1:
                     rows = np.array([], dtype=np.int32)
-
-                # PETSc.Sys.Print(direc,ci,rows,space.get_component_compositelgmap(self.si, ci, bi).apply(rows))
 
                 split_global_rows = space._parent.get_space(self.si).get_component_compositelgmap(self.si, ci).apply(rows)
                 global_rows = space._parent.get_component_compositelgmap(self.si, ci).apply(rows)
@@ -91,18 +81,11 @@ class DirichletBC():
             self._zerovals = np.concatenate(self._zerovals)
             self._bvals = np.concatenate(self._bvals)
 
-        # PETSc.Sys.Print(self._localrows)
-        # PETSc.Sys.Print(self._globalrows)
-
     def get_boundary_indices_local(self):
         return self._localrows
 
     def get_boundary_indices_global(self):
         return self._globalrows
-
-    # IS THIS NEEDED?
-    # def get_boundary_indices_splitglobal(self):
-    #     return self._splitfieldglobalrows
 
     def apply_vector(self, vector, bvals=None, zero=False):
         if zero:

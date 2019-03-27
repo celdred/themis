@@ -2,12 +2,11 @@
 
 from interop import PETSc, norm, dx, DumbCheckpoint, sin, inner, FILE_CREATE
 from interop import FunctionSpace, SpatialCoordinate, Function, Projector, NonlinearVariationalProblem, NonlinearVariationalSolver
-from interop import TestFunction, DirichletBC, pi, TestFunctions
+from interop import TestFunction, pi, TestFunctions
 from interop import split, div, cos, as_vector, MixedFunctionSpace
-from interop import derivative, Constant, FacetNormal, ds, dS, as_matrix, inv, dot, TensorElement
-import numpy as np
+from interop import derivative, Constant, FacetNormal, ds, as_matrix, inv, dot, TensorElement
 import time
-from utilities import adjust_coordinates, create_box_mesh, create_complex
+from utilities import create_box_mesh, create_complex
 
 OptDB = PETSc.Options()
 order = OptDB.getInt('order', 1)
@@ -18,7 +17,7 @@ velocityspace = OptDB.getString('variant', 'rt')
 nx = OptDB.getInt('nx', 16)
 ny = OptDB.getInt('ny', 16)
 cell = OptDB.getString('cell', 'quad')
-plot = OptDB.getBool('plot', True)  # periodic nonperiodic
+plot = OptDB.getBool('plot', True)
 mgd_lowest = OptDB.getBool('mgd_lowest', False)
 kappa_value = OptDB.getString('kappa_value', 'identity')
 kappa_type = OptDB.getString('kappa_type', 'ufl')
@@ -55,20 +54,20 @@ xn = Function(mixedspace, name='x')
 h, u = split(xn)
 
 end = time.time()
-PETSc.Sys.Print('made spaces/functions',end-start)
+PETSc.Sys.Print('made spaces/functions', end-start)
 start = time.time()
 
 # set rhs/soln
-x,y = SpatialCoordinate(mesh)
+x, y = SpatialCoordinate(mesh)
 
 
 if kappa_value == 'identity':
-    alpha,beta,gamma,delta = 1.,0.,0.,1.
-    alphax,betax,gammay,deltay = 0.,0.,0.,0.
+    alpha, beta, gamma, delta = 1., 0., 0., 1.
+    alphax, betax, gammay, deltay = 0., 0., 0., 0.
 
 if kappa_value == 'constant':
-    alpha,beta,gamma,delta = 0.8,0.2,0.2,0.6
-    alphax,betax,gammay,deltay = 0.,0.,0.,0.
+    alpha, beta, gamma, delta = 0.8, 0.2, 0.2, 0.6
+    alphax, betax, gammay, deltay = 0., 0., 0., 0.
 
 if kappa_value == 'variable':
     alpha = (x+1)*(x+1) + y*y
@@ -81,25 +80,24 @@ if kappa_value == 'variable':
     deltay = 0.
 
 hsolnexpr = x*x*x * y*y*y*y + x*x + sin(x*y) * cos(y)
-px = 3*x*x *y*y*y*y + 2*x + y*cos(x*y) * cos(y)
+px = 3*x*x * y*y*y*y + 2*x + y*cos(x*y) * cos(y)
 py = x*x*x * 4*y*y*y + x*cos(x*y) * cos(y) - sin(x*y) * sin(y)
-pxx = 6*x *y*y*y*y + 2 - y*y*sin(x*y) * cos(y)
+pxx = 6*x * y*y*y*y + 2 - y*y*sin(x*y) * cos(y)
 pyy = x*x*x * 12*y*y - x*x*sin(x*y) * cos(y) - x*cos(x*y) * sin(y) - x*cos(x*y) * sin(y) - sin(x*y) * cos(y)
 pxy = 12*x*x*y*y*y - x*y*sin(x*y)*cos(y) + cos(x*y) * cos(y) - y*cos(x*y) * sin(y)
-hrhsexpr = -(alphax * px + alpha * pxx + betax * py + beta * pxy +
-            gammay * px + gamma *pxy + deltay * py + delta * pyy)
-usolnexpr = -( alpha * px + beta * py )
-vsolnexpr = -( gamma * px + delta * py )
+hrhsexpr = -(alphax * px + alpha * pxx + betax * py + beta * pxy + gammay * px + gamma * pxy + deltay * py + delta * pyy)
+usolnexpr = -(alpha * px + beta * py)
+vsolnexpr = -(gamma * px + delta * py)
 vecsolnexpr = as_vector((usolnexpr, vsolnexpr))
 
 gexpr = hsolnexpr
-kappamat = [[alpha,beta],[gamma,delta]]
+kappamat = [[alpha, beta], [gamma, delta]]
 
 if kappa_type == 'field':
-    highelemdict = create_complex(cell, velocityspace, variant, order +1 )
-    l2tensorelem = TensorElement(highelemdict['l2'], shape = (2,2))
+    highelemdict = create_complex(cell, velocityspace, variant, order + 1)
+    l2tensorelem = TensorElement(highelemdict['l2'], shape=(2, 2))
     l2tensorspace = FunctionSpace(mesh, l2tensorelem)
-    kappa = Function(l2tensorspace, name = 'kappa')
+    kappa = Function(l2tensorspace, name='kappa')
     kappaproj = Projector(as_matrix(kappamat), kappa, bcs=[])
     kappaproj.project()
 elif kappa_type == 'const':
@@ -112,20 +110,20 @@ elif kappa_type == 'ufl':
 hsoln = Function(l2, name='hsoln')
 usoln = Function(hdiv, name='usoln')
 
-hsolnproj = Projector(hsolnexpr, hsoln, bcs=[])  # ,options_prefix= 'masssys_'
-usolnproj = Projector(vecsolnexpr, usoln, bcs=[])  # ,options_prefix= 'masssys_'
+hsolnproj = Projector(hsolnexpr, hsoln, bcs=[])
+usolnproj = Projector(vecsolnexpr, usoln, bcs=[])
 hsolnproj.project()
 usolnproj.project()
 
 end = time.time()
-PETSc.Sys.Print('projected',end-start)
+PETSc.Sys.Print('projected', end-start)
 start = time.time()
 
 # Create forms and problem
 kappainv = inv(kappa)
 n = FacetNormal(mesh)
-Rlhs = (hhat * div(u) + inner(uhat, dot(kappainv,u)) - div(uhat) * h) * dx
-Rrhs = inner(hhat, hrhsexpr) * dx - inner(gexpr,inner(uhat,n)) * ds
+Rlhs = (hhat * div(u) + inner(uhat, dot(kappainv, u)) - div(uhat) * h) * dx
+Rrhs = inner(hhat, hrhsexpr) * dx - inner(gexpr, inner(uhat, n)) * ds
 
 # create solvers
 J = derivative(Rlhs - Rrhs, xn)
@@ -140,14 +138,14 @@ problem._constant_jacobian = True
 solver = NonlinearVariationalSolver(problem, options_prefix='linsys_', solver_parameters={'snes_type': 'ksponly'})
 
 end = time.time()
-PETSc.Sys.Print('made solver',end-start)
+PETSc.Sys.Print('made solver', end-start)
 start = time.time()
 
 # solve system
 solver.solve()
 
 end = time.time()
-PETSc.Sys.Print('solved',end-start)
+PETSc.Sys.Print('solved', end-start)
 start = time.time()
 
 # compute norms
@@ -167,20 +165,20 @@ checkpoint.store(usoln)
 checkpoint.store(mesh.coordinates, name='coords')
 
 hdiff = Function(l2, name='hdiff')
-hdiffproj = Projector(h-hsoln, hdiff)  # options_prefix= 'masssys_'
+hdiffproj = Projector(h-hsoln, hdiff)
 hdiffproj.project()
 checkpoint.store(hdiff)
 udiff = Function(hdiv, name='udiff')
-udiffproj = Projector(u-usoln, udiff)  # options_prefix= 'masssys_'
+udiffproj = Projector(u-usoln, udiff)
 udiffproj.project()
 checkpoint.store(udiff)
 
 hdirectdiff = Function(l2, name='hdirectdiff')
-hdirectdiffproj = Projector(h-hsolnexpr, hdirectdiff)  # options_prefix= 'masssys_'
+hdirectdiffproj = Projector(h-hsolnexpr, hdirectdiff)
 hdirectdiffproj.project()
 checkpoint.store(hdirectdiff)
 udirectdiff = Function(hdiv, name='udirectdiff')
-udirectdiffproj = Projector(u-vecsolnexpr, udirectdiff)  # options_prefix= 'masssys_'
+udirectdiffproj = Projector(u-vecsolnexpr, udirectdiff)
 udirectdiffproj.project()
 checkpoint.store(udirectdiff)
 checkpoint.write_attribute('fields/', 'hl2err', hl2err)
@@ -191,15 +189,15 @@ checkpoint.write_attribute('fields/', 'ul2directerr', ul2directerr)
 checkpoint.write_attribute('fields/', 'uhdivdirecterr', uhdivdirecterr)
 
 end = time.time()
-PETSc.Sys.Print('norms and output',end-start)
+PETSc.Sys.Print('norms and output', end-start)
 start = time.time()
 
 if plot:
-    from common import plot_function, get_plotting_spaces, evaluate_and_store_field
+    from interop import plot_function, get_plotting_spaces, evaluate_and_store_field
 
     # This is needed due to faulty handling of SplitFunctions within Themis KernelExpressionBuilder
     # Need to refactor split(f), f.split(), W.sub(), split(W), etc.
-    hsplit,usplit = xn.split()
+    hsplit, usplit = xn.split()
     honly = Function(l2, name='h')
     uonly = Function(hdiv, name='u')
     honly.assign(hsplit)
@@ -217,17 +215,17 @@ if plot:
     udiffeval = evaluate_and_store_field(vectorevalspace, opts, udiff, 'udiff', checkpoint)
     udirectdiffeval = evaluate_and_store_field(vectorevalspace, opts, udirectdiff, 'udirectdiff', checkpoint)
 
-    plot_function(heval,coordseval,'h')
-    plot_function(hsolneval,coordseval,'hsoln')
-    plot_function(hdiffeval,coordseval,'hdiff')
-    plot_function(hdirectdiffeval,coordseval,'hdirectdiff')
-    plot_function(ueval,coordseval,'u')
-    plot_function(usolneval,coordseval,'usoln')
-    plot_function(udiffeval,coordseval,'udiff')
-    plot_function(udirectdiffeval,coordseval,'udirectdiff')
+    plot_function(heval, coordseval, 'h')
+    plot_function(hsolneval, coordseval, 'hsoln')
+    plot_function(hdiffeval, coordseval, 'hdiff')
+    plot_function(hdirectdiffeval, coordseval, 'hdirectdiff')
+    plot_function(ueval, coordseval, 'u')
+    plot_function(usolneval, coordseval, 'usoln')
+    plot_function(udiffeval, coordseval, 'udiff')
+    plot_function(udirectdiffeval, coordseval, 'udirectdiff')
 
 checkpoint.close()
 
 end = time.time()
-PETSc.Sys.Print('plotted',end-start)
+PETSc.Sys.Print('plotted', end-start)
 start = time.time()

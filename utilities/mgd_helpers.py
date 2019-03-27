@@ -7,6 +7,7 @@ from ufl.algorithms.map_integrands import map_integrand_dags
 
 __all__ = ["lower_form_order", ]
 
+
 class Replacer(MultiFunction):
     def __init__(self, mapping):
         super().__init__()
@@ -95,7 +96,6 @@ def lower_form_order(form):
         for elem in elem_lowest:
             spacelist.append(FunctionSpace(mesh, elem))
         space_lowest = MixedFunctionSpace(spacelist)
-        # trialfuncs_lowest = TrialFunctions(space_lowest)
         testfuncs_lowest = TestFunctions(space_lowest)
         testfuncs = TestFunctions(testfunc.ufl_function_space())
         trialfuncs = TrialFunctions(trialfunc.ufl_function_space())

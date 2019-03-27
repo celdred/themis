@@ -2,10 +2,6 @@ from themis.petscshim import PETSc
 import numpy as np
 from themis.functionspace import FunctionSpace
 from themis.function import Function
-from themis.bcs import DirichletBC
-from themis.solver import NonlinearVariationalProblem, NonlinearVariationalSolver
-from ufl import inner, dx
-from themis.ufl_expr import TestFunction
 from themis.themiselement import ThemisElement
 from ufl import Mesh, FiniteElement, interval, VectorElement, quadrilateral, TensorProductElement, hexahedron
 from themis.assembly_utils import CompiledKernel
@@ -63,7 +59,6 @@ return 0;
 """
 
 
-
 decompfunction = CompiledKernel(decompfunction_code, "decompfunction", cppargs=["-O3"], argtypes=[ctypes.c_voidp, ctypes.c_voidp,
                                                                                                   ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ], restype=ctypes.c_int)
 
@@ -82,7 +77,8 @@ class SingleBlockMesh(Mesh):
 
             ndofs = subelem.ndofs_per_element
             nx = ndofs * self.nxs[i]
-            if subelem.cont == 'H1' and self.bcs[i] == 'nonperiodic': nx = nx + 1
+            if subelem.cont == 'H1' and self.bcs[i] == 'nonperiodic':
+                nx = nx + 1
             ndofs_per_cell.append(ndofs)
             sizes.append(nx)
 
@@ -103,7 +99,6 @@ class SingleBlockMesh(Mesh):
         da.setUp()
 
         return da
-
 
     def output(self, view):
         pass
@@ -180,7 +175,6 @@ class SingleBlockMesh(Mesh):
         self._vcelem = vcelem
 
         Mesh.__init__(self, self._vcelem)
-        # print(celem,vcelem,coordelem,bcs)
 
         # construct and set coordsvec
         coordsspace = FunctionSpace(self, self._vcelem)
@@ -201,7 +195,7 @@ class SingleBlockMesh(Mesh):
 
 class SingleBlockExtrudedMesh(SingleBlockMesh):
 
-    def __init__(self, basemesh, layers, layer_height = None, name='singleblockextrudedmesh', coords = None, vcoordelem=None):
+    def __init__(self, basemesh, layers, layer_height=None, name='singleblockextrudedmesh', coords=None, vcoordelem=None):
 
         self.basemesh = basemesh
         basenxs = basemesh.nxs
@@ -270,7 +264,6 @@ class SingleBlockExtrudedMesh(SingleBlockMesh):
         else:
             coords._vector.copy(result=self.coordinates._vector)
         self.coordinates.scatter()
-
 
     def get_boundary_direcs(self, subdomain):
         if subdomain == 'on_boundary':
