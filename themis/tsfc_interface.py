@@ -27,8 +27,10 @@ def compile_form(form):
         # compiler) to the global coefficient numbers
         number_map = dict((n, coefficient_numbers[c]) for (n, c) in enumerate(f.coefficients()))
 
+        from themis import PETSc
+        PETSc.Sys.Print('compiling form')
         tsfc_kernels = tsfc.compile_form(f, interface=kernel_interface.KernelBuilder)
-
+        
         kernels = []
         for kernel in tsfc_kernels:
             tkernel = ThemisKernel(kernel)

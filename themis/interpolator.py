@@ -66,6 +66,8 @@ class Interpolator():
                         loc = np.array([ptsx[lx], ptsy[ly], ptsz[lz]])
                     to_pts.append(loc)
 
+        from themis import PETSc
+        PETSc.Sys.Print('compiling interpolation')
         ast, oriented, needs_cell_sizes, coefficients, tabulations = compile_ufl_kernel(expr, to_pts, mesh.coordinates, interface=kernel_interface.ExpressionKernelBuilder)
 
         # process tabulations

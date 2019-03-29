@@ -1,9 +1,9 @@
 
-from common import PETSc, norm, dx, DumbCheckpoint, sin, sinh, inner, grad, FILE_CREATE, exp, cos
-from common import FunctionSpace, SpatialCoordinate, Function, Projector, NonlinearVariationalProblem, NonlinearVariationalSolver
-from common import TestFunction, DirichletBC, pi
-from common import create_box_mesh, create_complex, adjust_coordinates
-from common import derivative
+from interop import PETSc, norm, dx, DumbCheckpoint, sin, sinh, inner, grad, FILE_CREATE, exp, cos, perp
+from interop import FunctionSpace, SpatialCoordinate, Function, Projector, NonlinearVariationalProblem, NonlinearVariationalSolver
+from interop import TestFunction, DirichletBC, pi
+from interop import derivative
+from utilities import create_box_mesh, create_complex, adjust_coordinates
 
 OptDB = PETSc.Options()
 order = OptDB.getInt('order', 1)
@@ -16,16 +16,16 @@ zbc = OptDB.getString('zbc', 'nonperiodic')  # periodic nonperiodic
 nx = OptDB.getInt('nx', 16)
 ny = OptDB.getInt('ny', 16)
 nz = OptDB.getInt('nz', 16)
-ndims = OptDB.getInt('ndims', 2)
 cell = OptDB.getString('cell', 'quad')
 plot = OptDB.getBool('plot', True)  # periodic nonperiodic
 mgd_lowest = OptDB.getBool('mgd_lowest', False)
-use_sinh = OptDB.getBool('use_sinh', False)
-use_exp = OptDB.getBool('use_exp', False)
+solntype = OptDB.getString('solntype', 'sin') # sin exp sinh
 c = OptDB.getScalar('c', 0.0)
+formorientation = OptDB.getString('formorientation', 'outer')  # outer inner
 
 xbcs = [xbc, ybc, zbc]
 nxs = [nx, ny, nz]
+lxs = [1.0, 1.0, 1.0]
 
 PETSc.Sys.Print(variant, order, cell, coordorder, xbcs, nxs)
 
@@ -35,9 +35,10 @@ if variant == 'mgd' and order > 1:
 nquadplot = OptDB.getInt('nquadplot', nquadplot_default)
 
 # create mesh and spaces
-mesh = create_box_mesh(cell, nxs, xbcs, coordorder)
+mesh = create_box_mesh(cell, nxs, xbcs, lxs, coordorder)
 elemdict = create_complex(cell, 'rt', variant, order)
 adjust_coordinates(mesh, c)
+
 
 h1 = FunctionSpace(mesh, elemdict['h1'])
 
@@ -54,44 +55,50 @@ if cell in ['tpquad', 'tphex', 'tptri']:
 # set rhs/soln
 xs = SpatialCoordinate(mesh)
 
-a = 1. / pi
-scale = 1
-if ndims == 1:
+if solntype in ['sinh', 'exp'] and (xbcs[0] == 'periodic' or xbcs[1] == 'periodic' or xbcs[2] == 'periodic'):
+    raise ValueError('periodic boundaries requires solntype = sin')
+if solntype == 'sinh' and not cell == 'interval':
+    raise ValueError('solntype = sinh only works in 1D')
+
+if solntype == 'sinh':
     x = xs[0]
-    if use_sinh and xbcs[0] == 'nonperiodic':
-        rhsexpr = x
-        solnexpr = x - sinh(x)/sinh(1.)
-        scale = -1
-    elif use_exp and xbcs[0] == 'nonperiodic':
+    rhsexpr = x
+    solnexpr = x - sinh(x)/sinh(1.)
+if solntype == 'exp':
+    x = xs[0]
+    if cell in 'interval':
         solnexpr = exp(x) * sin(2*pi*x)
-        rhsexpr = (1. - 4.*pi*pi) * exp(x) * sin(2*pi*x) + 4 * pi * exp(x) * cos(2*pi*x) + exp(x) * sin(2*pi*x)
-    else:
-        rhsexpr = (-144. / a / a + 4.) * sin(6. * x / a)
-        solnexpr = 4. * sin(6. * x / a)
-if ndims == 2:
-    x = xs[0]
-    y = xs[1]
-    if use_exp and xbcs[0] == 'nonperiodic' and xbcs[1] == 'nonperiodic':
+        rhsexpr = -(1. - 4.*pi*pi) * exp(x) * sin(2*pi*x) - 4 * pi * exp(x) * cos(2*pi*x) + exp(x) * sin(2*pi*x)
+    if cell in ['quad', 'tri', 'tpquad']:
+        y = xs[1]
         solnexpr = exp(x+y) * sin(2*pi*x) * sin(2*pi*y)
-        rhsexpr = (1. - 4.*pi*pi) * exp(x+y) * sin(2*pi*x) * sin(2*pi*y) + 4 * pi * exp(x+y) * cos(2*pi*x) * sin(2*pi*y) +\
-                  (1. - 4.*pi*pi) * exp(x+y) * sin(2*pi*x) * sin(2*pi*y) + 4 * pi * exp(x+y) * sin(2*pi*x) * cos(2*pi*y) +\
+        rhsexpr = -(1. - 4.*pi*pi) * exp(x+y) * sin(2*pi*x) * sin(2*pi*y) - 4 * pi * exp(x+y) * cos(2*pi*x) * sin(2*pi*y) +\
+                  -(1. - 4.*pi*pi) * exp(x+y) * sin(2*pi*x) * sin(2*pi*y) - 4 * pi * exp(x+y) * sin(2*pi*x) * cos(2*pi*y) +\
             exp(x+y) * sin(2*pi*x) * sin(2*pi*y)
-    else:
-        rhsexpr = (-80. / a / a + 4.) * sin(2. * x / a) * sin(4. * y / a)
-        solnexpr = 4. * sin(2. * x / a) * sin(4. * y / a)
-if ndims == 3:
-    x = xs[0]
-    y = xs[1]
-    z = xs[2]
-    if use_exp and xbcs[0] == 'nonperiodic' and xbcs[1] == 'nonperiodic' and xbcs[2] == 'nonperiodic':
+    if cell in ['hex', 'tptri', 'tphex']:
+        y = xs[1]
+        z = xs[2]
         solnexpr = exp(x+y+z) * sin(2*pi*x) * sin(2*pi*y) * sin(2*pi*z)
-        rhsexpr = (1. - 4.*pi*pi) * exp(x+y+z) * sin(2*pi*x) * sin(2*pi*y) * sin(2*pi*z) + 4 * pi * exp(x+y+z) * cos(2*pi*x) * sin(2*pi*y) * sin(2*pi*z) +\
-                  (1. - 4.*pi*pi) * exp(x+y+z) * sin(2*pi*x) * sin(2*pi*y) * sin(2*pi*z) + 4 * pi * exp(x+y+z) * sin(2*pi*x) * cos(2*pi*y) * sin(2*pi*z) +\
-                  (1. - 4.*pi*pi) * exp(x+y+z) * sin(2*pi*x) * sin(2*pi*y) * sin(2*pi*z) + 4 * pi * exp(x+y+z) * sin(2*pi*x) * sin(2*pi*y) * cos(2*pi*z) +\
+        rhsexpr = -(1. - 4.*pi*pi) * exp(x+y+z) * sin(2*pi*x) * sin(2*pi*y) * sin(2*pi*z) - 4 * pi * exp(x+y+z) * cos(2*pi*x) * sin(2*pi*y) * sin(2*pi*z) +\
+                  -(1. - 4.*pi*pi) * exp(x+y+z) * sin(2*pi*x) * sin(2*pi*y) * sin(2*pi*z) - 4 * pi * exp(x+y+z) * sin(2*pi*x) * cos(2*pi*y) * sin(2*pi*z) +\
+                  -(1. - 4.*pi*pi) * exp(x+y+z) * sin(2*pi*x) * sin(2*pi*y) * sin(2*pi*z) - 4 * pi * exp(x+y+z) * sin(2*pi*x) * sin(2*pi*y) * cos(2*pi*z) +\
             exp(x+y+z) * sin(2*pi*x) * sin(2*pi*y) * sin(2*pi*z)
-    else:
-        rhsexpr = (-224. / a / a + 4.) * sin(2. * x / a) * sin(4. * y / a) * sin(6. * z / a)
-        solnexpr = 4. * sin(2. * x / a) * sin(4. * y / a) * sin(6. * z / a)
+
+if solntype == 'sin':
+    x = xs[0]
+    if cell in 'interval':
+        rhsexpr = (144. * pi * pi + 4.) * sin(6. * x * pi)
+        solnexpr = 4. * sin(6. * x * pi)
+    if cell in ['quad', 'tri', 'tpquad']:
+        y = xs[1]
+        rhsexpr = (80. * pi * pi + 4.) * sin(2. * x * pi) * sin(4. * y * pi)
+        solnexpr = 4. * sin(2. * x * pi) * sin(4. * y * pi)
+    if cell in ['hex', 'tptri', 'tphex']:
+        y = xs[1]
+        z = xs[2]
+        rhsexpr = (224. * pi * pi + 4.) * sin(2. * x * pi) * sin(4. * y * pi) * sin(6. * z * pi)
+        solnexpr = 4. * sin(2. * x * pi) * sin(4. * y * pi) * sin(6. * z * pi)
+
 
 # create soln and rhs
 soln = Function(h1, name='hsoln')
@@ -100,9 +107,12 @@ solnproj = Projector(solnexpr, soln, bcs=bcs)  # ,options_prefix= 'masssys_')
 solnproj.project()
 
 # Create forms and problem
-# Degree estimation for tensor product elements with more than 2 components is broken, hence the need for the below
-Rlhs = (hhat * h - scale*inner(grad(hhat), grad(h))) * dx  # degree=(order*2+1)
-Rrhs = hhat * rhsexpr * dx  # degree=(order*2+1)
+if formorientation == 'outer' and cell in ['quad', 'tpquad', 'tri']:
+    skewgrad = lambda u: perp(grad(u))
+    Rlhs = (hhat * h + inner(skewgrad(hhat), skewgrad(h))) * dx
+else:
+    Rlhs = (hhat * h + inner(grad(hhat), grad(h))) * dx
+Rrhs = hhat * rhsexpr * dx
 
 # create solvers
 J = derivative(Rlhs - Rrhs, h)
@@ -152,7 +162,7 @@ checkpoint.write_attribute('fields/', 'h1directerr', h1directerr)
 
 # plot
 if plot:
-    from common import plot_function, get_plotting_spaces, evaluate_and_store_field
+    from interop import plot_function, get_plotting_spaces, evaluate_and_store_field
 
     scalarevalspace, vectorevalspace, opts = get_plotting_spaces(mesh, nquadplot)
 

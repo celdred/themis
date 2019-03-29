@@ -1,10 +1,10 @@
 
 
-from common import PETSc, dx, DumbCheckpoint, inner, grad, exp
-from common import FunctionSpace, Function, NonlinearVariationalProblem, NonlinearVariationalSolver
-from common import TrialFunction, TestFunction, DirichletBC, Constant
-from common import create_box_mesh, create_complex, adjust_coordinates
-from common import derivative
+from interop import PETSc, dx, DumbCheckpoint, inner, grad, exp
+from interop import FunctionSpace, Function, NonlinearVariationalProblem, NonlinearVariationalSolver
+from interop import TrialFunction, TestFunction, DirichletBC, Constant
+from interop import derivative
+from utilities import create_box_mesh, create_complex, adjust_coordinates
 
 OptDB = PETSc.Options()
 order = OptDB.getInt('order', 1)
@@ -23,6 +23,7 @@ c = OptDB.getScalar('c', 0.0)
 
 xbcs = ['nonperiodic', 'nonperiodic', 'nonperiodic']
 nxs = [nx, ny, nz]
+lxs = [1.0, 1.0, 1.0]
 
 nquadplot_default = order
 if variant == 'mgd' and order > 1:
@@ -33,7 +34,7 @@ PETSc.Sys.Print(variant, order, cell, coordorder, nxs)
 
 # create mesh and spaces
 
-mesh = create_box_mesh(cell, nxs, xbcs, coordorder)
+mesh = create_box_mesh(cell, nxs, xbcs, lxs, coordorder)
 elemdict = create_complex(cell, 'rt', variant, order)
 adjust_coordinates(mesh, c)
 
@@ -74,7 +75,7 @@ checkpoint.store(mesh.coordinates)
 
 # plot
 if plot:
-    from common import plot_function, get_plotting_spaces, evaluate_and_store_field
+    from interop import plot_function, get_plotting_spaces, evaluate_and_store_field
 
     scalarevalspace, vectorevalspace, opts = get_plotting_spaces(mesh, nquadplot)
 

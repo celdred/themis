@@ -163,7 +163,6 @@ def get_pts(kernel, ndims, restrict, shiftaxis, shape):
             allpts.append(ps.points[:, 0])
 
     elif kernel.integral_type in exterior_facet_types + interior_facet_types:
-
         if restrict == 'm':
             zerodim_pts = np.zeros(shape[0])
         elif restrict == 'p':

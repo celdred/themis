@@ -1,9 +1,10 @@
-from common import PETSc, norm, dx, DumbCheckpoint, sin, inner, grad, avg, jump, ds, dS, FacetNormal, action
-from common import FunctionSpace, SpatialCoordinate, Function, Projector, NonlinearVariationalProblem, NonlinearVariationalSolver
-from common import TestFunction, pi, TrialFunction
-from common import ds_v, ds_t, ds_b, dS_h, dS_v
-from common import create_box_mesh, create_complex, adjust_coordinates
-from common import derivative  # ,Constant, CellSize
+from interop import PETSc, norm, dx, DumbCheckpoint, sin, inner, grad, avg, jump, ds, dS, FacetNormal, action
+from interop import FunctionSpace, SpatialCoordinate, Function, Projector, NonlinearVariationalProblem, NonlinearVariationalSolver
+from interop import TestFunction, pi, TrialFunction
+from interop import ds_v, ds_t, ds_b, dS_h, dS_v
+from interop import derivative
+from utilities import create_box_mesh, create_complex, adjust_coordinates
+from interop import CellVolume, FacetArea, Constant
 
 OptDB = PETSc.Options()
 order = OptDB.getInt('order', 1)
@@ -23,17 +24,18 @@ coordorder = OptDB.getInt('coordorder', 1)
 
 xbcs = [xbc, ybc, zbc]
 nxs = [nx, ny, nz]
+lxs = [1.0, 1.0, 1.0]
 
 PETSc.Sys.Print(variant, order, cell, coordorder, xbcs, nxs)
 
 nquadplot_default = order
-if variant == 'mgd' and order > 1:
+if variant == 'mgd':
     nquadplot_default = 2
 nquadplot = OptDB.getInt('nquadplot', nquadplot_default)
 
 
 # create mesh and spaces
-mesh = create_box_mesh(cell, nxs, xbcs, coordorder)
+mesh = create_box_mesh(cell, nxs, xbcs, lxs, coordorder)
 elemdict = create_complex(cell, 'rt', variant, order+1)  # must use order + 1 here since this returns FEEC complex compatible L2
 adjust_coordinates(mesh, c)
 
@@ -68,16 +70,6 @@ u = TestFunction(l2)
 v = TrialFunction(l2)
 x = Function(l2, name='x')
 
-n = FacetNormal(mesh)
-# THIS ASSUMES A UNIFORM GRID, SHOULD BE MORE CLEVER...
-ddx = 1. / nx
-if variant == 'mgd':
-    penalty = 1. * (1. + 1.) / ddx
-else:
-    penalty = order * (order + 1.) / ddx
-penalty_ext = penalty
-penalty_int = penalty
-
 if cell in ['tpquad', 'tphex', 'tptri']:
     dIF = dS_v + dS_h
     dEF = ds_v + ds_t + ds_b
@@ -85,14 +77,24 @@ else:
     dIF = dS
     dEF = ds
 
-# should probably scale these with order?
-# alpha = Constant(4.0)
-# gamma = Constant(8.0)
-# ddx = CellSize(mesh)
-# ddx_avg = (ddx('+') + ddx('-'))/2
-# penalty_int = alpha/ddx_avg
-# penalty_ext = gamma/ddx
+FA = FacetArea(mesh)
+CV = CellVolume(mesh)
+# ddx = CV/FA
+# ddx_avg = (ddx('+') + ddx('-'))/2.
+# CELLVOLUME IS BROKEN FOR RUNTIME TABULATED IN TSFC
+# Because it is not distinguishing between + and - cells for cell-wise geometric quantities in interior facet integrals
+ddx = 1. / nx
+ddx_avg = 1. / nx
+if variant == 'mgd': # SHOULD BE MORE CLEVER HERE- SCALE BY ORDER FOR SURE!
+    alpha = Constant(4.0)
+    gamma = Constant(8.0)
+else:
+    alpha = Constant(1.5 * order * (order + 1.))
+    gamma = Constant(3 * order * (order + 1.))
+penalty_int = alpha / ddx_avg
+penalty_ext = gamma / ddx
 
+n = FacetNormal(mesh)
 aV = inner(grad(u), grad(v)) * dx  # volume term
 aIF = (inner(jump(u, n), jump(v, n)) * penalty_int - inner(avg(grad(u)), jump(v, n)) - inner(avg(grad(v)), jump(u, n))) * dIF  # interior facet term
 aEF = (inner(u, v) * penalty_ext - inner(grad(u), v*n) - inner(grad(v), u*n)) * dEF  # exterior facet term
@@ -138,7 +140,7 @@ checkpoint.write_attribute('fields/', 'l2directerr', l2directerr)
 
 # plot
 if plot:
-    from common import plot_function, get_plotting_spaces, evaluate_and_store_field
+    from interop import plot_function, get_plotting_spaces, evaluate_and_store_field
 
     scalarevalspace, vectorevalspace, opts = get_plotting_spaces(mesh, nquadplot)
 

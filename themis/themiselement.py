@@ -48,21 +48,15 @@ def extract_element_info(elem):
             if elem.family() == 'Q':
                 contlist.append(['H1', 'H1', ])
             ncomp = 1
-        elif elem.family() == 'RTCF':
+        # This matches the construction in https://github.com/firedrakeproject/ufl/blob/master/ufl/finiteelement/finiteelement.py
+        # Note that on a reference element it gives u,v for RTCF and v,u for RTCE
+        elif elem.family() in ['RTCF', 'RTCE']:
             variantlist.append([variant, variant])
             variantlist.append([variant, variant])
             degreelist.append([degree, degree-1])
             degreelist.append([degree-1, degree])
             contlist.append(['H1', 'L2'])
             contlist.append(['L2', 'H1'])
-            ncomp = 2
-        elif elem.family() == 'RTCE':
-            variantlist.append([variant, variant])
-            variantlist.append([variant, variant])
-            degreelist.append([degree-1, degree])
-            degreelist.append([degree, degree-1])
-            contlist.append(['L2', 'H1'])
-            contlist.append(['H1', 'L2'])
             ncomp = 2
         else:
             raise ValueError('themis supports only Q/DQ/RTCF/RTCE on quads')
@@ -76,6 +70,8 @@ def extract_element_info(elem):
             if elem.family() == 'Q':
                 contlist.append(['H1', 'H1', 'H1'])
             ncomp = 1
+        # This matches the construction in https://github.com/firedrakeproject/ufl/blob/master/ufl/finiteelement/finiteelement.py
+        # It is u, v, w on the reference element
         elif elem.family() == 'NCF':
             variantlist.append([variant, variant, variant])
             variantlist.append([variant, variant, variant])
@@ -87,16 +83,18 @@ def extract_element_info(elem):
             contlist.append(['L2', 'H1', 'L2'])
             contlist.append(['L2', 'L2', 'H1'])
             ncomp = 3
+        # This matches the construction in https://github.com/firedrakeproject/ufl/blob/master/ufl/finiteelement/finiteelement.py
+        # It is w, v, u on the reference element
         elif elem.family() == 'NCE':
             variantlist.append([variant, variant, variant])
             variantlist.append([variant, variant, variant])
             variantlist.append([variant, variant, variant])
-            degreelist.append([degree-1, degree, degree])
-            degreelist.append([degree, degree-1, degree])
-            degreelist.append([degree, degree, degree-1])
-            contlist.append(['L2', 'H1', 'H1'])
-            contlist.append(['H1', 'L2', 'H1'])
             contlist.append(['H1', 'H1', 'L2'])
+            contlist.append(['H1', 'L2', 'H1'])
+            contlist.append(['L2', 'H1', 'H1'])
+            degreelist.append([degree, degree, degree-1])
+            degreelist.append([degree, degree-1, degree])
+            degreelist.append([degree-1, degree, degree])
             ncomp = 3
         else:
             raise ValueError('themis supports only Q/DQ/NCF/NCE on hexahedrons')

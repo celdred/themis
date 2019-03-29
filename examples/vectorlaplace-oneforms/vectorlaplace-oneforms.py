@@ -1,10 +1,9 @@
 
 
-from interop import PETSc, norm, dx, DumbCheckpoint, sin, inner, FILE_CREATE
+from interop import PETSc, errornorm, dx, DumbCheckpoint, sin, inner, grad, FILE_CREATE, Dx, norm
 from interop import FunctionSpace, SpatialCoordinate, Function, Projector, NonlinearVariationalProblem, NonlinearVariationalSolver
-from interop import TestFunction, DirichletBC, pi, TestFunctions
-from interop import split, div, cos, as_vector, MixedFunctionSpace, Dx
-from interop import derivative
+from interop import TestFunction, pi, TestFunctions
+from interop import split, div, cos, as_vector, MixedFunctionSpace, curl
 from utilities import create_box_mesh, create_complex, adjust_coordinates
 
 OptDB = PETSc.Options()
@@ -23,12 +22,12 @@ cell = OptDB.getString('cell', 'quad')
 plot = OptDB.getBool('plot', True)
 mgd_lowest = OptDB.getBool('mgd_lowest', False)
 c = OptDB.getScalar('c', 0.0)
-formorientation = OptDB.getString('formorientation', 'outer')  # outer inner
 
 nquadplot_default = order
 if variant == 'mgd' and order > 1:
     nquadplot_default = 2
 nquadplot = OptDB.getInt('nquadplot', nquadplot_default)
+
 xbcs = [xbc, ybc, zbc]
 nxs = [nx, ny, nz]
 lxs = [1.0, 1.0, 1.0]
@@ -38,108 +37,79 @@ PETSc.Sys.Print(variant, velocityspace, order, cell, coordorder, xbcs, nxs)
 # create mesh and spaces
 mesh = create_box_mesh(cell, nxs, xbcs, lxs, coordorder)
 elemdict = create_complex(cell, velocityspace, variant, order)
+# THIS IS BROKEN!
+# I am not sure the definitions for u/v/etc. work on a distorted mesh...
 adjust_coordinates(mesh, c)
 
-l2 = FunctionSpace(mesh, elemdict['l2'])
-if formorientation == 'inner' and cell in ['quad', 'tpquad', 'tri']:
-    hdiv = FunctionSpace(mesh, elemdict['hcurl'])
-else:
-    hdiv = FunctionSpace(mesh, elemdict['hdiv'])
+if cell == 'interval':
+    raise ValueError("must be in 2D or 3D")
 
-mixedspace = MixedFunctionSpace([l2, hdiv])
+h1 = FunctionSpace(mesh, elemdict['h1'])
+hcurl = FunctionSpace(mesh, elemdict['hcurl'])
+
+mixedspace = MixedFunctionSpace([h1, hcurl])
 hhat, uhat = TestFunctions(mixedspace)
 xhat = TestFunction(mixedspace)
 x = Function(mixedspace, name='x')
 h, u = split(x)
 
-# set boundary conditions
-fullbcs = [DirichletBC(mixedspace.sub(1), 0.0, "on_boundary"), ]
-ubcs = [DirichletBC(hdiv, 0.0, "on_boundary"), ]
-if cell in ['tpquad', 'tphex', 'tptri']:
-    fullbcs.append(DirichletBC(mixedspace.sub(1), 0.0, "top"))
-    fullbcs.append(DirichletBC(mixedspace.sub(1), 0.0, "bottom"))
-    ubcs.append(DirichletBC(hdiv, 0.0, "top"))
-    ubcs.append(DirichletBC(hdiv, 0.0, "bottom"))
-
 # set rhs/soln
 xs = SpatialCoordinate(mesh)
 
-c = 4.
-if xbcs[0] == 'periodic':
-    fx = sin(2. * xs[0] * pi)
-    dfx = 2. * pi * cos(2. * xs[0] * pi)
-    ddfx = -4. * pi * pi * sin(2. * xs[0] * pi)
-if xbcs[0] == 'nonperiodic':
-    fx = cos(2. * xs[0] * pi)
-    dfx = -2. * pi * sin(2. * xs[0] * pi)
-    ddfx = -4. * pi * pi * cos(2. * xs[0] * pi)
-if cell in ['quad', 'tri', 'tpquad', 'hex', 'tptri', 'tphex'] and xbcs[1] == 'periodic':
-    fy = sin(4. * xs[1] * pi)
-    dfy = 4. * pi * cos(4. * xs[1] * pi)
-    ddfy = -16. * pi * pi * sin(4. * xs[1] * pi)
-if cell in ['quad', 'tri', 'tpquad', 'hex', 'tptri', 'tphex'] and xbcs[1] == 'nonperiodic':
-    fy = cos(4. * xs[1] * pi)
-    dfy = -4. * pi * sin(4. * xs[1] * pi)
-    ddfy = -16. * pi * pi * cos(4. * xs[1] * pi)
-if cell in ['hex', 'tptri', 'tphex'] and xbcs[2] == 'periodic':
-    fz = sin(6. * xs[2] * pi)
-    dfz = 6. * pi * cos(6. * xs[2] * pi)
-    ddfz = -36. * pi * pi * sin(6. * xs[2] * pi)
-if cell in ['hex', 'tptri', 'tphex'] and xbcs[2] == 'nonperiodic':
-    fz = cos(6. * xs[2] * pi)
-    dfz = -6. * pi * sin(6. * xs[2] * pi)
-    ddfz = -36. * pi * pi * cos(6. * xs[2] * pi)
-
-if cell == 'interval':
-    hrhsexpr = c * (-ddfx + fx)
-    hsolnexpr = c * fx
-    usolnexpr = -c * dfx
-    vecsolnexpr = as_vector((usolnexpr,))
-if cell in ['quad', 'tri', 'tpquad']:
-    hrhsexpr = c * (-ddfx * fy - fx * ddfy + fx * fy)
-    hsolnexpr = c * fx * fy
-    if formorientation == 'inner':
-        usolnexpr = c * fx * dfy
-        vsolnexpr = -c * dfx * fy
-    if formorientation == 'outer':
-        usolnexpr = -c * dfx * fy
-        vsolnexpr = -c * fx * dfy
-    vecsolnexpr = as_vector((usolnexpr, vsolnexpr))
+k = 2
+p = 3
+m = 4
+sinx = sin(k * pi * xs[0])
+cosx = cos(k * pi * xs[0])
+siny = sin(p * pi * xs[1])
+cosy = cos(p * pi * xs[1])
 if cell in ['hex', 'tptri', 'tphex']:
-    hrhsexpr = c * (-ddfx * fy * fz - fx * ddfy * fz - fx * fy * ddfz + fx * fy * fz)
-    hsolnexpr = c * fx * fy * fz
-    usolnexpr = -c * dfx * fy * fz
-    vsolnexpr = -c * fx * dfy * fz
-    wsolnexpr = -c * fx * fy * dfz
+    sinz = sin(m * pi * xs[2])
+    cosz = cos(m * pi * xs[2])
+
+if cell in ['quad', 'tri', 'tpquad']:
+    urhsexpr = pi * pi * (k * k + p * p) * sinx * cosy
+    vrhsexpr = pi * pi * (k * k + p * p) * cosx * siny
+    vecrhsexpr = as_vector((urhsexpr, vrhsexpr))
+    usolnexpr = sinx * cosy
+    vsolnexpr = cosx * siny
+    vecsolnexpr = as_vector((usolnexpr, vsolnexpr))
+    hsolnexpr = - cosx * cosy * (k * pi + p * pi)
+if cell in ['hex', 'tptri', 'tphex']:
+    urhsexpr = pi * pi * (k * k + p * p) * sinx * cosy
+    vrhsexpr = pi * pi * (p * p + m * m) * siny * cosz
+    wrhsexpr = pi * pi * (k * k + m * m) * sinz * cosx
+    vecrhsexpr = as_vector((urhsexpr, vrhsexpr, wrhsexpr))
+    usolnexpr = sinx * cosy
+    vsolnexpr = siny * cosz
+    wsolnexpr = sinz * cosx
     vecsolnexpr = as_vector((usolnexpr, vsolnexpr, wsolnexpr))
+    hsolnexpr = - cosx * cosy * cosz * (k * pi + p * pi + m * pi)
+
+# HOW DO BCS WORK FOR THIS PROBLEM?
+# THIS IS THE INTERESTING BIT...
+# Right now we are treating only natural BCs...
+# Work on more interesting ones!
 
 # create soln and rhs
-hsoln = Function(l2, name='hsoln')
-usoln = Function(hdiv, name='usoln')
+hsoln = Function(h1, name='hsoln')
+usoln = Function(hcurl, name='usoln')
 
 hsolnproj = Projector(hsolnexpr, hsoln, bcs=[])
-usolnproj = Projector(vecsolnexpr, usoln, bcs=ubcs)
+usolnproj = Projector(vecsolnexpr, usoln, bcs=[])
 hsolnproj.project()
 usolnproj.project()
 
-
 # Create forms and problem
-if formorientation == 'inner' and cell in ['quad', 'tpquad', 'tri']:
+if cell in ['quad', 'tri', 'tpquad']:
     rot = lambda u: -Dx(u[0],1) + Dx(u[1],0)
-    Rlhs = (hhat * h + hhat * rot(u) + inner(uhat, u) - rot(uhat) * h) * dx
-else:
-    Rlhs = (hhat * h + hhat * div(u) + inner(uhat, u) - div(uhat) * h) * dx
-Rrhs = inner(hhat, hrhsexpr) * dx
+    Rlhs = (hhat * h - inner(grad(hhat), u) + inner(uhat, grad(h)) + inner(rot(uhat), rot(u))) * dx
+if cell in ['hex', 'tptri', 'tphex']:
+    Rlhs = (hhat * h - inner(grad(hhat), u) + inner(uhat, grad(h)) - inner(curl(uhat), curl(u))) * dx
+Rrhs = inner(uhat, vecrhsexpr) * dx
 
 # create solvers
-J = derivative(Rlhs - Rrhs, x)
-if mgd_lowest:
-    from mgd_helpers import lower_form_order
-    Jp = lower_form_order(J)
-else:
-    Jp = J
-problem = NonlinearVariationalProblem(Rlhs - Rrhs, x, bcs=fullbcs, J=J, Jp=Jp)
-
+problem = NonlinearVariationalProblem(Rlhs - Rrhs, x, bcs=[])
 problem._constant_jacobian = True
 solver = NonlinearVariationalSolver(problem, options_prefix='linsys_', solver_parameters={'snes_type': 'ksponly'})
 
@@ -148,18 +118,14 @@ solver.solve()
 
 # compute norms
 hl2err = norm(h - hsoln, norm_type='L2')
+hh1err = norm(h - hsoln, norm_type='H1')
 ul2err = norm(u - usoln, norm_type='L2')
-if formorientation == 'inner' and cell in ['quad', 'tpquad', 'tri']:
-    uhdiverr = norm(u - usoln, norm_type='Hcurl')
-else:
-    uhdiverr = norm(u - usoln, norm_type='Hdiv')
+uhcurlerr = norm(u - usoln, norm_type='Hcurl')
 hl2directerr = norm(h - hsolnexpr, norm_type='L2')
+hh1directerr = norm(h - hsolnexpr, norm_type='H1')
 ul2directerr = norm(u - vecsolnexpr, norm_type='L2')
-if formorientation == 'inner' and cell in ['quad', 'tpquad', 'tri']:
-    uhdivdirecterr = norm(u - vecsolnexpr, norm_type='Hcurl')
-else:
-    uhdivdirecterr = norm(u - vecsolnexpr, norm_type='Hdiv')
-PETSc.Sys.Print(hl2err, ul2err, uhdiverr, hl2directerr, ul2directerr, uhdivdirecterr)
+uhcurldirecterr = norm(u - vecsolnexpr, norm_type='Hcurl')
+PETSc.Sys.Print(hl2err, hh1err, ul2err, uhcurlerr, hl2directerr, hh1directerr, ul2directerr, uhcurldirecterr)
 
 # output
 checkpoint = DumbCheckpoint(simname, mode=FILE_CREATE)
@@ -168,30 +134,32 @@ checkpoint.store(hsoln)
 checkpoint.store(usoln)
 checkpoint.store(mesh.coordinates, name='coords')
 
-hdiff = Function(l2, name='hdiff')
+hdiff = Function(h1, name='hdiff')
 hdiffproj = Projector(h-hsoln, hdiff)
 hdiffproj.project()
 checkpoint.store(hdiff)
-udiff = Function(hdiv, name='udiff')
+udiff = Function(hcurl, name='udiff')
 udiffproj = Projector(u-usoln, udiff)
 udiffproj.project()
 checkpoint.store(udiff)
 
-hdirectdiff = Function(l2, name='hdirectdiff')
+hdirectdiff = Function(h1, name='hdirectdiff')
 hdirectdiffproj = Projector(h-hsolnexpr, hdirectdiff)
 hdirectdiffproj.project()
 checkpoint.store(hdirectdiff)
-udirectdiff = Function(hdiv, name='udirectdiff')
+udirectdiff = Function(hcurl, name='udirectdiff')
 udirectdiffproj = Projector(u-vecsolnexpr, udirectdiff)
 udirectdiffproj.project()
 checkpoint.store(udirectdiff)
 
 checkpoint.write_attribute('fields/', 'hl2err', hl2err)
+checkpoint.write_attribute('fields/', 'hh1err', hh1err)
 checkpoint.write_attribute('fields/', 'ul2err', ul2err)
-checkpoint.write_attribute('fields/', 'uhdiverr', uhdiverr)
+checkpoint.write_attribute('fields/', 'uhcurlerr', uhcurlerr)
 checkpoint.write_attribute('fields/', 'hl2directerr', hl2directerr)
+checkpoint.write_attribute('fields/', 'hh1directerr', hh1directerr)
 checkpoint.write_attribute('fields/', 'ul2directerr', ul2directerr)
-checkpoint.write_attribute('fields/', 'uhdivdirecterr', uhdivdirecterr)
+checkpoint.write_attribute('fields/', 'uhcurldirecterr', uhcurldirecterr)
 
 if plot:
     from interop import plot_function, get_plotting_spaces, evaluate_and_store_field
@@ -199,8 +167,8 @@ if plot:
     # This is needed due to faulty handling of SplitFunctions within Themis KernelExpressionBuilder
     # Need to refactor split(f), f.split(), W.sub(), split(W), etc.
     hsplit, usplit = x.split()
-    honly = Function(l2, name='h')
-    uonly = Function(hdiv, name='u')
+    honly = Function(h1, name='h')
+    uonly = Function(hcurl, name='u')
     honly.assign(hsplit)
     uonly.assign(usplit)
 
