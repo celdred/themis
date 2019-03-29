@@ -1,9 +1,9 @@
 
 
-from interop import PETSc, errornorm, dx, DumbCheckpoint, sin, inner, grad, FILE_CREATE, Dx, norm
+from interop import PETSc, dx, DumbCheckpoint, sin, inner, FILE_CREATE, norm
 from interop import FunctionSpace, SpatialCoordinate, Function, Projector, NonlinearVariationalProblem, NonlinearVariationalSolver
 from interop import TestFunction, pi, TestFunctions
-from interop import split, div, cos, as_vector, MixedFunctionSpace, curl, grad, perp
+from interop import split, div, cos, as_vector, MixedFunctionSpace, grad, perp
 from utilities import create_box_mesh, create_complex, adjust_coordinates
 
 OptDB = PETSc.Options()
@@ -106,7 +106,7 @@ usolnproj.project()
 # Create forms and problem
 if cell in ['quad', 'tri', 'tpquad']:
     curl = lambda w: perp(grad(w))  # as_vector( (-Dx(w,1), Dx(w,0)) )
-Rlhs = (inner(hhat,h) - inner(curl(hhat), u) + inner(uhat, curl(h)) + inner(div(uhat), div(u))) * dx
+Rlhs = (inner(hhat, h) - inner(curl(hhat), u) + inner(uhat, curl(h)) + inner(div(uhat), div(u))) * dx
 Rrhs = inner(uhat, vecrhsexpr) * dx
 
 # create solvers

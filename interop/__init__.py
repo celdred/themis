@@ -4,7 +4,7 @@ backend = 'themis'
 if backend == 'firedrake':
     from firedrake import *
     import matplotlib.pyplot as plt
-    from firedrake.petsc import PETSc
+    from firedrake.petsc import PETSc  # noqa: F401
 
     def plot_function(func, coords, name):
         plt.close('all')

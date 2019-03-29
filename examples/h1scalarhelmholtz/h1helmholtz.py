@@ -19,7 +19,7 @@ nz = OptDB.getInt('nz', 16)
 cell = OptDB.getString('cell', 'quad')
 plot = OptDB.getBool('plot', True)  # periodic nonperiodic
 mgd_lowest = OptDB.getBool('mgd_lowest', False)
-solntype = OptDB.getString('solntype', 'sin') # sin exp sinh
+solntype = OptDB.getString('solntype', 'sin')  # sin exp sinh
 c = OptDB.getScalar('c', 0.0)
 formorientation = OptDB.getString('formorientation', 'outer')  # outer inner
 

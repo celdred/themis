@@ -125,7 +125,7 @@ usolnproj.project()
 
 # Create forms and problem
 if formorientation == 'inner' and cell in ['quad', 'tpquad', 'tri']:
-    rot = lambda u: -Dx(u[0],1) + Dx(u[1],0)
+    rot = lambda u: -Dx(u[0], 1) + Dx(u[1], 0)
     Rlhs = (hhat * h + hhat * rot(u) + inner(uhat, u) - rot(uhat) * h) * dx
 else:
     Rlhs = (hhat * h + hhat * div(u) + inner(uhat, u) - div(uhat) * h) * dx

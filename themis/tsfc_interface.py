@@ -30,7 +30,7 @@ def compile_form(form):
         from themis import PETSc
         PETSc.Sys.Print('compiling form')
         tsfc_kernels = tsfc.compile_form(f, interface=kernel_interface.KernelBuilder)
-        
+
         kernels = []
         for kernel in tsfc_kernels:
             tkernel = ThemisKernel(kernel)

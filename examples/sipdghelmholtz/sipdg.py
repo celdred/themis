@@ -85,7 +85,7 @@ CV = CellVolume(mesh)
 # Because it is not distinguishing between + and - cells for cell-wise geometric quantities in interior facet integrals
 ddx = 1. / nx
 ddx_avg = 1. / nx
-if variant == 'mgd': # SHOULD BE MORE CLEVER HERE- SCALE BY ORDER FOR SURE!
+if variant == 'mgd':  # SHOULD BE MORE CLEVER HERE- SCALE BY ORDER FOR SURE!
     alpha = Constant(4.0)
     gamma = Constant(8.0)
 else:
